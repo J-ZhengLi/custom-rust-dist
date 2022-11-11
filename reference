@@ -1,0 +1,7 @@
+# Create patch for a project:
+- cd into it
+- `diff -u ORIGINAL MODIFIED > PATCH`
+
+# Patch for a project:
+- cd into it
+- `patch -p0 < PATCH`

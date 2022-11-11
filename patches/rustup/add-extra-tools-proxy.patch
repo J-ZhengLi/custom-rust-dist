@@ -1,0 +1,17 @@
+--- src/lib.rs.orig
++++ src/lib.rs
+@@ -30,6 +30,14 @@
+     "cargo-clippy",
+     "clippy-driver",
+     "cargo-miri",
++    // extra tools
++    "grcov",
++    "rust-code-analysis-cli",
++    "rust-code-analysis-web",
++    "cargo-audit",
++    "cargo-fuzz",
++    "cargo-flamegraph",
++    "flamegraph",
+ ];
+ 
+ // Tools which are commonly installed by Cargo as well as rustup. We take a bit
