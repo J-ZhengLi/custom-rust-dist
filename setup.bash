@@ -51,13 +51,8 @@ err() {
 ensure_manifest() {
     _manifest_url="$OFFICIAL_RUST_DIST_SERVER/dist/channel-rust-$TOOLCHAIN.toml"
     MANIFEST_PATH="$CACHE/channel-rust-$TOOLCHAIN.toml"
-    if [ "$1" == "force" ]; then
-        # force download
-        wget -O $MANIFEST_PATH $_manifest_url
-        [[ ! "$?" == 0 ]] && MANIFEST_PATH=""
-    elif [ ! -f $MANIFEST_PATH ]; then
-        # download when local file does not exist
-        wget -O $MANIFEST_PATH $_manifest_url
+    if [[ "$1" == "force" || ! -f $MANIFEST_PATH ]]; then
+        wget -q -O $MANIFEST_PATH $_manifest_url
     fi
 }
 
@@ -89,24 +84,28 @@ clone_and_build() {
 #   - name: actual name of the tool
 #   - dirname: git repo name
 patch_and_build() {
+    cd "$CACHE/$_dir_name"
+    [[ ! "$?" == "0" ]] && err "no source code found for '$1'"
+
     # patch
     if [ -d "$PATCHES/$1" ]; then
         _dir_name=${2:-$1}
-        cd "$CACHE/$_dir_name"
         for pf in "$(ls $PATCHES/$1)"; do
             echo "patch -p0 < $PATCHES/$1/$pf"
         done
-        cd -
     fi
 
     # build
     if [ -f "$SCRIPTS/build/$1.bash" ]; then
         echo "bash $SCRIPTS/build/$1.bash"
     else
+        cd -
         err "ERROR: no build script for $1 found, exiting..."
     fi
 
     # pack as tarball
+
+    cd -
 }
 
 test() {
