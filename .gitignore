@@ -1,2 +1,4 @@
 # cached files
-cache/*[^gitkeep]
+cache/
+# dist output
+output/

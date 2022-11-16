@@ -12,14 +12,16 @@
 
 TOOLCHAIN="stable"
 OFFICIAL_RUST_DIST_SERVER="https://static.rust-lang.org"
-DEFAULT_TARGET="x86_64-pc-windows-msvc"
 
 curdir="$(pwd)"
-CACHE="$curdir/cache"
-PATCHES="$curdir/patches"
-SCRIPTS="$curdir/scripts"
+export CACHE_DIR="$curdir/cache"
+export OUTPUT_DIR="$curdir/output"
+export PATCHES_DIR="$curdir/patches"
+export SCRIPTS_DIR="$curdir/scripts"
+# ensure these directories exist
+mkdir -p $CACHE_DIR
+mkdir -p $OUTPUT_DIR
 
-IFS=';'
 # Git urls with args for cloning the tools
 EXTRA_TOOLS_ARGS=(
     # grcov
@@ -50,7 +52,7 @@ err() {
 
 ensure_manifest() {
     _manifest_url="$OFFICIAL_RUST_DIST_SERVER/dist/channel-rust-$TOOLCHAIN.toml"
-    MANIFEST_PATH="$CACHE/channel-rust-$TOOLCHAIN.toml"
+    MANIFEST_PATH="$CACHE_DIR/channel-rust-$TOOLCHAIN.toml"
     if [[ "$1" == "force" || ! -f $MANIFEST_PATH ]]; then
         wget -q -O $MANIFEST_PATH $_manifest_url
     fi
@@ -58,60 +60,88 @@ ensure_manifest() {
 
 clone_and_build() {
     # build rustup first
-    echo "git clone $RUSTUP_GIT --depth 1 $CACHE/rustup"
+    _cmd="git clone $RUSTUP_GIT --depth 1 $CACHE_DIR/rustup"
+    eval "$_cmd"
+    # fetch version
+    get_rustup_version_from_source "$CACHE_DIR/rustup"
+    [[ -z $RUSTUP_VERSION || "$RUSTUP_VERSION" == "" ]] && err "unable to get rustup version"
     # apply patch then build with specified script
-    patch_and_build "rustup"
+    pack_for_tool "rustup" $RUSTUP_VERSION "rustup"
 
     for tool in "${EXTRA_TOOLS_ARGS[@]}"; do
+        IFS=';'
         read -ra tool_info <<< "$tool"
         tool_name=${tool_info[0]}
         tool_ver=${tool_info[1]}
         tool_git=${tool_info[2]}
+        _dir_name=${tool_info[3]:=$tool_name}
 
         # clone source into specific directory under cache
-        _dir_name=${tool_info[3]:=$tool_name}
-        echo "git clone $tool_git --depth 1 $CACHE/$_dir_name"
+        _cmd="git clone $tool_git --depth 1 $CACHE_DIR/$_dir_name"
+        eval "$_cmd"
+
         tools_cloned+=("$tool_name;$tool_ver")
-        echo "${tools_cloned[@]}"
 
         # apply patch if has
-        patch_and_build "$tool_name" $_dir_name
+        pack_for_tool $tool_name $tool_ver $_dir_name
         
     done
 }
 
+# Apply patch, build, and finally generagte a package tarball.
+# 
 # args:
 #   - name: actual name of the tool
+#   - version: version of the tool
 #   - dirname: git repo name
-patch_and_build() {
-    cd "$CACHE/$_dir_name"
+pack_for_tool() {
+    _dir_name=${3:-$1}
+    cd "$CACHE_DIR/$_dir_name"
     [[ ! "$?" == "0" ]] && err "no source code found for '$1'"
 
     # patch
-    if [ -d "$PATCHES/$1" ]; then
-        _dir_name=${2:-$1}
-        for pf in "$(ls $PATCHES/$1)"; do
-            echo "patch -p0 < $PATCHES/$1/$pf"
+    if [ -d "$PATCHES_DIR/$1" ]; then
+        for pf in "$(ls $PATCHES_DIR/$1)"; do
+            patch -p0 -N < $PATCHES_DIR/$1/$pf
         done
     fi
 
     # build
-    if [ -f "$SCRIPTS/build/$1.bash" ]; then
-        echo "bash $SCRIPTS/build/$1.bash"
+    if [ -f "$SCRIPTS_DIR/build/$1.bash" ]; then
+        bash $SCRIPTS_DIR/build/$1.bash
     else
-        cd -
-        err "ERROR: no build script for $1 found, exiting..."
+        cd $curdir
+        err "no build script for $1 found, exiting..."
     fi
 
     # pack as tarball
+    if [ -f "$SCRIPTS_DIR/package/$1.bash" ]; then
+        _pkg_dir="$CACHE_DIR/$1-$TARGET"
+        mkdir -p $_pkg_dir
+        bash $SCRIPTS_DIR/package/$1.bash $1 $2 $_pkg_dir
+    fi
+    cd $curdir
+}
 
-    cd -
+get_rust_target() {
+    _host=$(rustc -vV | grep 'host')
+    [[ ! "$?" == "0" || -z $_host ]] && err "unable to get rust target, please check rustc installation"
+    IFS=' '
+    _outputs=($_host)
+    export TARGET=${_outputs[1]}
+}
+
+# args:
+#   source_code_dir - Path to rustup source code
+get_rustup_version_from_source() {
+    [[ ! -f "$1/Cargo.toml" ]] && err "directory '$1' does not contains Cargo.toml"
+
+    RUSTUP_VERSION=$(grep -m 1 'version' $1/Cargo.toml | grep -o '".*"' | sed 's/"//g')
 }
 
 test() {
+    get_rust_target
     ensure_manifest
-    echo $MANIFEST_PATH
-
     clone_and_build
 }
 
