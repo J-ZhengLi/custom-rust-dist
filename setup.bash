@@ -57,7 +57,7 @@ ensure_manifest() {
     _manifest_url="$OFFICIAL_RUST_DIST_SERVER/dist/channel-rust-$TOOLCHAIN.toml"
     MANIFEST_PATH="$CACHE_DIR/channel-rust-$TOOLCHAIN.toml"
     if [[ "$1" == "force" || ! -f $MANIFEST_PATH ]]; then
-        (cd $CACHE_DIR && curl -O $_manifest_url)
+        (cd $CACHE_DIR && curl -k -O $_manifest_url)
     fi
 }
 
