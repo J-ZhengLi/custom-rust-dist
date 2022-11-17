@@ -3,11 +3,11 @@ This repository will be used to create a custom rust toolchain including third p
 
 # Prerequisite
 
-1. Windows
+1. (On Windows) git-bash
 
-2. docker
+2. curl
 
-3. rustup (with msvc build tools)
+3. rustup
 
 ## Getting Start
 

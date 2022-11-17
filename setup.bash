@@ -13,6 +13,9 @@
 TOOLCHAIN="stable"
 OFFICIAL_RUST_DIST_SERVER="https://static.rust-lang.org"
 
+# This variable prefer environment variable set by user
+dist_server=${DIST_SERVER:-$OFFICIAL_RUST_DIST_SERVER}
+
 curdir="$(pwd)"
 export CACHE_DIR="$curdir/cache"
 export OUTPUT_DIR="$curdir/output"
@@ -34,7 +37,7 @@ EXTRA_TOOLS_ARGS=(
     'cargo-fuzz;0.11.1;https://github.com/rust-fuzz/cargo-fuzz.git -b 0.11.1'
     # flamegraph-rs
     'flamegraph;0.6.2;https://github.com/flamegraph-rs/flamegraph.git'
-    # crate type extensions are not applicable here
+    # crate type extensions are not available yet
     # criterion.rs
     # mockall
     # libfuzzer-sys
@@ -42,19 +45,19 @@ EXTRA_TOOLS_ARGS=(
 # Rustup will be automatically patched and build during the proccess
 RUSTUP_GIT='https://github.com/rust-lang/rustup.git -b stable'
 
-tools_cloned=()
-
 err() {
     _code=${2:-"1"}
     echo "ERROR: $1"
     exit $_code
 }
 
+# args:
+#   force - force download option, will ignore existing manifest
 ensure_manifest() {
     _manifest_url="$OFFICIAL_RUST_DIST_SERVER/dist/channel-rust-$TOOLCHAIN.toml"
     MANIFEST_PATH="$CACHE_DIR/channel-rust-$TOOLCHAIN.toml"
     if [[ "$1" == "force" || ! -f $MANIFEST_PATH ]]; then
-        wget -q -O $MANIFEST_PATH $_manifest_url
+        (cd $CACHE_DIR && curl -O $_manifest_url)
     fi
 }
 
@@ -68,8 +71,8 @@ clone_and_build() {
     # apply patch then build with specified script
     pack_for_tool "rustup" $RUSTUP_VERSION "rustup"
 
+    IFS=';'
     for tool in "${EXTRA_TOOLS_ARGS[@]}"; do
-        IFS=';'
         read -ra tool_info <<< "$tool"
         tool_name=${tool_info[0]}
         tool_ver=${tool_info[1]}
@@ -80,11 +83,8 @@ clone_and_build() {
         _cmd="git clone $tool_git --depth 1 $CACHE_DIR/$_dir_name"
         eval "$_cmd"
 
-        tools_cloned+=("$tool_name;$tool_ver")
-
-        # apply patch if has
+        # patch, build, and pack
         pack_for_tool $tool_name $tool_ver $_dir_name
-        
     done
 }
 
@@ -116,11 +116,95 @@ pack_for_tool() {
 
     # pack as tarball
     if [ -f "$SCRIPTS_DIR/package/$1.bash" ]; then
-        _pkg_dir="$CACHE_DIR/$1-$TARGET"
+        _pkg_dir="$CACHE_DIR/$1-$2-$TARGET"
         mkdir -p $_pkg_dir
         bash $SCRIPTS_DIR/package/$1.bash $1 $2 $_pkg_dir
+        [[ ! "$?" == "0" ]] && err "failed to execute packaging script for $1"
     fi
     cd $curdir
+}
+
+# Generate an updated toolchain manifest after packaging
+update_manifest() {
+    # make a copy of the original toolchain manifest
+    _manifest_cp="$CACHE_DIR/.$(basename $MANIFEST_PATH)"
+    cp $MANIFEST_PATH $_manifest_cp
+
+    declare -A pkgs_map
+
+    # read output directory to search for all xz tarballs
+    for file in "$OUTPUT_DIR"/*.tar.xz; do
+        _basename=$(basename $file .tar.xz)
+
+        # this _version var mainly serve as seperator between pkg name and target
+        _version=$(echo "$_basename" | grep -Eo '([0-9].[0-9]+.[0-9]+)')
+        _name=${_basename%-$_version*}
+        _target=${_basename#*$_version-}
+
+        # FIXME: this method won't detects multiple package versions, which would be an error
+        IFS=' '
+        _key="$_name;$_version"
+        if [ -z ${pkgs_map[$_key]} ]; then
+            pkgs_map[$_key]="$_target"
+        else
+            pkgs_map[$_key]="${pkgs_map[$_key]};$_target"
+        fi
+    done
+
+    profile_tools=''
+    rust_ext=''
+    pkg=''
+
+    for key in ${!pkgs_map[@]}; do
+        #echo "key: $key, val: ${pkgs_map[$key]}"
+
+        IFS=';'
+        read -ra name_and_ver <<< "$key"
+        read -ra targets <<< "${pkgs_map[$key]}"
+
+        _name=${name_and_ver[0]}
+        _ver=${name_and_ver[1]}
+
+        profile_tools+="\"$_name\", "
+
+        pkg+="
+[pkg.$_name]
+version = \"$_ver\"
+"
+
+
+        for target in ${targets[@]}; do
+            xz_path="$OUTPUT_DIR/$_name-$_ver-$target.tar.xz"
+            _xz_hash_cont=$(cat $xz_path.sha256)
+            xz_hash="${_xz_hash_cont%% *}"
+            pkg+="
+[pkg.$_name.target.$target]
+available = true
+xz_url = \"$dist_server/dist/toolset/$(basename $xz_path)\"
+xz_hash = \"$xz_hash\"
+"
+
+            rust_ext+="
+[[pkg.rust.target.$target.extensions]]
+pkg = \"$_name\"
+target = \"$target\"
+"
+        done
+    done
+
+    # Modify _manifest_cp
+    # insert extra tools to profiles first
+    sed -i 's/^complete = \[/&\'$profile_tools'/' $_manifest_cp
+    sed -i 's/^default = \[/&\'$profile_tools'/' $_manifest_cp
+
+    # append extra tools section
+    echo '# =========================== Extra Tools ===========================' >> $_manifest_cp
+    echo "$pkg" >> $_manifest_cp
+    echo "$rust_ext" >> $_manifest_cp
+    echo '# ======================= End of Extra Tools ========================' >> $_manifest_cp
+
+    # move the modified copy to output
+    mv $_manifest_cp $OUTPUT_DIR/channel-rust-$TOOLCHAIN.toml
 }
 
 get_rust_target() {
@@ -139,10 +223,7 @@ get_rustup_version_from_source() {
     RUSTUP_VERSION=$(grep -m 1 'version' $1/Cargo.toml | grep -o '".*"' | sed 's/"//g')
 }
 
-test() {
-    get_rust_target
-    ensure_manifest
-    clone_and_build
-}
-
-test
+get_rust_target
+ensure_manifest
+clone_and_build
+update_manifest
