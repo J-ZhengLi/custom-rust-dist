@@ -10,8 +10,11 @@
 #   c. add extra tools in profiles
 # 5. Move modified toolchain manifest, and modified rustup-init binary into output
 
+# Used to download toolchain manifest
+OFFICE_DIST_SERVER="https://static.rust-lang.org"
+
 # These variables prefer environment variables that are set by the user
-dist_server=${DIST_SERVER:-"https://static.rust-lang.org"}
+dist_server=${DIST_SERVER:-$OFFICE_DIST_SERVER}
 toolchain=${TOOLCHAIN:-"stable"}
 
 curdir="$(pwd)"
@@ -34,7 +37,7 @@ EXTRA_TOOLS_ARGS=(
     # rust-fuzz (cargo-fuzz)
     'cargo-fuzz;0.11.1;https://github.com/rust-fuzz/cargo-fuzz.git -b 0.11.1'
     # flamegraph-rs
-    'flamegraph;0.6.2;https://github.com/flamegraph-rs/flamegraph.git'
+    'flamegraph;;https://github.com/flamegraph-rs/flamegraph.git'
     # crate type extensions are not available yet
     # criterion.rs
     # mockall
@@ -52,7 +55,7 @@ err() {
 # args:
 #   force - force download option, will ignore existing manifest
 ensure_manifest() {
-    _manifest_url="$OFFICIAL_RUST_DIST_SERVER/dist/channel-rust-$toolchain.toml"
+    _manifest_url="$OFFICE_DIST_SERVER/dist/channel-rust-$toolchain.toml"
     MANIFEST_PATH="$CACHE_DIR/channel-rust-$toolchain.toml"
     if [[ "$1" == "force" || ! -f $MANIFEST_PATH ]]; then
         (cd $CACHE_DIR && curl -k -O $_manifest_url)
@@ -64,10 +67,9 @@ clone_and_build() {
     _cmd="git clone $RUSTUP_GIT --depth 1 $CACHE_DIR/rustup"
     eval "$_cmd"
     # fetch version
-    get_rustup_version_from_source "$CACHE_DIR/rustup"
-    [[ -z $RUSTUP_VERSION || "$RUSTUP_VERSION" == "" ]] && err "unable to get rustup version"
+    get_version_from_source "$CACHE_DIR/rustup"
     # apply patch then build with specified script
-    pack_for_tool "rustup" $RUSTUP_VERSION "rustup"
+    pack_for_tool "rustup" $version "rustup"
 
     IFS=';'
     for tool in "${EXTRA_TOOLS_ARGS[@]}"; do
@@ -81,6 +83,11 @@ clone_and_build() {
         _cmd="git clone $tool_git --depth 1 $CACHE_DIR/$_dir_name"
         eval "$_cmd"
 
+        # some tool does may not having a certain version, thus it will should be determained after cloning
+        if [[ -z "$tool_ver" ]]; then
+            get_version_from_source "$CACHE_DIR/$_dir_name"
+            tool_ver=$version
+        fi
         # patch, build, and pack
         pack_for_tool $tool_name $tool_ver $_dir_name
     done
@@ -215,10 +222,12 @@ get_rust_target() {
 
 # args:
 #   source_code_dir - Path to rustup source code
-get_rustup_version_from_source() {
+get_version_from_source() {
     [[ ! -f "$1/Cargo.toml" ]] && err "directory '$1' does not contains Cargo.toml"
 
-    RUSTUP_VERSION=$(grep -m 1 'version' $1/Cargo.toml | grep -o '".*"' | sed 's/"//g')
+    version=$(grep -m 1 'version' $1/Cargo.toml | grep -o '".*"' | sed 's/"//g')
+
+    [[ -z $version || "$version" == "" ]] && err "failed to extract version from source directory '$1'"
 }
 
 get_rust_target
