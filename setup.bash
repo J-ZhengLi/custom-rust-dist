@@ -10,12 +10,9 @@
 #   c. add extra tools in profiles
 # 5. Move modified toolchain manifest, and modified rustup-init binary into output
 
-DEFAULT_TOOLCHAIN="stable"
-OFFICIAL_RUST_DIST_SERVER="https://static.rust-lang.org"
-
-# This variable prefer environment variable set by user
-dist_server=${DIST_SERVER:-$OFFICIAL_RUST_DIST_SERVER}
-toolchain=${DEFAULT_TOOLCHAIN:-$TOOLCHAIN}
+# These variables prefer environment variables that are set by the user
+dist_server=${DIST_SERVER:-"https://static.rust-lang.org"}
+toolchain=${TOOLCHAIN:-"stable"}
 
 curdir="$(pwd)"
 export CACHE_DIR="$curdir/cache"
