@@ -11,6 +11,20 @@ This repository will be used to create a custom rust toolchain including third p
 
 ## Getting Start
 
-1. Run `setup.bash` with git bash in project directory.
+1. (optional) Set dist environment variables:
 
-2. TBD
+    If wanting to dist for nightly or other toolchains:
+
+    ```bash
+    export TOOLCHAIN='nightly'
+    ```
+
+    Specify dist server for extra tools:
+
+    ```bash
+    export DIST_SERVER='https://example.com'
+    ```
+
+2. Run `setup.bash` with git bash in project directory.
+
+3. TBD

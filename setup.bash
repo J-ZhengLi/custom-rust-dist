@@ -10,11 +10,12 @@
 #   c. add extra tools in profiles
 # 5. Move modified toolchain manifest, and modified rustup-init binary into output
 
-TOOLCHAIN="stable"
+DEFAULT_TOOLCHAIN="stable"
 OFFICIAL_RUST_DIST_SERVER="https://static.rust-lang.org"
 
 # This variable prefer environment variable set by user
 dist_server=${DIST_SERVER:-$OFFICIAL_RUST_DIST_SERVER}
+toolchain=${DEFAULT_TOOLCHAIN:-$TOOLCHAIN}
 
 curdir="$(pwd)"
 export CACHE_DIR="$curdir/cache"
@@ -54,8 +55,8 @@ err() {
 # args:
 #   force - force download option, will ignore existing manifest
 ensure_manifest() {
-    _manifest_url="$OFFICIAL_RUST_DIST_SERVER/dist/channel-rust-$TOOLCHAIN.toml"
-    MANIFEST_PATH="$CACHE_DIR/channel-rust-$TOOLCHAIN.toml"
+    _manifest_url="$OFFICIAL_RUST_DIST_SERVER/dist/channel-rust-$toolchain.toml"
+    MANIFEST_PATH="$CACHE_DIR/channel-rust-$toolchain.toml"
     if [[ "$1" == "force" || ! -f $MANIFEST_PATH ]]; then
         (cd $CACHE_DIR && curl -k -O $_manifest_url)
     fi
@@ -204,7 +205,7 @@ target = \"$target\"
     echo '# ======================= End of Extra Tools ========================' >> $_manifest_cp
 
     # move the modified copy to output
-    mv $_manifest_cp $OUTPUT_DIR/channel-rust-$TOOLCHAIN.toml
+    mv $_manifest_cp $OUTPUT_DIR/channel-rust-$toolchain.toml
 }
 
 get_rust_target() {
