@@ -11,10 +11,10 @@
 # 5. Move modified toolchain manifest, and modified rustup-init binary into output
 
 # Used to download toolchain manifest
-OFFICE_DIST_SERVER="https://static.rust-lang.org"
+OFFICAL_DIST_SERVER="https://static.rust-lang.org"
 
 # These variables prefer environment variables that are set by the user
-dist_server=${DIST_SERVER:-$OFFICE_DIST_SERVER}
+dist_server=${DIST_SERVER:-$OFFICAL_DIST_SERVER}
 toolchain=${TOOLCHAIN:-"stable"}
 
 curdir="$(pwd)"
@@ -55,7 +55,7 @@ err() {
 # args:
 #   force - force download option, will ignore existing manifest
 ensure_manifest() {
-    _manifest_url="$OFFICE_DIST_SERVER/dist/channel-rust-$toolchain.toml"
+    _manifest_url="$OFFICAL_DIST_SERVER/dist/channel-rust-$toolchain.toml"
     MANIFEST_PATH="$CACHE_DIR/channel-rust-$toolchain.toml"
     if [[ "$1" == "force" || ! -f $MANIFEST_PATH ]]; then
         (cd $CACHE_DIR && curl -k -O $_manifest_url)
