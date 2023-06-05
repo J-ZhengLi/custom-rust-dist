@@ -1,0 +1,4 @@
+[submodule "rustup"]
+	path = rustup
+	url = https://github.com/rust-lang/rustup.git
+	branch = stable
