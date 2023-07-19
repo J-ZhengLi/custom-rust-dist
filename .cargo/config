@@ -1,0 +1,2 @@
+[alias]
+rustup_test = "test --manifest-path installer/rustup/Cargo.toml --target-dir target/"
