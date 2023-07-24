@@ -1,15 +1,19 @@
 //! The frontend proportion of this application
 
 mod side_panel;
+mod themes;
 
 use iced::theme::Theme;
-use iced::widget::{container, row, vertical_rule};
+use iced::widget::{container, row};
 use iced::{executor, window, Application, Color, Command, Element, Length, Settings};
-use side_panel::{SidePanel, SidePanelMsg};
+use side_panel::SidePanel;
 
 #[derive(Debug, Clone)]
 pub(crate) enum AppMessage {
-    SidePanel(SidePanelMsg),
+    ThemeChanged(ThemeMode),
+    ShowToolchains,
+    ShowSettings,
+    Exit,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,32 +57,25 @@ impl Application for App {
     }
 
     fn title(&self) -> String {
-        "Rustup GUI".to_string()
+        "GUI for rustup".to_string()
     }
 
     fn update(&mut self, message: Self::Message) -> Command<AppMessage> {
         match message {
-            AppMessage::SidePanel(msg) => {
-                match msg {
-                    SidePanelMsg::ThemeChanged(tm) => {
-                        self.theme = tm.into();
-                    }
-                    SidePanelMsg::Exit => {
-                        return window::close();
-                    }
-                }
-                Command::none()
+            AppMessage::ThemeChanged(tm) => self.theme = tm.into(),
+            AppMessage::Exit => {
+                return window::close();
+            }
+            _ => {
+                println!("{message:?} message recived, but it's not implemented");
             }
         }
+        Command::none()
     }
 
     fn view(&self) -> Element<'_, AppMessage> {
         let side_panel = SidePanel::default();
-
-        let content: Element<_> = row![side_panel.view(100), vertical_rule(10),]
-            .spacing(20)
-            .padding(20)
-            .into();
+        let content: Element<_> = row![side_panel.view(self.theme == Theme::Dark)].into();
 
         container(if self.debug {
             content.explain(Color::BLACK)
@@ -87,8 +84,6 @@ impl Application for App {
         })
         .width(Length::Fill)
         .height(Length::Fill)
-        .center_x()
-        .center_y()
         .into()
     }
 

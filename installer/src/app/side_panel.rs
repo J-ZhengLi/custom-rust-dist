@@ -1,64 +1,98 @@
+use super::themes::PanelTheme;
 use super::{AppMessage, ThemeMode};
-use iced::theme::Button;
-use iced::widget::{button, column, container, image, radio, Container};
-use iced::{Element, Length, Theme};
+use iced::widget::{self, button, column, container, image, text, toggler, Container};
+use iced::{alignment, theme, Alignment, Element, Length, Padding};
 
-#[derive(Debug, Clone)]
-pub(crate) enum SidePanelMsg {
-    ThemeChanged(ThemeMode),
-    Exit,
+#[derive(Debug, Default)]
+pub(crate) struct SidePanel;
+
+#[derive(Debug, Clone, Copy)]
+enum ButtonStyle {
+    Primary,
+    Secondary,
 }
 
-impl From<SidePanelMsg> for AppMessage {
-    fn from(value: SidePanelMsg) -> Self {
-        AppMessage::SidePanel(value)
+impl ButtonStyle {
+    fn to_style(&self) -> theme::Button {
+        match self {
+            Self::Primary => theme::Button::Primary,
+            Self::Secondary => theme::Button::Secondary,
+        }
     }
 }
 
-#[derive(Debug, Default)]
-pub(crate) struct SidePanel {
-    theme: Theme,
+fn panel_button(
+    text: &str,
+    style: ButtonStyle,
+    width: u16,
+    msg: AppMessage,
+) -> widget::button::Button<'_, AppMessage> {
+    button(text)
+        .style(style.to_style())
+        .width(width)
+        .padding(10)
+        .on_press(msg)
 }
 
 impl<'a> SidePanel {
-    pub fn view(&self, width: u16) -> Container<'a, AppMessage> {
+    pub fn view(&self, darkmode: bool) -> Container<'a, AppMessage> {
         let logo =
-            container(image(format!("{}/res/logo.png", env!("CARGO_MANIFEST_DIR"))).width(width))
-                .width(Length::Fill)
-                .center_x();
-        let choose_theme = [ThemeMode::Light, ThemeMode::Dark].iter().fold(
-            column![].spacing(10),
-            |column, theme| {
-                column.push(radio(
-                    format!("{theme:?}"),
-                    *theme,
-                    Some(match self.theme {
-                        Theme::Dark => ThemeMode::Dark,
-                        _ => ThemeMode::Light,
-                    }),
-                    set_theme,
-                ))
-            },
+            image(format!("{}/res/logo.png", env!("CARGO_MANIFEST_DIR"))).width(Length::Fill);
+        let logo_text = text(env!("CARGO_PKG_NAME").to_uppercase())
+            .size(21)
+            .width(Length::Fill)
+            .horizontal_alignment(alignment::Horizontal::Center);
+        let brand: Element<_> = column![logo, logo_text]
+            .spacing(10)
+            .width(Length::Fill)
+            .into();
+
+        let toolchains_btn = panel_button(
+            "Toolchains",
+            ButtonStyle::Primary,
+            100,
+            AppMessage::ShowToolchains,
         );
-        let exit_btn = button("exit")
-            .style(Button::Secondary)
-            .width(100)
-            .padding(10)
-            .on_press(AppMessage::from(SidePanelMsg::Exit));
-        let content: Element<_> = column![logo, choose_theme, exit_btn,]
+        let settings_btn = panel_button(
+            "Settings",
+            ButtonStyle::Primary,
+            100,
+            AppMessage::ShowSettings,
+        );
+        let exit_btn = panel_button("Exit", ButtonStyle::Secondary, 100, AppMessage::Exit);
+        let buttons: Element<_> = column![toolchains_btn, settings_btn, exit_btn]
             .spacing(20)
-            .padding(20)
+            .height(Length::FillPortion(6))
+            .width(Length::Fill)
+            .padding(Padding::from([40, 0]))
+            .align_items(Alignment::Center)
+            .into();
+
+        let darkmode_toggle = toggler(Some("Dark Mode:".to_string()), darkmode, |checked| {
+            let theme_mode: ThemeMode = checked
+                .then_some(ThemeMode::Dark)
+                .unwrap_or(ThemeMode::Light);
+            AppMessage::ThemeChanged(theme_mode)
+        })
+        .text_size(11)
+        .spacing(20)
+        .text_alignment(alignment::Horizontal::Center);
+        let version_info = text(format!("Version: {}", env!("CARGO_PKG_VERSION"))).size(11);
+        let bottom_extra: Element<_> = column![darkmode_toggle, version_info]
+            .spacing(10)
+            .width(Length::Fill)
+            .align_items(Alignment::Center)
+            .into();
+
+        let content: Element<_> = column![brand, buttons, bottom_extra]
+            .spacing(10)
+            .padding(10)
             .into();
 
         container(content)
             .width(Length::Fixed(150.0))
             .height(Length::Fill)
-            .center_x()
-            .center_y()
+            .style(theme::Container::Custom(Box::new(PanelTheme)))
             .into()
     }
-}
-
-fn set_theme(theme: ThemeMode) -> AppMessage {
-    SidePanelMsg::ThemeChanged(theme).into()
 }
