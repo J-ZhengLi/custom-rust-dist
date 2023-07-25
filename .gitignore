@@ -1,2 +1,5 @@
 target/
 .vscode/
+
+# Test artifacts
+installer/tests/home/

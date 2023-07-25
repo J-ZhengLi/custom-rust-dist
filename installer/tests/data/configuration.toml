@@ -1,0 +1,20 @@
+# All settings should NOT be directly synced with env variables (or file content),
+# instead, the program should checks them,
+# and let user choose whether or not to update this file if there are any differences.
+[settings]
+cargo_home = "/home/cargo"
+rustup_home = "/home/rustup"
+rustup_dist_server = ""
+rustup_update_root = ""
+http_proxy = ""
+https_proxy = ""
+no_proxy = ""
+
+# Cargo related settings will be loaded from "cargo_home/config{.toml}"
+[settings.cargo]
+git_fetch_with_cli = true
+check_revoke = false
+default_registry = "mirror"
+
+[settings.cargo.registries.mirror]
+index = "http://mirror.example.com"

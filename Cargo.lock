@@ -1257,6 +1257,7 @@ dependencies = [
  "anyhow",
  "cfg-if",
  "iced",
+ "toml_edit",
 ]
 
 [[package]]

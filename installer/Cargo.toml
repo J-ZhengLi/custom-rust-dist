@@ -4,9 +4,10 @@ version = "0.0.1-alpha.1"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.72"
-cfg-if = "1.0.0"
+anyhow = "1"
+cfg-if = "1"
 iced = { version = "0.9.0", features = ["image"], optional = true }
+toml_edit = "0.19"
 
 [features]
 default = []
