@@ -1255,6 +1255,7 @@ name = "installer"
 version = "0.0.1-alpha.1"
 dependencies = [
  "anyhow",
+ "cfg-if",
  "iced",
 ]
 

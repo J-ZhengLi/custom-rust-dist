@@ -5,7 +5,10 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.72"
-iced = { version = "0.9.0", features = ["image"] }
+cfg-if = "1.0.0"
+iced = { version = "0.9.0", features = ["image"], optional = true }
 
 [features]
+default = []
 debug = []
+iced-gui = ["dep:iced"]

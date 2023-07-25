@@ -1,9 +1,18 @@
 use anyhow::Result;
-use iced::Application;
+use cfg_if::cfg_if;
 
+#[cfg(feature = "iced-gui")]
 mod app;
 
 fn main() -> Result<()> {
-    app::App::run(app::default_settings())?;
+    cfg_if! {
+        if #[cfg(feature = "iced-gui")] {
+            use iced::Application;
+            app::App::run(app::default_settings())?;
+        } else {
+            println!("hello");
+        }
+    }
+
     Ok(())
 }
