@@ -1,12 +1,12 @@
 //! The frontend proportion of this application
-//! 
+//!
 //! The main interface of this application consisting 2 major parts:
 //! - A side panel contains static widgets. [`side_panel`]
 //! - Main frame showing different contents. [`main_frame`]
 
-mod themes;
-mod side_panel;
 mod main_frame;
+mod side_panel;
+mod themes;
 
 use iced::theme::Theme;
 use iced::widget::{container, row};

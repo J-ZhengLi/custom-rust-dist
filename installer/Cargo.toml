@@ -2,14 +2,19 @@
 name = "installer"
 version = "0.0.1-alpha.1"
 edition = "2021"
+rust = "1.70" # Minimum of 1.70 needed because of OnceLock
 
 [dependencies]
 anyhow = "1"
 cfg-if = "1"
+clap = { version = "4", features = ["derive"], optional = true }
 iced = { version = "0.9.0", features = ["image"], optional = true }
-toml_edit = "0.19"
+serde = { version = "1.0.175", features = ["derive"] }
+toml_edit = { version = "0.19", features = ["serde"] }
+home = "0.5.4"
 
 [features]
-default = []
+default = ["cli"]
 debug = []
+cli = ["dep:clap"]
 iced-gui = ["dep:iced"]
