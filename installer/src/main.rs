@@ -1,13 +1,20 @@
+// TODO: warn unused before release
+#![allow(unused)]
+
 use anyhow::Result;
 use cfg_if::cfg_if;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 #[cfg(feature = "iced-gui")]
 mod app;
 #[cfg(feature = "cli")]
 mod cli;
-mod configuration;
-mod utils;
+mod parser;
 mod steps;
+mod utils;
+
+static CONFIG_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 fn main() -> Result<()> {
     cfg_if! {
@@ -20,4 +27,9 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+pub(crate) fn config_path() -> &'static Path {
+    CONFIG_PATH
+        .get_or_init(|| utils::home_dir().join(format!(".{}-config", env!("CARGO_PKG_NAME"))))
 }

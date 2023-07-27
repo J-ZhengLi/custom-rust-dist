@@ -1,6 +1,136 @@
 use anyhow::Result;
+use clap::{ArgAction, Parser, Subcommand, ValueHint};
+
+#[derive(Parser)]
+#[command(version, about, arg_required_else_help = true)]
+struct Cli {
+    /// Enable verbose output
+    #[arg(short, long)]
+    verbose: bool,
+    /// Suppress all messages
+    #[arg(short, long)]
+    quiet: bool,
+    /// Disable interaction and answer 'Y' to all prompts
+    #[arg(short, long = "yes")]
+    yes_to_all: bool,
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Adjust program configurations
+    Config {
+        /// List all configuration
+        #[arg(short, long)]
+        list: bool,
+        /// Set the path to cargo home, where the binaries and crate caches are located
+        #[arg(long, value_name = "PATH", value_hint = ValueHint::DirPath)]
+        cargo_home: Option<String>,
+        /// Set the path to rustup home, where the Rust toolchains are located
+        #[arg(long, value_name = "PATH", value_hint = ValueHint::DirPath)]
+        rustup_home: Option<String>,
+        /// Specify which server to download Rust toolchains from
+        #[arg(long, value_name = "URL", value_hint = ValueHint::Url)]
+        rustup_dist_server: Option<String>,
+        /// Specify which site to download rustup
+        #[arg(long, value_name = "URL", value_hint = ValueHint::Url)]
+        rustup_update_root: Option<String>,
+        /// Specify HTTP proxy
+        #[arg(long, value_name = "URL", value_hint = ValueHint::Url)]
+        http_proxy: Option<String>,
+        /// Specify HTTPS proxy
+        #[arg(long, value_name = "URL", value_hint = ValueHint::Url)]
+        https_proxy: Option<String>,
+        /// Skip proxy for following hostname globs, seperated by commas
+        #[arg(long, value_name = "NAMES")]
+        no_proxy: Option<String>,
+        /// [Cargo] use the `git` executable for git operations
+        #[arg(long, action = ArgAction::SetTrue)]
+        git_fetch_with_cli: Option<bool>,
+        /// [Cargo] check for SSL certificate revocation
+        #[arg(long, action = ArgAction::SetTrue)]
+        check_revoke: Option<bool>,
+        #[command(subcommand)]
+        registry: Option<ConfigSubcommand>,
+        /// Load configuration from a file
+        #[arg(
+            short,
+            long,
+            value_name = "FILE",
+            value_hint = ValueHint::FilePath,
+            conflicts_with_all = [
+                "cargo_home", "rustup_home", "rustup_dist_server", "rustup_update_root",
+                "http_proxy", "https_proxy", "no_proxy", "git_fetch_with_cli", "check_revoke",
+            ]
+        )]
+        input: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ConfigSubcommand {
+    /// [Cargo] Configurations for cargo registries
+    Registry {
+        #[command(subcommand)]
+        opt: Option<RegistryOpt>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum RegistryOpt {
+    /// Set the default registry to download crates from
+    Default {
+        /// Name of an existing registry
+        default: Option<String>,
+    },
+    /// Add a cargo registry
+    Add {
+        /// Url of the cargo registry
+        url: Option<String>,
+        /// Name of the cargo registry, URL hostname will be used if not set
+        #[arg(short, long, value_name = "NAME")]
+        name: Option<String>,
+    },
+    /// Remove a certain registry by its name
+    Rm {
+        /// Name of the carge registry
+        name: Option<String>,
+    },
+}
 
 pub(crate) fn run() -> Result<()> {
-    println!("hello");
+    // let config = steps::load_config()?;
+    // println!("config: {:?}", config);
+    let cli = Cli::parse();
+
+    let verbose = cli.verbose;
+    let quiet = cli.quiet;
+    let yes_to_all = cli.yes_to_all;
+
+    match &cli.command {
+        Some(subcommand) => {
+            println!(
+                "verbose: {verbose}\n\
+                quiet: {quiet}\n\
+                yes: {yes_to_all}\n\
+                {:#?}",
+                subcommand
+            );
+        }
+        None => {}
+    }
+
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Cli;
+
+    #[test]
+    fn cli() {
+        use clap::CommandFactory;
+        Cli::command().debug_assert()
+    }
 }

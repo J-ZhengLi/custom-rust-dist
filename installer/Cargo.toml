@@ -2,6 +2,7 @@
 name = "installer"
 version = "0.0.1-alpha.1"
 edition = "2021"
+description = "Manage rust and cargo installation with ease"
 rust = "1.70" # Minimum of 1.70 needed because of OnceLock
 
 [dependencies]
