@@ -1,5 +1,9 @@
 use anyhow::Result;
 use clap::{ArgAction, Parser, Subcommand, ValueHint};
+use url::Url;
+
+mod config;
+mod common;
 
 #[derive(Parser)]
 #[command(version, about, arg_required_else_help = true)]
@@ -10,15 +14,15 @@ struct Cli {
     /// Suppress all messages
     #[arg(short, long)]
     quiet: bool,
-    /// Disable interaction and answer 'Y' to all prompts
+    /// Disable interaction and answer 'yes' to all prompts
     #[arg(short, long = "yes")]
     yes_to_all: bool,
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Option<Subcommands>,
 }
 
 #[derive(Subcommand, Debug)]
-enum Commands {
+pub(crate) enum Subcommands {
     /// Adjust program configurations
     Config {
         /// List all configuration
@@ -32,16 +36,13 @@ enum Commands {
         rustup_home: Option<String>,
         /// Specify which server to download Rust toolchains from
         #[arg(long, value_name = "URL", value_hint = ValueHint::Url)]
-        rustup_dist_server: Option<String>,
+        rustup_dist_server: Option<Url>,
         /// Specify which site to download rustup
         #[arg(long, value_name = "URL", value_hint = ValueHint::Url)]
-        rustup_update_root: Option<String>,
-        /// Specify HTTP proxy
+        rustup_update_root: Option<Url>,
+        /// Set internet proxy
         #[arg(long, value_name = "URL", value_hint = ValueHint::Url)]
-        http_proxy: Option<String>,
-        /// Specify HTTPS proxy
-        #[arg(long, value_name = "URL", value_hint = ValueHint::Url)]
-        https_proxy: Option<String>,
+        proxy: Option<String>,
         /// Skip proxy for following hostname globs, seperated by commas
         #[arg(long, value_name = "NAMES")]
         no_proxy: Option<String>,
@@ -61,15 +62,17 @@ enum Commands {
             value_hint = ValueHint::FilePath,
             conflicts_with_all = [
                 "cargo_home", "rustup_home", "rustup_dist_server", "rustup_update_root",
-                "http_proxy", "https_proxy", "no_proxy", "git_fetch_with_cli", "check_revoke",
+                "proxy", "no_proxy", "git_fetch_with_cli", "check_revoke",
             ]
         )]
         input: Option<String>,
     },
+    /// Install new components, including tools or toolchains
+    Install,
 }
 
 #[derive(Subcommand, Debug)]
-enum ConfigSubcommand {
+pub(crate) enum ConfigSubcommand {
     /// [Cargo] Configurations for cargo registries
     Registry {
         #[command(subcommand)]
@@ -78,7 +81,7 @@ enum ConfigSubcommand {
 }
 
 #[derive(Subcommand, Debug)]
-enum RegistryOpt {
+pub(crate) enum RegistryOpt {
     /// Set the default registry to download crates from
     Default {
         /// Name of an existing registry
@@ -99,6 +102,13 @@ enum RegistryOpt {
     },
 }
 
+impl Subcommands {
+    pub fn process(&self, verbose: bool) -> Result<()> {
+        config::process(self, verbose)?;
+        Ok(())
+    }
+}
+
 pub(crate) fn run() -> Result<()> {
     // let config = steps::load_config()?;
     // println!("config: {:?}", config);
@@ -109,19 +119,9 @@ pub(crate) fn run() -> Result<()> {
     let yes_to_all = cli.yes_to_all;
 
     match &cli.command {
-        Some(subcommand) => {
-            println!(
-                "verbose: {verbose}\n\
-                quiet: {quiet}\n\
-                yes: {yes_to_all}\n\
-                {:#?}",
-                subcommand
-            );
-        }
-        None => {}
+        Some(subcommand) => subcommand.process(verbose),
+        None => Ok(()),
     }
-
-    Ok(())
 }
 
 #[cfg(test)]

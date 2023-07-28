@@ -1,6 +1,6 @@
 mod configuration;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
 use std::fs::read_to_string;
@@ -40,4 +40,9 @@ pub(crate) trait TomlTable {
         let raw = read_to_string(path)?;
         Self::from_toml(&raw)
     }
+}
+
+/// Convenient function to load [`Configuration`] from a certain path.
+pub(crate) fn load_config(path: &Path) -> Result<Configuration> {
+    Configuration::load(path).context("unable to load configuration file.")
 }

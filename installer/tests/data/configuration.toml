@@ -4,8 +4,8 @@
 [settings]
 cargo_home = "/home/cargo"
 rustup_home = "/home/rustup"
-rustup_dist_server = ""
-rustup_update_root = ""
+rustup_dist_server = "http://example.com/"
+rustup_update_root = "http://example.com/"
 http_proxy = ""
 https_proxy = ""
 no_proxy = ""

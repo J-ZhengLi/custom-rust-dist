@@ -6,6 +6,8 @@ use cfg_if::cfg_if;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+use logger::Logger;
+
 #[cfg(feature = "iced-gui")]
 mod app;
 #[cfg(feature = "cli")]
@@ -14,9 +16,16 @@ mod parser;
 mod steps;
 mod utils;
 
+mod applog {
+    pub use logger::{debug, err, info, trace, warn};
+}
+
 static CONFIG_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 fn main() -> Result<()> {
+    // initialize logger
+    Logger::new().colored().init()?;
+
     cfg_if! {
         if #[cfg(feature = "iced-gui")] {
             use iced::Application;

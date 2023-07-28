@@ -4,6 +4,7 @@
 use super::TomlTable;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use url::Url;
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) struct Configuration {
@@ -17,12 +18,18 @@ impl TomlTable for Configuration {}
 pub(crate) struct Settings {
     pub cargo_home: Option<String>,
     pub rustup_home: Option<String>,
-    pub rustup_dist_server: Option<String>,
-    pub rustup_update_root: Option<String>,
-    pub http_proxy: Option<String>,
-    pub https_proxy: Option<String>,
+    pub rustup_dist_server: Option<Url>,
+    pub rustup_update_root: Option<Url>,
+    pub proxy: Option<String>,
     pub no_proxy: Option<String>,
     pub cargo: Option<CargoSettings>,
+}
+
+impl Settings {
+    /// Return true if self is default settings.
+    pub fn is_default(&self) -> bool {
+        self == &Settings::default()
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -82,7 +89,7 @@ pub(crate) struct Tool {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) struct ToolDetail {
     version: String,
-    installed_from_source: bool,
+    installed_from_source: Option<bool>,
 }
 
 #[cfg(test)]
@@ -97,10 +104,9 @@ mod tests {
         let input = r#"[settings]
 cargo_home = "cargo"
 rustup_home = "rustup"
-rustup_dist_server = "rustup_dist_server"
-rustup_update_root = "rustup_update_root"
-http_proxy = "http_proxy"
-https_proxy = "https_proxy"
+rustup_dist_server = "https://example.com/"
+rustup_update_root = "https://example.com/"
+proxy = "proxy"
 no_proxy = "no_proxy"
 
 [settings.cargo]

@@ -18,10 +18,16 @@
 //!         Try to gather toolchain/tool info by accessing various files,
 //!         and SYNC those info into installation.toml.
 
-use crate::parser::{Configuration, TomlTable};
-use anyhow::{Context, Result};
+use crate::parser::{self, Configuration, Settings};
+use anyhow::Result;
 
 pub(crate) fn load_config() -> Result<Configuration> {
     let config_path = crate::config_path();
-    Configuration::load(config_path).context("unable to load configuration file.")
+    parser::load_config(config_path)
+}
+
+pub(crate) fn update_settings(setts: Settings) -> Result<()> {
+    let mut existing_cfg = load_config()?;
+    existing_cfg.settings = setts;
+    Ok(())
 }
