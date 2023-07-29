@@ -103,8 +103,8 @@ pub(crate) enum RegistryOpt {
 }
 
 impl Subcommands {
-    pub fn process(&self, verbose: bool) -> Result<()> {
-        config::process(self, verbose)?;
+    pub fn process(&self, verbose: bool, yes: bool) -> Result<()> {
+        config::process(self, verbose, yes)?;
         Ok(())
     }
 }
@@ -119,7 +119,7 @@ pub(crate) fn run() -> Result<()> {
     let yes_to_all = cli.yes_to_all;
 
     match &cli.command {
-        Some(subcommand) => subcommand.process(verbose),
+        Some(subcommand) => subcommand.process(verbose, yes_to_all),
         None => Ok(()),
     }
 }

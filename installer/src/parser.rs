@@ -3,7 +3,7 @@ mod configuration;
 use anyhow::{Context, Result};
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
-use std::fs::read_to_string;
+use std::fs::{read_to_string, self};
 use std::path::Path;
 use toml_edit::{de, ser};
 
@@ -45,4 +45,10 @@ pub(crate) trait TomlTable {
 /// Convenient function to load [`Configuration`] from a certain path.
 pub(crate) fn load_config(path: &Path) -> Result<Configuration> {
     Configuration::load(path).context("unable to load configuration file.")
+}
+
+pub(crate) fn write_config(path: &Path, cfg: &Configuration, pretty: bool) -> Result<()> {
+    let toml = cfg.to_toml(pretty)?;
+    fs::write(path, toml)?;
+    Ok(())
 }

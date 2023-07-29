@@ -6,9 +6,8 @@ cargo_home = "/home/cargo"
 rustup_home = "/home/rustup"
 rustup_dist_server = "http://example.com/"
 rustup_update_root = "http://example.com/"
-http_proxy = ""
-https_proxy = ""
-no_proxy = ""
+proxy = "http://username:password@example.com:1234"
+no_proxy = "localhost"
 
 # Cargo related settings will be loaded from "cargo_home/config{.toml}"
 [settings.cargo]

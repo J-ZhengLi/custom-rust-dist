@@ -18,7 +18,7 @@
 //!         Try to gather toolchain/tool info by accessing various files,
 //!         and SYNC those info into installation.toml.
 
-use crate::parser::{self, Configuration, Settings};
+use crate::parser::{self, Configuration};
 use anyhow::Result;
 
 pub(crate) fn load_config() -> Result<Configuration> {
@@ -26,8 +26,7 @@ pub(crate) fn load_config() -> Result<Configuration> {
     parser::load_config(config_path)
 }
 
-pub(crate) fn update_settings(setts: Settings) -> Result<()> {
-    let mut existing_cfg = load_config()?;
-    existing_cfg.settings = setts;
-    Ok(())
+pub(crate) fn update_config(config: &Configuration) -> Result<()> {
+    let config_path = crate::config_path();
+    parser::write_config(config_path, config, true)
 }
