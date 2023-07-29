@@ -91,14 +91,15 @@ fn list_config(settings: &Settings, verbose: bool) {
 }
 
 fn registries_string(settings: &Settings) -> String {
-    settings.cargo.as_ref().map(|c| &c.registries)
+    let content = settings.cargo.as_ref().map(|c| &c.registries)
         .map(|hm| {
             hm.iter()
                 .map(|(k, v)| format!("'{k} - ({})'", &v.index))
                 .collect::<Vec<_>>()
-                .join(",")
+                .join(", ")
         })
-        .unwrap_or_else(|| "default".to_string())
+        .unwrap_or_else(|| "default".to_string());
+    format!("[{content}]")
 }
 
 fn import_config(path_str: &str, existing: &mut Configuration, create_new: bool, yes: bool) -> Result<()> {
@@ -136,27 +137,37 @@ fn show_settings_diff(old: &Settings, new: &Settings) {
     // FIXME: hygine
     macro_rules! diff {
         ($name:literal, $lhs:expr => $rhs:expr) => {{
+            let lhs_str = $lhs;
             let rhs_str = $rhs;
-            let rhs_colored = logger::color::ColoredStr::new()
-                .content(&rhs_str)
-                .color(logger::color::Color::Green)
-                .bright()
-                .build();
-            println!("{}: {} -> {}", $name, $lhs, rhs_colored);
+            let rhs_colored = if lhs_str != rhs_str {
+                logger::color::ColoredStr::new()
+                    .content(&rhs_str)
+                    .color(logger::color::Color::Green)
+                    .bright()
+                    .build()
+            } else {
+                rhs_str
+            };
+            println!("{}: {} -> {}", $name, lhs_str, rhs_colored);
         }};
         ($name:literal, $def:literal, $($opt:tt)*) => {{
+            let old_string = old.$($opt)*.as_ref().map(|t| t.to_string())
+                .unwrap_or_else(|| $def.to_string());
             let new_string = new.$($opt)*.as_ref().map(|t| t.to_string())
                 .unwrap_or_else(|| $def.to_string());
-            let new_colored_string = logger::color::ColoredStr::new()
-                .content(&new_string)
-                .color(logger::color::Color::Green)
-                .bright()
-                .build();
+            let new_colored_string = if old_string != new_string {
+                logger::color::ColoredStr::new()
+                    .content(&new_string)
+                    .color(logger::color::Color::Green)
+                    .bright()
+                    .build()
+            } else {
+                new_string
+            };
             println!(
                 "{}: {} -> {}",
                 $name,
-                old.$($opt)*.as_ref().map(|t| t.to_string())
-                    .unwrap_or_else(|| $def.to_string()),
+                old_string,
                 new_colored_string
             );
         }};
