@@ -2,8 +2,8 @@ use anyhow::Result;
 use clap::{ArgAction, Parser, Subcommand, ValueHint};
 use url::Url;
 
-mod config;
 mod common;
+mod config;
 
 #[derive(Parser)]
 #[command(version, about, arg_required_else_help = true)]
@@ -90,7 +90,7 @@ pub(crate) enum RegistryOpt {
     /// Add a cargo registry
     Add {
         /// Url of the cargo registry
-        url: Option<String>,
+        url: Option<Url>,
         /// Name of the cargo registry, URL hostname will be used if not set
         #[arg(short, long, value_name = "NAME")]
         name: Option<String>,

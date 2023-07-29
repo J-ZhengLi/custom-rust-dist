@@ -32,26 +32,15 @@ impl Settings {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub(crate) struct CargoSettings {
-    pub git_fetch_with_cli: bool,
-    pub check_revoke: bool,
+    pub git_fetch_with_cli: Option<bool>,
+    pub check_revoke: Option<bool>,
     pub default_registry: Option<String>,
     pub registries: HashMap<String, CargoRegistry>,
 }
 
-impl Default for CargoSettings {
-    fn default() -> Self {
-        Self {
-            git_fetch_with_cli: false,
-            check_revoke: true,
-            default_registry: None,
-            registries: HashMap::default(),
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub(crate) struct CargoRegistry {
     pub index: String,
 }

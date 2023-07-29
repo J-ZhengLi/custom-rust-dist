@@ -3,7 +3,7 @@ mod configuration;
 use anyhow::{Context, Result};
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
-use std::fs::{read_to_string, self};
+use std::fs::{self, read_to_string};
 use std::path::Path;
 use toml_edit::{de, ser};
 

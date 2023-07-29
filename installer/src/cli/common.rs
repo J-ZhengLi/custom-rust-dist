@@ -1,5 +1,5 @@
-use std::io::{stdout, Write, Read, stdin, BufRead};
-use anyhow::{Result, anyhow, Context};
+use anyhow::{anyhow, Context, Result};
+use std::io::{stdin, stdout, BufRead, Read, Write};
 
 /// Read line input from standard input.
 // (Migrated from rustup)
