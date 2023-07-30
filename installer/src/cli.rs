@@ -47,10 +47,10 @@ pub(crate) enum Subcommands {
         #[arg(long, value_name = "NAMES")]
         no_proxy: Option<String>,
         /// [Cargo] use the `git` executable for git operations
-        #[arg(long, action = ArgAction::SetTrue)]
+        #[arg(long)]
         git_fetch_with_cli: Option<bool>,
         /// [Cargo] check for SSL certificate revocation
-        #[arg(long, action = ArgAction::SetTrue)]
+        #[arg(long)]
         check_revoke: Option<bool>,
         #[command(subcommand)]
         registry: Option<ConfigSubcommand>,
@@ -66,6 +66,17 @@ pub(crate) enum Subcommands {
             ]
         )]
         input: Option<String>,
+        /// Use default settings
+        #[arg(
+            short,
+            long,
+            action = ArgAction::SetTrue,
+            conflicts_with_all = [
+                "cargo_home", "rustup_home", "rustup_dist_server", "rustup_update_root",
+                "proxy", "no_proxy", "git_fetch_with_cli", "check_revoke", "input",
+            ]
+        )]
+        default: Option<bool>,
     },
     /// Install new components, including tools or toolchains
     Install,

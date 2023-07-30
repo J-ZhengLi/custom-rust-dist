@@ -14,7 +14,7 @@ pub(crate) struct Configuration {
 
 impl TomlTable for Configuration {}
 
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub(crate) struct Settings {
     pub cargo_home: Option<String>,
     pub rustup_home: Option<String>,
@@ -43,6 +43,12 @@ pub(crate) struct CargoSettings {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub(crate) struct CargoRegistry {
     pub index: String,
+}
+
+impl From<String> for CargoRegistry {
+    fn from(value: String) -> Self {
+        Self { index: value }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]

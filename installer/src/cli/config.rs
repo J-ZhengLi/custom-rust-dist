@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use super::{common, Subcommands};
 use crate::applog::*;
 use crate::cli::{ConfigSubcommand, RegistryOpt};
-use crate::parser::{load_config, CargoRegistry, Configuration, Settings};
+use crate::parser::{load_config, CargoRegistry, CargoSettings, Configuration, Settings};
 use crate::steps::{self, update_config};
 
 macro_rules! print_opt {
@@ -23,55 +23,43 @@ macro_rules! print_opt {
     }};
 }
 
+/// Print a nice message when two individual settings are different.
+// TODO: reduce repeatition
 macro_rules! diff {
     ($name:literal, $lhs:expr => $rhs:expr) => {{
         let lhs_str = $lhs;
         let rhs_str = $rhs;
-        let rhs_colored = if lhs_str != rhs_str {
-            logger::color::ColoredStr::new()
+        if lhs_str != rhs_str {
+            let rhs_colored = logger::color::ColoredStr::new()
                 .content(&rhs_str)
                 .color(logger::color::Color::Green)
                 .bright()
-                .build()
-        } else {
-            rhs_str
-        };
-        println!("{}: {} -> {}", $name, lhs_str, rhs_colored);
+                .build();
+            println!("{}: {} -> {}", $name, lhs_str, rhs_colored);
+        }
     }};
     ($name:literal, $def:literal, $old:ident => $new:ident, $($opt:tt)*) => {{
-        let old_string = $old.$($opt)*.as_ref().map(|t| t.to_string())
+        let lhs_str = $old.$($opt)*.as_ref().map(|t| t.to_string())
             .unwrap_or_else(|| $def.to_string());
-        let new_string = $new.$($opt)*.as_ref().map(|t| t.to_string())
+        let rhs_str = $new.$($opt)*.as_ref().map(|t| t.to_string())
             .unwrap_or_else(|| $def.to_string());
-        let new_colored_string = if old_string != new_string {
-            logger::color::ColoredStr::new()
-                .content(&new_string)
+        if lhs_str != rhs_str {
+            let rhs_colored = logger::color::ColoredStr::new()
+                .content(&rhs_str)
                 .color(logger::color::Color::Green)
                 .bright()
-                .build()
-        } else {
-            new_string
-        };
-        println!(
-            "{}: {} -> {}",
-            $name,
-            old_string,
-            new_colored_string
-        );
+                .build();
+            println!("{}: {} -> {}", $name, lhs_str, rhs_colored);
+        }
     }};
 }
 
+/// Simple macro to replace an option value with another,
+/// if only the other option contains some value.
 macro_rules! apply {
     ($from:ident, $to:expr) => {
         if $from.is_some() {
             $to = $from.clone();
-        }
-    };
-    ($from:ident, $to:expr, $inner:ident) => {
-        if $from.is_some() {
-            let mut $inner = $to.unwrap_or_default();
-            $inner.$from = $from.clone();
-            $to = Some($inner);
         }
     };
 }
@@ -89,12 +77,13 @@ pub(super) fn process(subcommand: &Subcommands, verbose: bool, yes: bool) -> Res
         git_fetch_with_cli,
         check_revoke,
         registry,
-        input
+        input,
+        default,
     } = subcommand else { return Ok(()) };
 
     let maybe_config = steps::load_config().ok();
     let create_new = maybe_config.is_none();
-    let mut existing_config = maybe_config.unwrap_or_default();
+    let mut existing_config = &mut maybe_config.unwrap_or_default();
 
     if *list {
         if create_new {
@@ -107,15 +96,28 @@ pub(super) fn process(subcommand: &Subcommands, verbose: bool, yes: bool) -> Res
         import_config(cfg_path_str, &mut existing_config, create_new, yes)?;
         return Ok(());
     }
+    if let Some(true) = default {
+        if !overriding("override with default", create_new, yes)? {
+            return Ok(());
+        }
+        return apply_settings(existing_config, Settings::default());
+    }
 
-    let mut temp_setts = Settings::default();
+    let mut temp_settings = existing_config.settings.clone();
+    let has_no_cargo_setts = temp_settings.cargo.is_none();
+    // FIXME: this is a simple but not optimized solution to bypass lifetime restriction
+    // of the next line.
+    let mut def_cargo_setts = CargoSettings::default();
+    let mut cargo_settings = temp_settings.cargo.as_mut().unwrap_or(&mut def_cargo_setts);
     // because `registry` is a seperated command, it will be checked seperatedly
     if let Some(ConfigSubcommand::Registry { opt: Some(reg_opt) }) = registry.as_ref().map(|cs| cs)
     {
         match reg_opt {
             RegistryOpt::Default {
                 default: Some(default),
-            } => {}
+            } => {
+                cargo_settings.default_registry = Some(default.to_owned());
+            }
             RegistryOpt::Add {
                 url: Some(url),
                 name,
@@ -127,23 +129,31 @@ pub(super) fn process(subcommand: &Subcommands, verbose: bool, yes: bool) -> Res
                             try using `--name` to specify one"
                         )
                     })?;
+                cargo_settings
+                    .registries
+                    .insert(name_fullback.to_string(), url.as_str().to_string().into());
             }
-            RegistryOpt::Rm { name: Some(name) } => {}
-            _ => (),
+            RegistryOpt::Rm { name: Some(name) } => {
+                cargo_settings.registries.remove(name);
+            }
+            _ => return Ok(()),
         }
     } else {
         // apply provided configs one by one
-        apply!(cargo_home, temp_setts.cargo_home);
-        apply!(rustup_home, temp_setts.rustup_home);
-        apply!(rustup_dist_server, temp_setts.rustup_dist_server);
-        apply!(rustup_update_root, temp_setts.rustup_update_root);
-        apply!(proxy, temp_setts.proxy);
-        apply!(no_proxy, temp_setts.no_proxy);
-        apply!(git_fetch_with_cli, temp_setts.cargo, cargo_settings);
-        apply!(check_revoke, temp_setts.cargo, cargo_settings);
+        apply!(cargo_home, temp_settings.cargo_home);
+        apply!(rustup_home, temp_settings.rustup_home);
+        apply!(rustup_dist_server, temp_settings.rustup_dist_server);
+        apply!(rustup_update_root, temp_settings.rustup_update_root);
+        apply!(proxy, temp_settings.proxy);
+        apply!(no_proxy, temp_settings.no_proxy);
+        apply!(git_fetch_with_cli, cargo_settings.git_fetch_with_cli);
+        apply!(check_revoke, cargo_settings.check_revoke);
+    }
+    if has_no_cargo_setts {
+        temp_settings.cargo = Some(cargo_settings.clone());
     }
 
-    Ok(())
+    apply_settings(&mut existing_config, temp_settings)
 }
 
 /// Format program settings ([`Settings`]), and prints them.
@@ -219,30 +229,37 @@ fn import_config(
     }
     let importing_cfg = load_config(cfg_path)?;
 
-    info!("configuration will be updated to:");
-    println!();
-    show_settings_diff(&existing.settings, &importing_cfg.settings);
-
-    if !overriding(create_new, yes)? {
+    if !overriding("overide", create_new, yes)? {
         return Ok(());
     }
     if importing_cfg.installation.is_some() {
         info!("force skipping `[installation]` sections");
     }
 
-    existing.settings = importing_cfg.settings;
-    update_config(existing)?;
-    info!("configuration updated successfully.");
+    apply_settings(existing, importing_cfg.settings)
+}
 
+fn apply_settings(conf: &mut Configuration, setts: Settings) -> Result<()> {
+    // don't do anything if two settings are identical
+    if conf.settings == setts {
+        info!("no change applied to user configuration");
+        return Ok(());
+    }
+    info!("these settings will be updated to:");
+    println!();
+    show_settings_diff(&conf.settings, &setts);
+    conf.settings = setts;
+    update_config(conf)?;
+    info!("configuration updated successfully.");
     Ok(())
 }
 
 /// Ask confirmation whether or not to override existing configuration, e.g.
 /// returning `Ok(true)` means it will be overrided.
-fn overriding(create_new: bool, yes: bool) -> Result<bool> {
+fn overriding(msg: &str, create_new: bool, yes: bool) -> Result<bool> {
     if !create_new {
         warn!("existing configuration detected");
-        if !yes && !common::confirm("override? (y/n)", false)? {
+        if !yes && !common::confirm(&format!("{msg}? (y/n)"), false)? {
             return Ok(false);
         }
     }
