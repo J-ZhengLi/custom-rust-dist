@@ -40,6 +40,12 @@ pub(crate) struct CargoSettings {
     pub registries: HashMap<String, CargoRegistry>,
 }
 
+impl CargoSettings {
+    pub fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub(crate) struct CargoRegistry {
     pub index: String,

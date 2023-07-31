@@ -17,6 +17,9 @@ url = { version = "2.4.0", features = ["serde"] }
 logger = { path = "../logger" }
 log = { version = "0.4", features = ["std"] }
 
+[dev-dependencies]
+tempfile = "3.4"
+
 [features]
 default = ["cli"]
 debug = []

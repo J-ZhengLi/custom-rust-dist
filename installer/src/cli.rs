@@ -21,6 +21,7 @@ struct Cli {
     command: Option<Subcommands>,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Subcommand, Debug)]
 pub(crate) enum Subcommands {
     /// Adjust program configurations

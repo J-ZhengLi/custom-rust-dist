@@ -93,7 +93,7 @@ pub(super) fn process(subcommand: &Subcommands, verbose: bool, yes: bool) -> Res
         return Ok(());
     }
     if let Some(cfg_path_str) = input {
-        import_config(cfg_path_str, &mut existing_config, create_new, yes)?;
+        import_config(cfg_path_str, existing_config, create_new, yes)?;
         return Ok(());
     }
     if let Some(true) = default {
@@ -110,7 +110,7 @@ pub(super) fn process(subcommand: &Subcommands, verbose: bool, yes: bool) -> Res
     let mut def_cargo_setts = CargoSettings::default();
     let mut cargo_settings = temp_settings.cargo.as_mut().unwrap_or(&mut def_cargo_setts);
     // because `registry` is a seperated command, it will be checked seperatedly
-    if let Some(ConfigSubcommand::Registry { opt: Some(reg_opt) }) = registry.as_ref().map(|cs| cs)
+    if let Some(ConfigSubcommand::Registry { opt: Some(reg_opt) }) = registry.as_ref()
     {
         match reg_opt {
             RegistryOpt::Default {
@@ -153,7 +153,7 @@ pub(super) fn process(subcommand: &Subcommands, verbose: bool, yes: bool) -> Res
         temp_settings.cargo = Some(cargo_settings.clone());
     }
 
-    apply_settings(&mut existing_config, temp_settings)
+    apply_settings(existing_config, temp_settings)
 }
 
 /// Format program settings ([`Settings`]), and prints them.
@@ -239,11 +239,15 @@ fn import_config(
     apply_settings(existing, importing_cfg.settings)
 }
 
-fn apply_settings(conf: &mut Configuration, setts: Settings) -> Result<()> {
+fn apply_settings(conf: &mut Configuration, mut setts: Settings) -> Result<()> {
     // don't do anything if two settings are identical
     if conf.settings == setts {
         info!("no change applied to user configuration");
         return Ok(());
+    }
+    if matches!(setts.cargo.as_ref(), Some(cargo_setts) if cargo_setts.is_default()) {
+        // avoids write an empty `[settings.cargo]` section in the result toml
+        setts.cargo = None;
     }
     info!("these settings will be updated to:");
     println!();
