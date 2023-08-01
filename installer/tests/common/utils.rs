@@ -9,12 +9,13 @@ pub fn execute<P: AsRef<OsStr>>(program: P, args: &[&str]) {
     let _ = Command::new(&program)
         .args(args)
         .output()
-        .unwrap_or_else(|e| {
+        .ok()
+        .filter(|o| o.status.success())
+        .unwrap_or_else(|| {
             panic!(
-                "unable to execute '{} {}': {}",
+                "unable to execute '{} {}'",
                 program.as_ref().to_string_lossy().to_string(),
                 args.join(" "),
-                e.to_string(),
             )
         });
 }
@@ -27,4 +28,9 @@ pub fn read_to_string<P: AsRef<Path>>(path: P) -> String {
             e.to_string()
         )
     })
+}
+
+pub fn path_to_str(path: &Path) -> &str {
+    path.to_str()
+        .unwrap_or_else(|| panic!("unable to convert path '{path:?}' to str"))
 }

@@ -110,8 +110,7 @@ pub(super) fn process(subcommand: &Subcommands, verbose: bool, yes: bool) -> Res
     let mut def_cargo_setts = CargoSettings::default();
     let mut cargo_settings = temp_settings.cargo.as_mut().unwrap_or(&mut def_cargo_setts);
     // because `registry` is a seperated command, it will be checked seperatedly
-    if let Some(ConfigSubcommand::Registry { opt: Some(reg_opt) }) = registry.as_ref()
-    {
+    if let Some(ConfigSubcommand::Registry { opt: Some(reg_opt) }) = registry.as_ref() {
         match reg_opt {
             RegistryOpt::Default {
                 default: Some(default),
@@ -134,7 +133,11 @@ pub(super) fn process(subcommand: &Subcommands, verbose: bool, yes: bool) -> Res
                     .insert(name_fullback.to_string(), url.as_str().to_string().into());
             }
             RegistryOpt::Rm { name: Some(name) } => {
-                cargo_settings.registries.remove(name);
+                // user might passing the name with quotes, which somehow does not
+                // took care by `clap`, but we need to remove them, otherwise the hashmap
+                // might not able to find it.
+                let raw_name = name.trim_matches(|c| c == '\'' || c == '"');
+                cargo_settings.registries.remove(raw_name);
             }
             _ => return Ok(()),
         }

@@ -1,3 +1,4 @@
+#[cfg(feature = "cli")]
 mod cli_config;
 
 use crate::common::run;
