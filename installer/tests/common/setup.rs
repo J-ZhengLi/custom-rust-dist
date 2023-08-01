@@ -77,6 +77,14 @@ impl TestConfig {
         let path = self.data_dir.join(filename);
         utils::read_to_string(path)
     }
+
+    pub fn read_config(&self) -> String {
+        let raw = utils::read_to_string(&self.conf_path);
+        // The output of configuration uses single quote instead of double quote
+        // on some machine, which is bad for our tests,
+        // so we need to unify them into double quotes.
+        raw.replace('\'', "\"")
+    }
 }
 
 fn exe_path() -> &'static Path {

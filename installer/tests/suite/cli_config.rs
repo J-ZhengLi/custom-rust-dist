@@ -17,11 +17,10 @@ fn new_config_with_cargo_home_set() {
 
         cfg.execute(&["config", "--cargo-home", cargo_home_str]);
 
-        assert!(cfg.conf_path.is_file());
-        let cfg_content = utils::read_to_string(&cfg.conf_path);
+        let cfg_content = cfg.read_config();
         assert_eq!(
             cfg_content.trim(),
-            &format!("[settings]\ncargo_home = '{cargo_home_str}'")
+            &format!("[settings]\ncargo_home = \"{cargo_home_str}\"")
         );
     })
 }
@@ -34,11 +33,8 @@ fn import_full_config() {
 
         cfg.execute(&["config", "--input", conf_path_str]);
 
-        assert!(cfg.conf_path.is_file());
         // eliminate line ending difference between different OS by removing whitespaces
-        let imported_content: String = utils::read_to_string(&cfg.conf_path)
-            .split_whitespace()
-            .collect();
+        let imported_content: String = cfg.read_config().split_whitespace().collect();
         let expected: String = cfg
             .read_data("all_settings.toml")
             .split_whitespace()
@@ -83,15 +79,14 @@ fn config_with_cli_args() {
         // set 'mirror' as default registry
         cfg.execute(&["config", "registry", "default", "mirror"]);
 
-        assert!(cfg.conf_path.is_file());
-        let cfg_content = utils::read_to_string(&cfg.conf_path);
+        let cfg_content = cfg.read_config();
 
         assert_eq!(
             cfg_content.trim(),
             format!(
                 r#"[settings]
-cargo_home = '{}'
-rustup_home = '{}'
+cargo_home = "{}"
+rustup_home = "{}"
 rustup_dist_server = "http://example.com/"
 rustup_update_root = "http://example.com/rustup/"
 proxy = "https://my:1234@my.proxy.com:1234"
@@ -132,8 +127,7 @@ fn add_and_rm_registry() {
         ]);
         cfg.execute(&["config", "registry", "add", "http://mirror.c.com/"]);
 
-        assert!(cfg.conf_path.is_file());
-        let cfg_content = utils::read_to_string(&cfg.conf_path);
+        let cfg_content = cfg.read_config();
 
         // due to the nature of hashmap, we can't really predict the order of added registries
         // but we can perform a little trick to manually sort the registries.
@@ -168,8 +162,7 @@ fn restore_config_to_default() {
     run(|cfg| {
         cfg.execute(&["config", "--rustup-dist-server", "http://a.com/"]);
 
-        assert!(cfg.conf_path.is_file());
-        let cfg_content = utils::read_to_string(&cfg.conf_path);
+        let cfg_content = cfg.read_config();
         assert_eq!(
             cfg_content.trim(),
             r#"[settings]
