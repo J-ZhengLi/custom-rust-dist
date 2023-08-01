@@ -26,6 +26,7 @@ struct Cli {
 pub(crate) enum Subcommands {
     /// Adjust program configurations
     Config {
+        // TODO: move this list arg as a separated subcommand
         /// List all configuration
         #[arg(short, long)]
         list: bool,
@@ -79,8 +80,11 @@ pub(crate) enum Subcommands {
         )]
         default: Option<bool>,
     },
-    /// Install new components, including tools or toolchains
-    Install,
+    /// Install rustup, rust toolchain, or various tools
+    Install {
+        #[command(subcommand)]
+        commands: Option<InstallCommand>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -111,6 +115,60 @@ pub(crate) enum RegistryOpt {
     Rm {
         /// Name of the carge registry
         name: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub(crate) enum InstallCommand {
+    /// Install rustup, the rust toolchain manager
+    Rustup {
+        /// Specify which version of rustup to install
+        #[arg(long)]
+        version: Option<String>,
+    },
+    /// Install rust toolchain, requires `rustup` being installed
+    Toolchain {
+        /// Specify a (toolchain) version of rust to install
+        toolchain: Option<String>,
+        /// Add specific targets on installation
+        #[arg(short, long, value_name = "TARGETS")]
+        target: Option<String>,
+        /// Specify a different toolchain profile
+        #[arg(long)]
+        profile: Option<String>,
+        /// Add specific components on installation
+        #[arg(short, long, value_name = "COMPONENTS")]
+        component: Option<String>,
+    },
+    /// Install standalone tools for rust, requires `cargo` being installed
+    Tool {
+        /// Name of cargo crates
+        name: Option<String>,
+        /// Filesystem path to local crate/package to install
+        #[arg(long, value_hint = ValueHint::AnyPath)]
+        path: Option<String>,
+        /// Git URL to install the specified crate from
+        #[arg(long, value_name = "URL")]
+        git: Option<Url>,
+        /// Specify a version to install
+        #[arg(long, conflicts_with = "path")]
+        version: Option<String>,
+        /// Force overwriting existing crates or binaries
+        #[arg(short, long)]
+        force: bool,
+        /// Space or comma separated list of features to activate
+        #[arg(short = 'F', long)]
+        features: Option<Vec<String>>,
+    },
+    /// Install component for toolchain
+    Component {
+        /// Add a specific toolchain component
+        name: Option<String>,
+        #[arg(long)]
+        /// Toolchain name, such as 'stable', 'nightly', or '1.8.0'
+        toolchain: Option<String>,
+        #[arg(long)]
+        target: Option<String>,
     },
 }
 

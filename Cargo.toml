@@ -5,3 +5,11 @@ members = [
     "packager",
     "logger",
 ]
+
+[workspace.dependencies]
+# Keep same dep versions as rustup's
+anyhow = "1.0.69"
+lazy_static = "1"
+tempfile = "3.4"
+thiserror = "1.0"
+url = { version = "2.3.0", features = ["serde"] }

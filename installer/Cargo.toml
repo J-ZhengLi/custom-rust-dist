@@ -6,19 +6,20 @@ description = "Manage rust and cargo installation with ease"
 rust-version = "1.70" # Minimum of 1.70 needed because of OnceLock
 
 [dependencies]
-anyhow = "1"
+anyhow.workspace = true
 cfg-if = "1"
 clap = { version = "4", features = ["derive"], optional = true }
+download = { path = "rustup/download", default-features = false }
 iced = { version = "0.9.0", features = ["image"], optional = true }
 serde = { version = "1.0.175", features = ["derive"] }
 toml_edit = { version = "0.19", features = ["serde"] }
 home = "0.5.4"
-url = { version = "2.4.0", features = ["serde"] }
+url.workspace = true
 logger = { path = "../logger" }
 log = { version = "0.4", features = ["std"] }
 
 [dev-dependencies]
-tempfile = "3.4"
+tempfile.workspace = true
 
 [features]
 default = ["cli"]
