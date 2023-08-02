@@ -4,18 +4,19 @@ use url::Url;
 
 mod common;
 mod config;
+mod install;
 
 #[derive(Parser)]
 #[command(version, about, arg_required_else_help = true)]
 struct Cli {
     /// Enable verbose output
-    #[arg(short, long)]
+    #[arg(short, long, conflicts_with_all = ["quiet", "yes_to_all"])]
     verbose: bool,
-    /// Suppress all messages
-    #[arg(short, long)]
+    /// Suppress non-critical messages
+    #[arg(short, long, conflicts_with_all = ["verbose", "yes_to_all"])]
     quiet: bool,
     /// Disable interaction and answer 'yes' to all prompts
-    #[arg(short, long = "yes")]
+    #[arg(short, long = "yes", conflicts_with_all = ["quiet", "verbose"])]
     yes_to_all: bool,
     #[command(subcommand)]
     command: Option<Subcommands>,
@@ -111,8 +112,9 @@ pub(crate) enum RegistryOpt {
         #[arg(short, long, value_name = "NAME")]
         name: Option<String>,
     },
+    #[command(visible_alias = "rm")]
     /// Remove a certain registry by its name
-    Rm {
+    Remove {
         /// Name of the carge registry
         name: Option<String>,
     },
@@ -139,6 +141,9 @@ pub(crate) enum InstallCommand {
         /// Add specific components on installation
         #[arg(short, long, value_name = "COMPONENTS")]
         component: Option<String>,
+        /// Filesystem path to local toolchain directory/package
+        #[arg(long, value_hint = ValueHint::AnyPath)]
+        path: Option<String>,
     },
     /// Install standalone tools for rust, requires `cargo` being installed
     Tool {
@@ -173,23 +178,31 @@ pub(crate) enum InstallCommand {
 }
 
 impl Subcommands {
-    pub fn process(&self, verbose: bool, yes: bool) -> Result<()> {
-        config::process(self, verbose, yes)?;
+    pub fn process(&self, opt: GlobalOpt) -> Result<()> {
+        config::process(self, opt)?;
+        install::process(self, opt)?;
         Ok(())
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct GlobalOpt {
+    verbose: bool,
+    quiet: bool,
+    yes: bool,
+}
+
 pub(crate) fn run() -> Result<()> {
-    // let config = steps::load_config()?;
-    // println!("config: {:?}", config);
     let cli = Cli::parse();
 
-    let verbose = cli.verbose;
-    let quiet = cli.quiet;
-    let yes_to_all = cli.yes_to_all;
+    let global_opt = GlobalOpt {
+        verbose: cli.verbose,
+        quiet: cli.quiet,
+        yes: cli.yes_to_all,
+    };
 
     match &cli.command {
-        Some(subcommand) => subcommand.process(verbose, yes_to_all),
+        Some(subcommand) => subcommand.process(global_opt),
         None => Ok(()),
     }
 }

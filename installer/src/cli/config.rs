@@ -3,7 +3,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, bail, Result};
 
-use super::{common, Subcommands};
+use super::{common, GlobalOpt, Subcommands};
 use crate::applog::*;
 use crate::cli::{ConfigSubcommand, RegistryOpt};
 use crate::parser::{load_config, CargoRegistry, CargoSettings, Configuration, Settings};
@@ -65,7 +65,7 @@ macro_rules! apply {
 }
 
 /// Processing `config` subcommand if it exist, otherwise this won't do anything.
-pub(super) fn process(subcommand: &Subcommands, verbose: bool, yes: bool) -> Result<()> {
+pub(super) fn process(subcommand: &Subcommands, opt: GlobalOpt) -> Result<()> {
     let Subcommands::Config {
         list,
         cargo_home,
@@ -86,21 +86,21 @@ pub(super) fn process(subcommand: &Subcommands, verbose: bool, yes: bool) -> Res
     let mut existing_config = &mut maybe_config.unwrap_or_default();
 
     if *list {
-        if create_new {
+        if !opt.quiet && create_new {
             warn!("no configuration file detected, showing default configuration instead");
         }
-        list_config(&existing_config.settings, verbose);
+        list_config(&existing_config.settings, opt);
         return Ok(());
     }
     if let Some(cfg_path_str) = input {
-        import_config(cfg_path_str, existing_config, create_new, yes)?;
+        import_config(cfg_path_str, existing_config, create_new, opt)?;
         return Ok(());
     }
     if let Some(true) = default {
-        if !overriding("override with default", create_new, yes)? {
+        if !overriding("override with default", create_new, opt)? {
             return Ok(());
         }
-        return apply_settings(existing_config, Settings::default());
+        return apply_settings(existing_config, Settings::default(), opt);
     }
 
     let mut temp_settings = existing_config.settings.clone();
@@ -124,7 +124,7 @@ pub(super) fn process(subcommand: &Subcommands, verbose: bool, yes: bool) -> Res
                 let name_fullback =
                     name.as_deref().or_else(|| url.host_str()).ok_or_else(|| {
                         anyhow!(
-                            "fail to automatically resolve the registry name, \
+                            "failed to automatically resolve the registry name, \
                             try using `--name` to specify one"
                         )
                     })?;
@@ -132,7 +132,7 @@ pub(super) fn process(subcommand: &Subcommands, verbose: bool, yes: bool) -> Res
                     .registries
                     .insert(name_fullback.to_string(), url.as_str().to_string().into());
             }
-            RegistryOpt::Rm { name: Some(name) } => {
+            RegistryOpt::Remove { name: Some(name) } => {
                 // user might passing the name with quotes, which somehow does not
                 // took care by `clap`, but we need to remove them, otherwise the hashmap
                 // might not able to find it.
@@ -156,11 +156,11 @@ pub(super) fn process(subcommand: &Subcommands, verbose: bool, yes: bool) -> Res
         temp_settings.cargo = Some(cargo_settings.clone());
     }
 
-    apply_settings(existing_config, temp_settings)
+    apply_settings(existing_config, temp_settings, opt)
 }
 
 /// Format program settings ([`Settings`]), and prints them.
-fn list_config(settings: &Settings, verbose: bool) {
+fn list_config(settings: &Settings, _opt: GlobalOpt) {
     println!(
         "\n\
         list of configurations\n\
@@ -221,7 +221,7 @@ fn import_config(
     path_str: &str,
     existing: &mut Configuration,
     create_new: bool,
-    yes: bool,
+    opt: GlobalOpt,
 ) -> Result<()> {
     let cfg_path = Path::new(path_str);
     if !cfg_path.is_file() {
@@ -232,41 +232,50 @@ fn import_config(
     }
     let importing_cfg = load_config(cfg_path)?;
 
-    if !overriding("overide", create_new, yes)? {
+    if !overriding("overide", create_new, opt)? {
         return Ok(());
     }
-    if importing_cfg.installation.is_some() {
+    if !opt.quiet && importing_cfg.installation.is_some() {
         info!("force skipping `[installation]` sections");
     }
 
-    apply_settings(existing, importing_cfg.settings)
+    apply_settings(existing, importing_cfg.settings, opt)
 }
 
-fn apply_settings(conf: &mut Configuration, mut setts: Settings) -> Result<()> {
+fn apply_settings(conf: &mut Configuration, mut setts: Settings, opt: GlobalOpt) -> Result<()> {
     // don't do anything if two settings are identical
     if conf.settings == setts {
-        info!("no change applied to user configuration");
+        if !opt.quiet {
+            info!("no change applied to user configuration");
+        }
         return Ok(());
     }
     if matches!(setts.cargo.as_ref(), Some(cargo_setts) if cargo_setts.is_default()) {
         // avoids write an empty `[settings.cargo]` section in the result toml
         setts.cargo = None;
     }
-    info!("these settings will be updated to:");
-    println!();
-    show_settings_diff(&conf.settings, &setts);
+
+    if !opt.quiet {
+        info!("these settings will be updated to:");
+        println!();
+        show_settings_diff(&conf.settings, &setts);
+    }
     conf.settings = setts;
     update_config(conf)?;
-    info!("configuration updated successfully.");
+    if !opt.quiet {
+        info!("configuration updated successfully.");
+    }
     Ok(())
 }
 
 /// Ask confirmation whether or not to override existing configuration, e.g.
 /// returning `Ok(true)` means it will be overrided.
-fn overriding(msg: &str, create_new: bool, yes: bool) -> Result<bool> {
+fn overriding(msg: &str, create_new: bool, opt: GlobalOpt) -> Result<bool> {
     if !create_new {
-        warn!("existing configuration detected");
-        if !yes && !common::confirm(&format!("{msg}? (y/n)"), false)? {
+        if !opt.quiet {
+            warn!("existing configuration detected");
+        }
+        if !opt.yes && !common::confirm(&format!("{msg}? (y/n)"), false)? {
             return Ok(false);
         }
     }

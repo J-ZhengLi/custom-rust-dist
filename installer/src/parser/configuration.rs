@@ -1,10 +1,33 @@
 //! Configurations for this application, including information about
 //! installed tools and toolchain.
 
-use super::TomlTable;
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
+
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use url::Url;
+
+use super::TomlTable;
+use crate::utils;
+
+pub trait TryFromEnv {
+    /// Attempt to load data from runtime environment.
+    ///
+    /// Typically, data can be loaded from environment variables, but could also
+    /// from filesystem, such as reading config files etc.
+    ///
+    /// # Errors
+    ///
+    /// Errors will occur when the required data is in-accessable,
+    /// such as when the program does not have enough permissions, or some
+    /// simply does not exist thus cannot be fetched.
+    fn try_from_env() -> Result<Self>
+    where
+        Self: Sized;
+}
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) struct Configuration {
@@ -13,6 +36,15 @@ pub(crate) struct Configuration {
 }
 
 impl TomlTable for Configuration {}
+
+impl TryFromEnv for Configuration {
+    fn try_from_env() -> Result<Self> {
+        Ok(Self {
+            settings: Settings::try_from_env()?,
+            installation: Some(Installation::try_from_env()?),
+        })
+    }
+}
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub(crate) struct Settings {
@@ -23,6 +55,12 @@ pub(crate) struct Settings {
     pub proxy: Option<String>,
     pub no_proxy: Option<String>,
     pub cargo: Option<CargoSettings>,
+}
+
+impl TryFromEnv for Settings {
+    fn try_from_env() -> Result<Self> {
+        Ok(Settings::default())
+    }
 }
 
 impl Settings {
@@ -60,20 +98,56 @@ impl From<String> for CargoRegistry {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) struct Installation {
     #[serde(rename = "rustup")]
-    rustup_ver: String,
+    rustup_ver: Option<String>,
     toolchain: Toolchain,
     tool: Tool,
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub(crate) struct Toolchain {
-    default: String,
-    #[serde(flatten)]
-    installed: HashMap<String, ToolchainTarget>,
+impl TryFromEnv for Installation {
+    fn try_from_env() -> Result<Self> {
+        let rustup_ver = get_single_line_from_stdout("rustup", &["-V"]);
+
+        Ok(Installation {
+            rustup_ver,
+            toolchain: Toolchain::try_from_env()?,
+            tool: Tool::try_from_env()?,
+        })
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
-pub(crate) struct ToolchainTarget {
+pub(crate) struct Toolchain {
+    default: Option<String>,
+    #[serde(flatten)]
+    installed: HashMap<String, ToolchainInfo>,
+}
+
+impl TryFromEnv for Toolchain {
+    fn try_from_env() -> Result<Self> {
+        let default = get_single_line_from_stdout("rustup", &["default"])
+            .map(|line| line.trim_end_matches(" (default)").to_owned());
+
+        let toolchain_list = utils::standard_output("rustup", &["toolchain", "list", "-v"])
+            .with_context(|| "unable to get list of installed toolchain")?;
+        let mut installed = HashMap::new();
+
+        for line in toolchain_list.lines() {
+            let mut splited = line.split_whitespace();
+            // skip empty lines if there's one
+            let Some(tc_name) = splited.next() else { continue };
+            // if `rustup toolchain list -v` doesn't give us a toolchain name with path,
+            // then there might be a bug, we need to be cautious about it.
+            let tc_path = splited.last().unwrap_or_else(|| {
+                panic!("got invalid output '{line}' when trying to gather toolchain list")
+            });
+        }
+
+        Ok(Toolchain { default, installed })
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub(crate) struct ToolchainInfo {
     version: String,
     components: Vec<String>,
 }
@@ -81,16 +155,57 @@ pub(crate) struct ToolchainTarget {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) struct Tool {
     keep_package: bool,
-    package_dir: Option<String>,
-    tools_dir: Option<String>,
+    package_dir: Option<PathBuf>,
+    tools_dir: Option<PathBuf>,
     #[serde(flatten)]
     installed: HashMap<String, ToolDetail>,
+}
+
+impl Default for Tool {
+    fn default() -> Self {
+        let install_root = utils::home_dir().join(env!("CARGO_PKG_NAME"));
+        Self {
+            keep_package: true,
+            package_dir: Some(install_root.join("packages")),
+            tools_dir: Some(install_root.join("tools")),
+            installed: HashMap::new(),
+        }
+    }
+}
+
+impl TryFromEnv for Tool {
+    fn try_from_env() -> Result<Self> {
+        Ok(Tool::default())
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub(crate) struct ToolDetail {
     version: String,
     installed_from_source: Option<bool>,
+}
+
+fn get_single_line_from_stdout(p: &str, args: &[&str]) -> Option<String> {
+    let output = utils::standard_output(p, args).ok()?;
+    Some(output.lines().next()?.into())
+}
+
+/// Gather information from a toolchain folder.
+fn read_toolchain_info<P: AsRef<Path>>(toolchain_folder: P) -> Result<ToolchainInfo> {
+    // maybe there's no need to add extension?
+    let rustc_exe = toolchain_folder.as_ref().join("bin").join("rustc");
+    let components_file = toolchain_folder
+        .as_ref()
+        .join("lib")
+        .join("rustlib")
+        .join("components");
+    let rustc_version = utils::standard_output_first_line_only(rustc_exe, &["-V"])
+        .with_context(|| "unable to determine rustc version")?;
+    // TODO: fill components
+    Ok(ToolchainInfo {
+        version: rustc_version,
+        components: vec![],
+    })
 }
 
 #[cfg(test)]
