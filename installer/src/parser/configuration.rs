@@ -10,7 +10,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
-use super::TomlTable;
+use super::{crates::CargoInstallTrackerLite, TomlTable};
 use crate::utils;
 
 pub trait TryFromEnv {
@@ -140,6 +140,8 @@ impl TryFromEnv for Toolchain {
             let tc_path = splited.last().unwrap_or_else(|| {
                 panic!("got invalid output '{line}' when trying to gather toolchain list")
             });
+            let tc_info = read_toolchain_info(tc_path)?;
+            installed.insert(tc_name.into(), tc_info);
         }
 
         Ok(Toolchain { default, installed })
@@ -163,11 +165,11 @@ pub(crate) struct Tool {
 
 impl Default for Tool {
     fn default() -> Self {
-        let install_root = utils::home_dir().join(env!("CARGO_PKG_NAME"));
+        let root = utils::installer_home();
         Self {
             keep_package: true,
-            package_dir: Some(install_root.join("packages")),
-            tools_dir: Some(install_root.join("tools")),
+            package_dir: Some(root.join("packages")),
+            tools_dir: Some(root.join("tools")),
             installed: HashMap::new(),
         }
     }
@@ -175,7 +177,28 @@ impl Default for Tool {
 
 impl TryFromEnv for Tool {
     fn try_from_env() -> Result<Self> {
-        Ok(Tool::default())
+        let mut installed = HashMap::new();
+
+        // attemp to read cargo installation record
+        let crates_toml = home::cargo_home()?.join(".crates.toml");
+        if let Ok(cargo_ins_rec) = super::load_toml::<CargoInstallTrackerLite>(&crates_toml) {
+            for crate_info in cargo_ins_rec.v1.keys() {
+                installed.insert(
+                    crate_info.name.clone(),
+                    ToolDetail {
+                        version: crate_info.version.clone(),
+                        installed_from_source: None,
+                    },
+                );
+            }
+        }
+
+        // TODO: load tool installation record
+
+        Ok(Tool {
+            installed,
+            ..Default::default()
+        })
     }
 }
 
@@ -201,10 +224,13 @@ fn read_toolchain_info<P: AsRef<Path>>(toolchain_folder: P) -> Result<ToolchainI
         .join("components");
     let rustc_version = utils::standard_output_first_line_only(rustc_exe, &["-V"])
         .with_context(|| "unable to determine rustc version")?;
-    // TODO: fill components
+    let components: Vec<String> = utils::read_to_string(components_file)?
+        .lines()
+        .map(ToOwned::to_owned)
+        .collect();
     Ok(ToolchainInfo {
         version: rustc_version,
-        components: vec![],
+        components,
     })
 }
 

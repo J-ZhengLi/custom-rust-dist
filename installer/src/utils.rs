@@ -1,5 +1,6 @@
 use std::ffi::OsStr;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use anyhow::{anyhow, bail, Context, Result};
@@ -13,6 +14,17 @@ use anyhow::{anyhow, bail, Context, Result};
 /// check [`home::home_dir`] for more information.
 pub(crate) fn home_dir() -> PathBuf {
     home::home_dir().expect("aborting because the home directory cannot be determined.")
+}
+
+/// Get a path to the root directory of this program.
+///
+/// # Panic
+///
+/// Will panic if the home directory cannot be determined,
+/// which could be the result of missing certain environment variable at runtime,
+/// check [`home::home_dir`] for more information.
+pub(crate) fn installer_home() -> PathBuf {
+    home_dir().join(env!("CARGO_PKG_NAME"))
 }
 
 macro_rules! exec_err {
@@ -53,6 +65,15 @@ where
     Ok(String::from_utf8(bytes)?)
 }
 
+/// Similar to [`standard_output`], but get first line of the output as string instead
+///
+/// # Errors
+///
+/// This will return errors if:
+/// 1. The specific command cannot be execute.
+/// 2. The command was executed but failed.
+/// 3. The standard output contains non-UTF8 characteres thus cannot be parsed from bytes.
+/// 4. The output string was empty.
 pub(crate) fn standard_output_first_line_only<P, A>(program: P, args: &[A]) -> Result<String>
 where
     P: AsRef<OsStr>,
@@ -64,4 +85,10 @@ where
         .next()
         .map(ToOwned::to_owned)
         .ok_or_else(|| exec_err!(program.as_ref(), args.iter(), ": empty output"))
+}
+
+/// Wrapper to [`std::fs::read_to_string`] but with additional error context.
+pub(crate) fn read_to_string<P: AsRef<Path>>(path: P) -> Result<String> {
+    fs::read_to_string(path.as_ref())
+        .with_context(|| format!("failed to read '{}'", path.as_ref().display()))
 }

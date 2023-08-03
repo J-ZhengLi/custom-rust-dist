@@ -39,6 +39,11 @@ fn main() -> Result<()> {
 }
 
 pub(crate) fn config_path() -> &'static Path {
-    CONFIG_PATH
-        .get_or_init(|| utils::home_dir().join(format!(".{}-config", env!("CARGO_PKG_NAME"))))
+    CONFIG_PATH.get_or_init(|| {
+        let installer_home = utils::installer_home();
+        // ensure installer home
+        std::fs::create_dir_all(&installer_home)
+            .expect("aborting because installer home cannot be created");
+        installer_home.join("config")
+    })
 }

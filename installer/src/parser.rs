@@ -1,4 +1,5 @@
 mod configuration;
+mod crates;
 
 use anyhow::{Context, Result};
 use serde::de::DeserializeOwned;
@@ -43,11 +44,15 @@ pub(crate) trait TomlTable {
 }
 
 /// Convenient function to load [`Configuration`] from a certain path.
-pub(crate) fn load_config(path: &Path) -> Result<Configuration> {
-    Configuration::load(path).context("unable to load configuration file.")
+pub(crate) fn load_toml<T: TomlTable + DeserializeOwned>(path: &Path) -> Result<T> {
+    T::load(path).context("unable to load configuration file.")
 }
 
-pub(crate) fn write_config(path: &Path, cfg: &Configuration, pretty: bool) -> Result<()> {
+pub(crate) fn write_toml<T: TomlTable + Serialize>(
+    path: &Path,
+    cfg: &T,
+    pretty: bool,
+) -> Result<()> {
     let toml = cfg.to_toml(pretty)?;
     fs::write(path, toml)?;
     Ok(())

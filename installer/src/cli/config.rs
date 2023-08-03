@@ -6,7 +6,7 @@ use anyhow::{anyhow, bail, Result};
 use super::{common, GlobalOpt, Subcommands};
 use crate::applog::*;
 use crate::cli::{ConfigSubcommand, RegistryOpt};
-use crate::parser::{load_config, CargoRegistry, CargoSettings, Configuration, Settings};
+use crate::parser::{load_toml, CargoRegistry, CargoSettings, Configuration, Settings};
 use crate::steps::{self, update_config};
 
 macro_rules! print_opt {
@@ -230,7 +230,7 @@ fn import_config(
             cfg_path.display()
         );
     }
-    let importing_cfg = load_config(cfg_path)?;
+    let importing_cfg: Configuration = load_toml(cfg_path)?;
 
     if !overriding("overide", create_new, opt)? {
         return Ok(());

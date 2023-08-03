@@ -23,10 +23,10 @@ use anyhow::Result;
 
 pub(crate) fn load_config() -> Result<Configuration> {
     let config_path = crate::config_path();
-    parser::load_config(config_path)
+    parser::load_toml(config_path)
 }
 
 pub(crate) fn update_config(config: &Configuration) -> Result<()> {
     let config_path = crate::config_path();
-    parser::write_config(config_path, config, true)
+    parser::write_toml(config_path, config, true)
 }
