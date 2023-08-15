@@ -3,9 +3,10 @@ use std::path::Path;
 
 use anyhow::{anyhow, bail, Result};
 
-use super::{common, GlobalOpt, Subcommands};
+use super::{GlobalOpt, Subcommands};
 use crate::applog::*;
 use crate::cli::{ConfigSubcommand, RegistryOpt};
+use crate::mini_rustup::cli_common;
 use crate::parser::{load_toml, CargoRegistry, CargoSettings, Configuration, Settings};
 use crate::steps::{self, update_config};
 
@@ -275,7 +276,7 @@ fn overriding(msg: &str, create_new: bool, opt: GlobalOpt) -> Result<bool> {
         if !opt.quiet {
             warn!("existing configuration detected");
         }
-        if !opt.yes && !common::confirm(&format!("{msg}? (y/n)"), false)? {
+        if !opt.yes && !cli_common::confirm(&format!("{msg}? (y/n)"), false)? {
             return Ok(false);
         }
     }

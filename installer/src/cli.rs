@@ -2,7 +2,6 @@ use anyhow::Result;
 use clap::{ArgAction, Parser, Subcommand, ValueHint};
 use url::Url;
 
-mod common;
 mod config;
 mod install;
 

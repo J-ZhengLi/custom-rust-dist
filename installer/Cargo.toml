@@ -10,19 +10,51 @@ anyhow.workspace = true
 cfg-if = "1"
 clap = { version = "4", features = ["derive"], optional = true }
 download = { path = "rustup/download", default-features = false }
-iced = { version = "0.9.0", features = ["image"], optional = true }
-serde = { version = "1.0.175", features = ["derive"] }
-toml_edit = { version = "0.19", features = ["serde"] }
 home = "0.5.4"
-url.workspace = true
-logger = { path = "../logger" }
+iced = { version = "0.9.0", features = ["image"], optional = true }
 log = { version = "0.4", features = ["std"] }
-
-[dev-dependencies]
+logger = { path = "../logger" }
+serde = { version = "1.0.175", features = ["derive"] }
+sha2 = "0.10"
 tempfile.workspace = true
+toml_edit = { version = "0.19", features = ["serde"] }
+url.workspace = true
+
+[build-dependencies]
+lazy_static.workspace = true
+regex = "1.9.3"
 
 [features]
 default = ["cli"]
 debug = []
 cli = ["dep:clap"]
 iced-gui = ["dep:iced"]
+
+[target."cfg(windows)".dependencies]
+cc = "1"
+winreg = "0.11"
+
+[target."cfg(windows)".dependencies.winapi]
+features = [
+    "combaseapi",
+    "errhandlingapi",
+    "fileapi",
+    "handleapi",
+    "ioapiset",
+    "jobapi",
+    "jobapi2",
+    "minwindef",
+    "processthreadsapi",
+    "psapi",
+    "shlobj",
+    "shtypes",
+    "synchapi",
+    "sysinfoapi",
+    "tlhelp32",
+    "userenv",
+    "winbase",
+    "winerror",
+    "winioctl",
+    "winnt",
+    "winuser",
+]

@@ -1,17 +1,12 @@
 // TODO: warn unused before release
 #![allow(unused)]
 
-use anyhow::Result;
-use cfg_if::cfg_if;
-use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
-
-use logger::Logger;
-
 #[cfg(feature = "iced-gui")]
 mod app;
 #[cfg(feature = "cli")]
 mod cli;
+mod defaults;
+mod mini_rustup;
 mod parser;
 mod steps;
 mod utils;
@@ -20,6 +15,15 @@ mod applog {
     pub use logger::{debug, err, info, trace, warn};
 }
 
+use anyhow::Result;
+use cfg_if::cfg_if;
+use parser::Configuration;
+use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+
+use logger::Logger;
+
+pub(crate) const APPNAME: &str = env!("CARGO_PKG_NAME");
 static CONFIG_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 fn main() -> Result<()> {

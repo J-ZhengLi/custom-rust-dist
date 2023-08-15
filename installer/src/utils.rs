@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
 use anyhow::{anyhow, bail, Context, Result};
+use url::Url;
 
 /// Get a path to user's "home" directory.
 ///
@@ -91,4 +92,8 @@ where
 pub(crate) fn read_to_string<P: AsRef<Path>>(path: P) -> Result<String> {
     fs::read_to_string(path.as_ref())
         .with_context(|| format!("failed to read '{}'", path.as_ref().display()))
+}
+
+pub(crate) fn parse_url(url: &str) -> Result<Url> {
+    Url::parse(url).with_context(|| format!("failed to parse url: {url}"))
 }

@@ -1,8 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use std::io::{stdin, stdout, BufRead, Read, Write};
 
-/// Read line input from standard input.
-// (Migrated from rustup)
 pub(crate) fn read_line() -> Result<String> {
     let stdin = stdin().lock();
     let mut lines = stdin.lines();
@@ -13,8 +11,7 @@ pub(crate) fn read_line() -> Result<String> {
     }
     .context("unable to read from stdin for confirmation")
 }
-/// Asking user confirmation from standard input.
-// (Migrated from rustup)
+
 pub(crate) fn confirm(question: &str, default: bool) -> Result<bool> {
     let mut stdout = stdout();
     write!(stdout, "{question} ")?;
