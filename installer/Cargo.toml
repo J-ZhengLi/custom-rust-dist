@@ -1,5 +1,5 @@
 [package]
-name = "installer"
+name = "rupe"
 version = "0.0.1-alpha.1"
 edition = "2021"
 description = "Manage rust and cargo installation with ease"
@@ -9,13 +9,15 @@ rust-version = "1.70" # Minimum of 1.70 needed because of OnceLock
 anyhow.workspace = true
 cfg-if = "1"
 clap = { version = "4", features = ["derive"], optional = true }
-download = { path = "rustup/download", default-features = false }
 home = "0.5.4"
 iced = { version = "0.9.0", features = ["image"], optional = true }
+indicatif = { version = "0.17", optional = true }
+# to make sure `indicatif` and `log` don't interfering each other
+indicatif-log-bridge = { version = "0.2", optional = true }
 log = { version = "0.4", features = ["std"] }
 logger = { path = "../logger" }
+reqwest = { version = "0.11.18", features = ["blocking"] }
 serde = { version = "1.0.175", features = ["derive"] }
-sha2 = "0.10"
 tempfile.workspace = true
 toml_edit = { version = "0.19", features = ["serde"] }
 url.workspace = true
@@ -27,8 +29,11 @@ regex = "1.9.3"
 [features]
 default = ["cli"]
 debug = []
-cli = ["dep:clap"]
+cli = ["dep:clap", "dep:indicatif", "dep:indicatif-log-bridge"]
 iced-gui = ["dep:iced"]
+
+[target."cfg(not(windows))".dependencies]
+libc = "0.2.147"
 
 [target."cfg(windows)".dependencies]
 cc = "1"
@@ -58,3 +63,4 @@ features = [
     "winnt",
     "winuser",
 ]
+version = "0.3"

@@ -33,8 +33,12 @@ pub struct Logger {
 
 impl Logger {
     pub fn new() -> Self {
+        Self::new_with_level(LevelFilter::Trace)
+    }
+
+    pub fn new_with_level(level: LevelFilter) -> Self {
         Logger {
-            level: LevelFilter::Trace,
+            level,
             ts_format: "[hour]:[minute]:[second].[subsecond digits:3]".to_string(),
             colored: false,
         }

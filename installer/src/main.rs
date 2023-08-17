@@ -28,7 +28,9 @@ static CONFIG_PATH: OnceLock<PathBuf> = OnceLock::new();
 
 fn main() -> Result<()> {
     // initialize logger
-    Logger::new().colored().init()?;
+    Logger::new_with_level(log::LevelFilter::Info)
+        .colored()
+        .init()?;
 
     cfg_if! {
         if #[cfg(feature = "iced-gui")] {
@@ -43,11 +45,5 @@ fn main() -> Result<()> {
 }
 
 pub(crate) fn config_path() -> &'static Path {
-    CONFIG_PATH.get_or_init(|| {
-        let installer_home = utils::installer_home();
-        // ensure installer home
-        std::fs::create_dir_all(&installer_home)
-            .expect("aborting because installer home cannot be created");
-        installer_home.join("config")
-    })
+    CONFIG_PATH.get_or_init(|| utils::home_dir().join(format!(".{APPNAME}-config")))
 }

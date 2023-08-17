@@ -13,3 +13,7 @@ lazy_static = "1"
 tempfile = "3.4"
 thiserror = "1.0"
 url = { version = "2.3.0", features = ["serde"] }
+
+[profile.release]
+codegen-units = 1
+lto = true

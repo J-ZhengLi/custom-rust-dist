@@ -68,6 +68,39 @@ impl Settings {
     pub fn is_default(&self) -> bool {
         self == &Settings::default()
     }
+
+    /// Convert settings into key value pairs that can be used as env vars.
+    ///
+    /// Note: cargo related settings will NOT be converted as they cannot be
+    /// used as env vars.
+    pub fn to_key_value_pairs(&self) -> Vec<(&str, &str)> {
+        fn add_kv<'a, T: AsRef<str>>(
+            seq: &mut Vec<(&'a str, &'a str)>,
+            key: &'a str,
+            v: &'a Option<T>,
+        ) {
+            let Some(val) = v else { return };
+            seq.push((key, val.as_ref()));
+        }
+        let mut pairs = vec![];
+        add_kv(&mut pairs, "CARGO_HOME", &self.cargo_home);
+        add_kv(&mut pairs, "RUSTUP_HOME", &self.rustup_home);
+        add_kv(&mut pairs, "RUSTUP_DIST_SERVER", &self.rustup_dist_server);
+        add_kv(&mut pairs, "RUSTUP_UPDATE_ROOT", &self.rustup_update_root);
+        let key = if self
+            .proxy
+            .as_ref()
+            .filter(|url_like| url_like.starts_with("https"))
+            .is_some()
+        {
+            "https_proxy"
+        } else {
+            "http_proxy"
+        };
+        add_kv(&mut pairs, key, &self.proxy);
+        add_kv(&mut pairs, "no_proxy", &self.no_proxy);
+        pairs
+    }
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq, Clone)]

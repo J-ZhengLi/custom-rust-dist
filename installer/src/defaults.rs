@@ -7,6 +7,6 @@ macro_rules! crate_const {
 }
 
 crate_const! {
-    RUSTUP_DIST_SERVER: &str = "https://static.rust-lang.org/";
-    RUSTUP_UPDATE_ROOT: &str = "https://static.rust-lang.org/rustup/";
+    RUSTUP_DIST_SERVER: &str = "https://static.rust-lang.org";
+    RUSTUP_UPDATE_ROOT: &str = "https://static.rust-lang.org/rustup";
 }

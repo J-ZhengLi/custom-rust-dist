@@ -3,6 +3,8 @@ use clap::{ArgAction, Parser, Subcommand, ValueHint};
 use url::Url;
 
 mod config;
+mod extra;
+mod init;
 mod install;
 
 #[derive(Parser)]
@@ -85,6 +87,29 @@ pub(crate) enum Subcommands {
         #[command(subcommand)]
         commands: Option<InstallCommand>,
     },
+    /// Initialize application by setting up environment, and install rustup
+    Init {
+        /// Don't configure the PATH environment variable
+        #[arg(long)]
+        no_modify_path: bool,
+        /// Specify a root path for installation, default to `$HOME/rupe`
+        #[arg(short, long, value_name = "PATH", value_hint = ValueHint::DirPath)]
+        root: Option<String>,
+        /// Specify which server to download rustup-init
+        #[arg(long, value_name = "URL", value_hint = ValueHint::Url)]
+        rustup_update_root: Option<Url>,
+        /// Choose a specific version of rustup to install
+        #[arg(long)]
+        rustup_version: Option<String>,
+        /// Set proxy server. If this option was not provided,
+        /// the program will attemp to read it from env vars
+        #[arg(long, value_name = "URL", value_hint = ValueHint::Url)]
+        proxy: Option<String>,
+        /// Set no proxy, separated using comma ','. If this option was not provided,
+        /// the program will attemp to read it from env vars
+        #[arg(long)]
+        no_proxy: Option<String>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -121,12 +146,6 @@ pub(crate) enum RegistryOpt {
 
 #[derive(Subcommand, Debug)]
 pub(crate) enum InstallCommand {
-    /// Install rustup, the rust toolchain manager
-    Rustup {
-        /// Specify which version of rustup to install
-        #[arg(long)]
-        version: Option<String>,
-    },
     /// Install rust toolchain, requires `rustup` being installed
     Toolchain {
         /// Specify a (toolchain) version of rust to install
@@ -178,6 +197,7 @@ pub(crate) enum InstallCommand {
 
 impl Subcommands {
     pub fn process(&self, opt: GlobalOpt) -> Result<()> {
+        init::process(self, opt)?;
         config::process(self, opt)?;
         install::process(self, opt)?;
         Ok(())
