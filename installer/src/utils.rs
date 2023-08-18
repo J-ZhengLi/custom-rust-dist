@@ -1,8 +1,9 @@
 use std::cmp::min;
+use std::env;
 use std::ffi::OsStr;
 use std::fs::{self, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Output};
 use std::time::Duration;
 
@@ -101,11 +102,18 @@ pub(crate) fn parse_url(url: &str) -> Result<Url> {
     Url::parse(url).with_context(|| format!("failed to parse url: {url}"))
 }
 
-pub(crate) fn execute_for_output_with_env<P, S, I>(program: P, args: &[S], env: I) -> Result<Output>
+// FIXME: I just CAN'T with all these generics!
+pub(crate) fn execute_for_output_with_env<P, A, K, V, I>(
+    program: P,
+    args: &[A],
+    env: I,
+) -> Result<Output>
 where
     P: AsRef<OsStr>,
-    S: AsRef<OsStr>,
-    I: IntoIterator<Item = (S, S)>,
+    A: AsRef<OsStr>,
+    K: AsRef<OsStr>,
+    V: AsRef<OsStr>,
+    I: IntoIterator<Item = (K, V)>,
 {
     Command::new(program.as_ref())
         .args(args)
@@ -222,4 +230,34 @@ impl<T: Sized> DownloadOpt<T> {
             }
         }
     }
+}
+
+pub(crate) fn to_nomalized_abspath<P: AsRef<Path> + Into<PathBuf>>(path: P) -> Result<PathBuf> {
+    if path.as_ref().is_absolute() {
+        return Ok(path.into());
+    }
+    let raw = env::current_dir()
+        .context("current directory cannot be determined")
+        .map(|mut cd| {
+            cd.push(path);
+            cd
+        })?;
+    // Remove any `.` and `..` from origin path
+    let mut nomalized_path = PathBuf::new();
+    for path_component in raw.components() {
+        match path_component {
+            Component::CurDir => (),
+            Component::ParentDir => {
+                nomalized_path.pop();
+            }
+            _ => nomalized_path.push(path_component),
+        }
+    }
+
+    Ok(nomalized_path)
+}
+
+/// Flip `Option<Result<T, E>>` to `Result<Option<T>, E>`
+pub(crate) fn flip_option_result<T, E>(x: Option<Result<T, E>>) -> Result<Option<T>, E> {
+    x.map_or(Ok(None), |v| v.map(Some))
 }

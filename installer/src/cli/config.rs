@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, bail, Result};
 
@@ -58,7 +58,7 @@ macro_rules! diff {
 /// Simple macro to replace an option value with another,
 /// if only the other option contains some value.
 macro_rules! apply {
-    ($from:ident, $to:expr) => {
+    ($from:expr, $to:expr) => {
         if $from.is_some() {
             $to = $from.clone();
         }
@@ -144,8 +144,14 @@ pub(super) fn process(subcommand: &Subcommands, opt: GlobalOpt) -> Result<()> {
         }
     } else {
         // apply provided configs one by one
-        apply!(cargo_home, temp_settings.cargo_home);
-        apply!(rustup_home, temp_settings.rustup_home);
+        apply!(
+            cargo_home.as_ref().map(PathBuf::from),
+            temp_settings.cargo_home
+        );
+        apply!(
+            rustup_home.as_ref().map(PathBuf::from),
+            temp_settings.rustup_home
+        );
         apply!(rustup_dist_server, temp_settings.rustup_dist_server);
         apply!(rustup_update_root, temp_settings.rustup_update_root);
         apply!(proxy, temp_settings.proxy);
@@ -167,8 +173,16 @@ fn list_config(settings: &Settings, _opt: GlobalOpt) {
         list of configurations\n\
         ----------------------"
     );
-    print_opt!("cargo-home", "[default]", settings.cargo_home);
-    print_opt!("rustup-home", "[default]", settings.rustup_home);
+    print_opt!(
+        "cargo-home",
+        "[default]",
+        settings.cargo_home.as_deref().map(Path::to_string_lossy)
+    );
+    print_opt!(
+        "rustup-home",
+        "[default]",
+        settings.rustup_home.as_deref().map((Path::to_string_lossy))
+    );
     print_opt!(
         "rustup-dist-server",
         "[default]",
@@ -284,8 +298,8 @@ fn overriding(msg: &str, create_new: bool, opt: GlobalOpt) -> Result<bool> {
 }
 
 fn show_settings_diff(old: &Settings, new: &Settings) {
-    diff!("cargo-home", "[default]", old => new, cargo_home);
-    diff!("rustup-home", "[default]", old => new, rustup_home);
+    diff!("cargo-home", "[default]", old => new, cargo_home.as_ref().map(|s| s.to_string_lossy()));
+    diff!("rustup-home", "[default]", old => new, rustup_home.as_ref().map(|s| s.to_string_lossy()));
     diff!("rustup-dist-server", "[default]", old => new, rustup_dist_server);
     diff!("rustup-update-root", "[default]", old => new, rustup_update_root);
     diff!("proxy", "[N/A]", old => new, proxy);

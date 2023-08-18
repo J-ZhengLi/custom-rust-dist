@@ -3,6 +3,7 @@
 
 use std::{
     collections::HashMap,
+    ffi::{OsStr, OsString},
     path::{Path, PathBuf},
 };
 
@@ -48,8 +49,8 @@ impl TryFromEnv for Configuration {
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub(crate) struct Settings {
-    pub cargo_home: Option<String>,
-    pub rustup_home: Option<String>,
+    pub cargo_home: Option<PathBuf>,
+    pub rustup_home: Option<PathBuf>,
     pub rustup_dist_server: Option<Url>,
     pub rustup_update_root: Option<Url>,
     pub proxy: Option<String>,
@@ -73,20 +74,36 @@ impl Settings {
     ///
     /// Note: cargo related settings will NOT be converted as they cannot be
     /// used as env vars.
-    pub fn to_key_value_pairs(&self) -> Vec<(&str, &str)> {
-        fn add_kv<'a, T: AsRef<str>>(
-            seq: &mut Vec<(&'a str, &'a str)>,
+    pub fn to_key_value_pairs(&self) -> Vec<(&str, OsString)> {
+        fn add_kv<'a, T: AsRef<OsStr>>(
+            seq: &mut Vec<(&'a str, OsString)>,
             key: &'a str,
-            v: &'a Option<T>,
+            v: Option<T>,
         ) {
             let Some(val) = v else { return };
-            seq.push((key, val.as_ref()));
+            seq.push((key, val.as_ref().to_os_string()));
         }
         let mut pairs = vec![];
-        add_kv(&mut pairs, "CARGO_HOME", &self.cargo_home);
-        add_kv(&mut pairs, "RUSTUP_HOME", &self.rustup_home);
-        add_kv(&mut pairs, "RUSTUP_DIST_SERVER", &self.rustup_dist_server);
-        add_kv(&mut pairs, "RUSTUP_UPDATE_ROOT", &self.rustup_update_root);
+        add_kv(
+            &mut pairs,
+            "CARGO_HOME",
+            self.cargo_home.as_deref().map(Path::as_os_str),
+        );
+        add_kv(
+            &mut pairs,
+            "RUSTUP_HOME",
+            self.rustup_home.as_deref().map(Path::as_os_str),
+        );
+        add_kv(
+            &mut pairs,
+            "RUSTUP_DIST_SERVER",
+            self.rustup_dist_server.as_ref().map(Url::as_str),
+        );
+        add_kv(
+            &mut pairs,
+            "RUSTUP_UPDATE_ROOT",
+            self.rustup_update_root.as_ref().map(Url::as_str),
+        );
         let key = if self
             .proxy
             .as_ref()
@@ -97,8 +114,8 @@ impl Settings {
         } else {
             "http_proxy"
         };
-        add_kv(&mut pairs, key, &self.proxy);
-        add_kv(&mut pairs, "no_proxy", &self.no_proxy);
+        add_kv(&mut pairs, key, self.proxy.as_ref());
+        add_kv(&mut pairs, "no_proxy", self.no_proxy.as_ref());
         pairs
     }
 }

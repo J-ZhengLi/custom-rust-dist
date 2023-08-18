@@ -5,6 +5,7 @@ use anyhow::Result;
 use logger::{err, info};
 use reqwest::{NoProxy, Proxy};
 
+use crate::mini_rustup::cli_common;
 use crate::parser::{Configuration, Settings};
 use crate::utils::DownloadOpt;
 use crate::{defaults, mini_rustup, steps, utils};
@@ -26,31 +27,49 @@ pub(super) fn process(subcommand: &Subcommands, opt: GlobalOpt) -> Result<()> {
         return Ok(());
     }
 
-    let root = root
-        .as_ref()
-        .map(PathBuf::from)
-        .unwrap_or_else(utils::home_dir);
-    let cargo_home = root.join(".cargo");
-    let rustup_home = root.join(".rustup");
-    // read the env var if the user did not pass the arg
-    let update_root = rustup_update_root.clone().or(env::var("RUSTUP_UPDATE_ROOT")
-        .ok()
-        .and_then(|s| s.parse().ok()));
-    let proxy = proxy
-        .clone()
-        .or(env::var("http_proxy").ok())
-        .or(env::var("HTTP_PROXY").ok())
-        .or(env::var("https_proxy").ok())
-        .or(env::var("HTTPS_PROXY").ok());
-    let no_proxy = no_proxy
-        .clone()
-        .or(env::var("no_proxy").ok())
-        .or(env::var("NO_PROXY").ok());
+    if let Some(root_path) = root {
+        // make sure this "root" directory exist
+        utils::mkdirs(&root_path)?;
+    }
+
+    let cargo_home_string = confirm_env_override(
+        "cargo-home (derived from `--root`)",
+        root.as_ref().map(|r| format!("{r}/.cargo")),
+        &["CARGO_HOME"],
+        opt,
+    )?
+    .map(utils::to_nomalized_abspath);
+    let rustup_home_string = confirm_env_override(
+        "rustup-home (derived from `--root`)",
+        root.as_ref().map(|r| format!("{r}/.rustup")),
+        &["RUSTUP_HOME"],
+        opt,
+    )?
+    .map(utils::to_nomalized_abspath);
+    let rustup_update_root = confirm_env_override(
+        "--rustup-update-root",
+        rustup_update_root.as_ref().map(|u| u.as_str().into()),
+        &["RUSTUP_UPDATE_ROOT"],
+        opt,
+    )?
+    .map(|s| utils::parse_url(&s));
+    let proxy = confirm_env_override(
+        "--proxy",
+        proxy.clone(),
+        &["http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"],
+        opt,
+    )?;
+    let no_proxy = confirm_env_override(
+        "--no-proxy",
+        no_proxy.clone(),
+        &["no_proxy", "NO_PROXY"],
+        opt,
+    )?;
     let config = Configuration {
         settings: Settings {
-            cargo_home: Some(utils::stringify_path(cargo_home)?),
-            rustup_home: Some(utils::stringify_path(rustup_home)?),
-            rustup_update_root: update_root,
+            cargo_home: utils::flip_option_result(cargo_home_string)?,
+            rustup_home: utils::flip_option_result(rustup_home_string)?,
+            rustup_update_root: utils::flip_option_result(rustup_update_root)?,
             proxy,
             no_proxy,
             ..Default::default()
@@ -59,9 +78,6 @@ pub(super) fn process(subcommand: &Subcommands, opt: GlobalOpt) -> Result<()> {
     };
 
     let triple = mini_rustup::target_triple();
-
-    // make sure this "root" directory exist
-    utils::mkdirs(&root)?;
     download_and_install_rustup(rustup_version.as_deref(), &config, &triple, *no_modify_path)?;
 
     Ok(())
@@ -135,4 +151,54 @@ fn configured_proxy_to_reqwest_proxy(config: &Configuration) -> Result<Option<Pr
         .as_ref()
         .and_then(|s| NoProxy::from_string(s));
     Ok(Some(proxy.no_proxy(maybe_no_proxy)))
+}
+
+/// Notify when the provided `val` is conflicting with a certain set of environment variables,
+/// and return a value base on user's choice.
+fn confirm_env_override(
+    name: &str,
+    val: Option<String>,
+    env_key: &[&str],
+    opt: GlobalOpt,
+) -> Result<Option<String>> {
+    if opt.yes {
+        return Ok(val);
+    }
+    let existing_env_var = env_key
+        .iter()
+        .find_map(|key| env::var(key).ok().map(|v| (key, v)));
+
+    if let Some(val_inner) = &val {
+        if let Some((env_key, env_val)) = existing_env_var {
+            // Both specified val and env var exists.
+            if val_inner == &env_val {
+                // Both specified val and env var exists but are the same, so return either one.
+                return Ok(Some(env_val));
+            }
+
+            if !opt.quiet {
+                info!(
+                    "specified value of '{name}' is already exist as environment variable '{env_key}', \
+                    continue with specified value? (This will overrides its environment variable)"
+                );
+            }
+            if !cli_common::confirm("Override (Y/n):", true)? {
+                return Ok(Some(env_val));
+            }
+        }
+    } else {
+        if let Some((env_key, env_val)) = existing_env_var {
+            // Only env var exists.
+            if !opt.quiet {
+                info!(
+                    "value of '{name}' was not specified but exists as environment variable '{env_key}', \
+                    do you want to keep it unspecified? (This will overrides its environment variable)"
+                );
+            }
+            if !cli_common::confirm("Keep value unspecified (y/N):", true)? {
+                return Ok(Some(env_val));
+            }
+        }
+    }
+    Ok(val)
 }
