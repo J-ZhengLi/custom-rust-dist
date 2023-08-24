@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use logger::{err, info};
 use reqwest::{NoProxy, Proxy};
 
@@ -23,9 +23,13 @@ pub(super) fn process(subcommand: &Subcommands, opt: GlobalOpt) -> Result<()> {
     } = subcommand else { return Ok(()) };
 
     if steps::load_config().is_ok() {
-        err!("unable to initialize because a configuration is already exist.");
-        return Ok(());
+        bail!(
+            "unable to initialize because configuration file already exists.\n\
+            run `uninstall` first if you want to re-init, otherwise just run `config` with \
+            desired values instead."
+        );
     }
+    
 
     if let Some(root_path) = root {
         // make sure this "root" directory exist

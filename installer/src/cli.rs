@@ -87,6 +87,11 @@ pub(crate) enum Subcommands {
         #[command(subcommand)]
         commands: Option<InstallCommand>,
     },
+    /// Uninstall options
+    Uninstall {
+        #[command(subcommand)]
+        commands: Option<UninstallCommand>,
+    },
     /// Initialize application by setting up environment, and install rustup
     Init {
         /// Don't configure the PATH environment variable
@@ -193,6 +198,11 @@ pub(crate) enum InstallCommand {
         #[arg(long)]
         target: Option<String>,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub(crate) enum UninstallCommand {
+    All,
 }
 
 impl Subcommands {
