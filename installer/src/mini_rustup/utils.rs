@@ -25,6 +25,7 @@ pub(crate) fn make_executable(path: &Path) -> Result<()> {
 
         perms.set_mode(new_mode);
         fs::set_permissions(path, perms)?;
+        Ok(())
     }
 
     inner(path)

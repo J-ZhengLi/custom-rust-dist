@@ -5,6 +5,31 @@
 use std::fmt;
 use std::ops::Deref;
 
+// Linux hosts don't indicate clib in uname, however binaries only
+// run on boxes with the same clib, as expected.
+#[cfg(all(not(windows), not(target_env = "musl")))]
+const TRIPLE_X86_64_UNKNOWN_LINUX: &str = "x86_64-unknown-linux-gnu";
+#[cfg(all(not(windows), target_env = "musl"))]
+const TRIPLE_X86_64_UNKNOWN_LINUX: &str = "x86_64-unknown-linux-musl";
+#[cfg(all(not(windows), not(target_env = "musl")))]
+const TRIPLE_AARCH64_UNKNOWN_LINUX: &str = "aarch64-unknown-linux-gnu";
+#[cfg(all(not(windows), target_env = "musl"))]
+const TRIPLE_AARCH64_UNKNOWN_LINUX: &str = "aarch64-unknown-linux-musl";
+
+// MIPS platforms don't indicate endianness in uname, however binaries only
+// run on boxes with the same endianness, as expected.
+// Hence we could distinguish between the variants with compile-time cfg()
+// attributes alone.
+#[cfg(all(not(windows), target_endian = "big"))]
+static TRIPLE_MIPS_UNKNOWN_LINUX_GNU: &str = "mips-unknown-linux-gnu";
+#[cfg(all(not(windows), target_endian = "little"))]
+static TRIPLE_MIPS_UNKNOWN_LINUX_GNU: &str = "mipsel-unknown-linux-gnu";
+
+#[cfg(all(not(windows), target_endian = "big"))]
+static TRIPLE_MIPS64_UNKNOWN_LINUX_GNUABI64: &str = "mips64-unknown-linux-gnuabi64";
+#[cfg(all(not(windows), target_endian = "little"))]
+static TRIPLE_MIPS64_UNKNOWN_LINUX_GNUABI64: &str = "mips64el-unknown-linux-gnuabi64";
+
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TargetTriple(String);
 

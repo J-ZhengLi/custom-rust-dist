@@ -46,7 +46,9 @@ impl TestConfig {
             .prefix("home_")
             .tempdir_in(&home_dir)
             .expect("unable to create temp home");
-        let conf_path = home.path().join(format!(".{}-config", env!("CARGO_PKG_NAME")));
+        let conf_path = home
+            .path()
+            .join(format!(".{}-config", env!("CARGO_PKG_NAME")));
 
         Self {
             data_dir: tests_dir.join("data"),
