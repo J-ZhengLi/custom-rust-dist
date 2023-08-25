@@ -28,7 +28,6 @@ pub struct TestConfig {
     pub exe_path: PathBuf,
     /// Mocked user `HOME` path.
     pub home: TempDir,
-    pub installer_home: PathBuf,
     /// The default configuration path defined by the installer,
     /// which should be placed under `home` directory.
     pub conf_path: PathBuf,
@@ -47,15 +46,13 @@ impl TestConfig {
             .prefix("home_")
             .tempdir_in(&home_dir)
             .expect("unable to create temp home");
-        let installer_home = home.path().join(env!("CARGO_PKG_NAME"));
-        let conf_path = installer_home.join("config");
+        let conf_path = home.path().join(format!(".{}-config", env!("CARGO_PKG_NAME")));
 
         Self {
             data_dir: tests_dir.join("data"),
             exe_path: exe_path().to_path_buf(),
             root: tests_dir,
             home,
-            installer_home,
             conf_path,
         }
     }

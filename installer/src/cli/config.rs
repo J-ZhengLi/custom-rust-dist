@@ -181,7 +181,7 @@ fn list_config(settings: &Settings, _opt: GlobalOpt) {
     print_opt!(
         "rustup-home",
         "[default]",
-        settings.rustup_home.as_deref().map((Path::to_string_lossy))
+        settings.rustup_home.as_deref().map(Path::to_string_lossy)
     );
     print_opt!(
         "rustup-dist-server",

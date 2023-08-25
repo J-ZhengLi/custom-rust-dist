@@ -1,7 +1,7 @@
 use std::env;
 use std::path::PathBuf;
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use logger::{err, info};
 use reqwest::{NoProxy, Proxy};
 
@@ -29,11 +29,10 @@ pub(super) fn process(subcommand: &Subcommands, opt: GlobalOpt) -> Result<()> {
             desired values instead."
         );
     }
-    
 
     if let Some(root_path) = root {
         // make sure this "root" directory exist
-        utils::mkdirs(&root_path)?;
+        utils::mkdirs(root_path)?;
     }
 
     let cargo_home_string = confirm_env_override(
@@ -190,18 +189,16 @@ fn confirm_env_override(
                 return Ok(Some(env_val));
             }
         }
-    } else {
-        if let Some((env_key, env_val)) = existing_env_var {
-            // Only env var exists.
-            if !opt.quiet {
-                info!(
-                    "value of '{name}' was not specified but exists as environment variable '{env_key}', \
-                    do you want to keep it unspecified? (This will overrides its environment variable)"
-                );
-            }
-            if !cli_common::confirm("Keep value unspecified (y/N):", true)? {
-                return Ok(Some(env_val));
-            }
+    } else if let Some((env_key, env_val)) = existing_env_var {
+        // Only env var exists.
+        if !opt.quiet {
+            info!(
+                "value of '{name}' was not specified but exists as environment variable '{env_key}', \
+                do you want to keep it unspecified? (This will overrides its environment variable)"
+            );
+        }
+        if !cli_common::confirm("Keep value unspecified (y/N):", true)? {
+            return Ok(Some(env_val));
         }
     }
     Ok(val)
