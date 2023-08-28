@@ -1,6 +1,7 @@
 [settings]
-cargo_home = "/home/cargo"
-rustup_home = "/home/rustup"
+install_dir = "/home/rupe"
+cargo_home = "/home/rupe/cargo"
+rustup_home = "/home/rupe/rustup"
 rustup_dist_server = "http://example.com/"
 rustup_update_root = "http://example.com/"
 proxy = "http://username:password@example.com:1234"

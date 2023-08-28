@@ -1,7 +1,13 @@
-#[cfg(feature = "cli")]
-mod cli_config;
+use cfg_if::cfg_if;
 
 use crate::common::run;
+
+cfg_if! {
+    if #[cfg(feature = "cli")] {
+        mod cli_config;
+        mod cli_init;
+    }
+}
 
 #[test]
 fn tests_path_created() {

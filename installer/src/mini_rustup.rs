@@ -12,7 +12,7 @@ pub(crate) mod utils;
 
 use dist::TargetTriple;
 
-pub(crate) fn target_triple() -> TargetTriple {
+pub fn target_triple() -> TargetTriple {
     // Get build triple
     let triple = dist::TargetTriple::from_build();
     // For windows x86 builds seem slow when used with windows defender.

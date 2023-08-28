@@ -1,5 +1,5 @@
 use std::cmp::min;
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::Path;
 use std::time::Duration;
@@ -49,7 +49,18 @@ impl<T: Sized> DownloadOpt<T> {
             handler,
         })
     }
+    // TODO: make local file download fancier
     pub fn download_file(&self, url: &Url, path: &Path, resume: bool) -> Result<()> {
+        if url.scheme() == "file" {
+            fs::copy(
+                url.to_file_path().map_err(|_| {
+                    anyhow!("unable to convert to file path for url '{}'", url.as_str())
+                })?,
+                path,
+            )?;
+            return Ok(());
+        }
+
         let mut resp = self.client.get(url.as_ref()).send()?;
         let total_size = resp
             .content_length()

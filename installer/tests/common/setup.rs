@@ -1,16 +1,19 @@
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, Once, OnceLock};
 use std::{env, fs, panic};
 
+use anyhow::Result;
 use tempfile::TempDir;
 
 use super::utils;
+use rupe::mini_rustup::target_triple;
 
 static EXE_PATH: OnceLock<PathBuf> = OnceLock::new();
 /// Global lock for tests using [`run`] wrapper,
 /// because such test jobs would rely on modified env variables,
 /// thus will not be safe to run concurrently.
 static LOCK: Mutex<()> = Mutex::new(());
+static BUILD_RUSTUP: Once = Once::new();
 
 #[cfg(windows)]
 const EXE_SUFFIX: &str = ".exe";
@@ -31,6 +34,7 @@ pub struct TestConfig {
     /// The default configuration path defined by the installer,
     /// which should be placed under `home` directory.
     pub conf_path: PathBuf,
+    pub mocked_server_root: PathBuf,
 }
 
 impl TestConfig {
@@ -39,23 +43,28 @@ impl TestConfig {
         let home_dir = tests_dir.join("home");
         // need to make sure this root exist so that a temp dir could be created.
         fs::create_dir_all(&home_dir).expect(
-            "unable to create `home` directory, \
-            try manually create one under `tests`",
+            "unable to create test home, \
+            try manually create a `./tests/home` directory",
         );
+
         let home = tempfile::Builder::new()
             .prefix("home_")
             .tempdir_in(&home_dir)
             .expect("unable to create temp home");
-        let conf_path = home
-            .path()
-            .join(format!(".{}-config", env!("CARGO_PKG_NAME")));
+        let conf_path = home.path().join(format!(".{}-config", super::APPNAME));
+        let data_dir = tests_dir.join("data");
+
+        // make a mock rustup dist server
+        let mocked_server_root = home_dir.join("server");
+        create_mocked_server(&mocked_server_root).expect("unable to create mocked server");
 
         Self {
-            data_dir: tests_dir.join("data"),
+            data_dir,
             exe_path: exe_path().to_path_buf(),
             root: tests_dir,
             home,
             conf_path,
+            mocked_server_root,
         }
     }
 
@@ -69,6 +78,14 @@ impl TestConfig {
     /// Convenient method to execute the built 'installer' executable with given args.
     pub fn execute(&self, args: &[&str]) {
         utils::execute(&self.exe_path, args)
+    }
+
+    pub fn execute_with_env<'a, I: IntoIterator<Item = (&'a str, &'a str)>>(
+        &self,
+        args: &[&str],
+        env: I,
+    ) {
+        utils::execute_with_env(&self.exe_path, args, env)
     }
 
     /// Convenient method to read a single file under `data_dir`
@@ -87,6 +104,61 @@ impl TestConfig {
     }
 }
 
+/// This will build `rustup-init` from `rustup` submodule, and then copy
+/// the result binary into a several locations under `tests/home` to produce a
+/// mocked rustup update root
+// FIXME: DRY
+fn create_mocked_server(server_path: &Path) -> Result<()> {
+    // build rustup-init from `rusup` submodule, this is preventing tests from downloading
+    // rustup-init binary from
+    let rustup_source_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("rustup");
+    if !rustup_source_dir.is_dir() {
+        panic!(
+            "unable to find rustup source directory, \n\
+            make sure `rustup` submodule was up to date by running \n\
+            `git submodule --init && git submodule --update`"
+        );
+    }
+    let target_triple = target_triple();
+    let target = target_triple.as_ref();
+    BUILD_RUSTUP.call_once(|| {
+        let _ = std::process::Command::new("cargo")
+            .current_dir(&rustup_source_dir)
+            .args(["build", "--locked", "--release", "--target", &target])
+            .status()
+            .expect("unable to build rustup");
+    });
+    let bin_name = format!("rustup-init{EXE_SUFFIX}");
+    let source_bin = rustup_source_dir
+        .join("target")
+        .join(target)
+        .join("release")
+        .join(&bin_name);
+
+    let rustup_root = server_path.join("rustup");
+    let dist_dir = rustup_root.join("dist").join(target);
+    fs::create_dir_all(&dist_dir)?;
+    let dist_path = dist_dir.join(&bin_name);
+    fs::copy(&source_bin, dist_path)?;
+
+    let mut version = String::new();
+    let rustup_manifest = fs::read_to_string(rustup_source_dir.join("Cargo.toml"))
+        .expect("unable to read cargo manifest from `rustup`");
+    for line in rustup_manifest.lines() {
+        if let Some(ver) = line.strip_prefix("version =") {
+            let trim_pat: &[_] = &['\"', ' ', '\n'];
+            version = ver.trim_matches(trim_pat).to_string();
+            break;
+        }
+    }
+    let archive_dir = rustup_root.join("archive").join(version).join(target);
+    fs::create_dir_all(&archive_dir)?;
+    let archive_path = archive_dir.join(&bin_name);
+    fs::copy(&source_bin, archive_path)?;
+
+    Ok(())
+}
+
 fn exe_path() -> &'static Path {
     EXE_PATH.get_or_init(|| {
         let test_exe_path = env::current_exe().expect("unable to locate current test exe");
@@ -94,7 +166,7 @@ fn exe_path() -> &'static Path {
         if built_exe_dir.ends_with("deps") {
             built_exe_dir = built_exe_dir.parent().unwrap();
         }
-        built_exe_dir.join(format!("{}{EXE_SUFFIX}", env!("CARGO_PKG_NAME")))
+        built_exe_dir.join(format!("{}{EXE_SUFFIX}", super::APPNAME))
     })
 }
 

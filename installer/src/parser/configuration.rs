@@ -5,6 +5,7 @@ use std::{
     collections::HashMap,
     ffi::{OsStr, OsString},
     path::{Path, PathBuf},
+    sync::OnceLock,
 };
 
 use anyhow::{anyhow, Context, Result};
@@ -13,6 +14,12 @@ use url::Url;
 
 use super::{crates::CargoInstallTrackerLite, TomlTable};
 use crate::utils;
+
+static DEFAULT_ROOT: OnceLock<PathBuf> = OnceLock::new();
+
+fn default_root<'a>() -> &'a Path {
+    DEFAULT_ROOT.get_or_init(|| utils::home_dir().join(crate::APPNAME))
+}
 
 pub trait TryFromEnv {
     /// Attempt to load data from runtime environment.
@@ -49,6 +56,8 @@ impl TryFromEnv for Configuration {
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq, Clone)]
 pub(crate) struct Settings {
+    /// Main directory for installation, this might containing `.rustup` or `.cargo` directories.
+    pub install_dir: Option<PathBuf>,
     pub cargo_home: Option<PathBuf>,
     pub rustup_home: Option<PathBuf>,
     pub rustup_dist_server: Option<Url>,
@@ -58,6 +67,42 @@ pub(crate) struct Settings {
     pub cargo: Option<CargoSettings>,
 }
 
+/// A struct containing paths to various sub folders
+/// under [`Settings::install_dir`].
+pub(crate) struct InstallerDirs {
+    pub root: PathBuf,
+    /// Directory for downloads
+    pub downloads: PathBuf,
+    /// Directory for extracted tools
+    pub tools: PathBuf,
+    /// Directory to store package archives
+    pub packages: PathBuf,
+    pub cargo: PathBuf,
+    pub rustup: PathBuf,
+}
+
+impl InstallerDirs {
+    fn from_settings(setts: &Settings) -> Self {
+        let root = setts.install_dir.as_deref().unwrap_or_else(default_root);
+        let cargo = setts
+            .cargo_home
+            .clone()
+            .unwrap_or_else(|| root.join(".cargo"));
+        let rustup = setts
+            .rustup_home
+            .clone()
+            .unwrap_or_else(|| root.join(".rustup"));
+        Self {
+            root: root.to_path_buf(),
+            downloads: root.join("downloads"),
+            tools: root.join("tools"),
+            packages: root.join("packages"),
+            cargo,
+            rustup,
+        }
+    }
+}
+
 impl TryFromEnv for Settings {
     fn try_from_env() -> Result<Self> {
         Ok(Settings::default())
@@ -65,6 +110,10 @@ impl TryFromEnv for Settings {
 }
 
 impl Settings {
+    /// Get paths to various sub folders under `install_dir`.
+    pub fn installer_dirs(&self) -> InstallerDirs {
+        InstallerDirs::from_settings(self)
+    }
     /// Return true if self is default settings.
     pub fn is_default(&self) -> bool {
         self == &Settings::default()

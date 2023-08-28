@@ -28,7 +28,7 @@ fn new_config_with_cargo_home_set() {
 #[test]
 fn import_full_config() {
     run(|cfg| {
-        let conf_path = cfg.data_dir.join("all_settings.toml");
+        let conf_path = cfg.data_dir.join("settings_with_no_previous_env.toml");
         let conf_path_str = utils::path_to_str(&conf_path);
 
         cfg.execute(&["config", "--input", conf_path_str]);
@@ -36,7 +36,7 @@ fn import_full_config() {
         // eliminate line ending difference between different OS by removing whitespaces
         let imported_content: String = cfg.read_config().split_whitespace().collect();
         let expected: String = cfg
-            .read_data("all_settings.toml")
+            .read_data("settings_with_no_previous_env.toml")
             .split_whitespace()
             .collect();
         assert_eq!(imported_content, expected);

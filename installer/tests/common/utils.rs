@@ -8,14 +8,32 @@ use std::process::Command;
 pub fn execute<P: AsRef<OsStr>>(program: P, args: &[&str]) {
     let _ = Command::new(&program)
         .args(args)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
-        .unwrap_or_else(|| {
+        .status()
+        .unwrap_or_else(|e| {
             panic!(
-                "unable to execute '{} {}'",
+                "unable to execute '{} {}': {}",
                 program.as_ref().to_string_lossy().to_string(),
                 args.join(" "),
+                e.to_string(),
+            )
+        });
+}
+
+pub fn execute_with_env<'a, P, I>(program: P, args: &[&str], env: I)
+where
+    P: AsRef<OsStr>,
+    I: IntoIterator<Item = (&'a str, &'a str)>,
+{
+    let _ = Command::new(program.as_ref())
+        .args(args)
+        .envs(env)
+        .status()
+        .unwrap_or_else(|e| {
+            panic!(
+                "unable to execute '{} {}': {}",
+                program.as_ref().to_string_lossy().to_string(),
+                args.join(" "),
+                e.to_string(),
             )
         });
 }

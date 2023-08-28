@@ -221,7 +221,7 @@ pub(crate) struct GlobalOpt {
     yes: bool,
 }
 
-pub(crate) fn run() -> Result<()> {
+pub fn run() -> Result<()> {
     let cli = Cli::parse();
 
     let global_opt = GlobalOpt {
