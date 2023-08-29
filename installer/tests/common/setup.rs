@@ -13,7 +13,9 @@ static EXE_PATH: OnceLock<PathBuf> = OnceLock::new();
 /// because such test jobs would rely on modified env variables,
 /// thus will not be safe to run concurrently.
 static LOCK: Mutex<()> = Mutex::new(());
-static BUILD_RUSTUP: Once = Once::new();
+static CREATE_MOCKED_RUSTUP_ROOT: Once = Once::new();
+
+type EnvPairs = Vec<(String, Option<String>)>;
 
 #[cfg(windows)]
 const EXE_SUFFIX: &str = ".exe";
@@ -56,7 +58,9 @@ impl TestConfig {
 
         // make a mock rustup dist server
         let mocked_server_root = home_dir.join("server");
-        create_mocked_server(&mocked_server_root).expect("unable to create mocked server");
+        CREATE_MOCKED_RUSTUP_ROOT.call_once(|| {
+            create_mocked_server(&mocked_server_root).expect("unable to create mocked server")
+        });
 
         Self {
             data_dir,
@@ -68,11 +72,20 @@ impl TestConfig {
         }
     }
 
-    pub fn setup_env<'a>(&self) -> Vec<(&'a str, Option<String>)> {
+    pub fn setup_env(&self) -> EnvPairs {
         let orig_home_var = env::var(HOME_VAR).ok();
-        env::set_var(HOME_VAR, &self.home.path());
+        let orig_cargo_home = env::var("CARGO_HOME").ok();
+        let orig_rustup_home = env::var("RUSTUP_HOME").ok();
 
-        vec![(HOME_VAR, orig_home_var)]
+        env::set_var(HOME_VAR, &self.home.path());
+        env::remove_var("CARGO_HOME");
+        env::remove_var("RUSTUP_HOME");
+
+        vec![
+            (HOME_VAR.into(), orig_home_var),
+            ("CARGO_HOME".into(), orig_cargo_home),
+            ("RUSTUP_HOME".into(), orig_rustup_home),
+        ]
     }
 
     /// Convenient method to execute the built 'installer' executable with given args.
@@ -121,13 +134,14 @@ fn create_mocked_server(server_path: &Path) -> Result<()> {
     }
     let target_triple = target_triple();
     let target = target_triple.as_ref();
-    BUILD_RUSTUP.call_once(|| {
-        let _ = std::process::Command::new("cargo")
-            .current_dir(&rustup_source_dir)
-            .args(["build", "--locked", "--release", "--target", &target])
-            .status()
-            .expect("unable to build rustup");
-    });
+
+    // build rustup-init
+    let _ = std::process::Command::new("cargo")
+        .current_dir(&rustup_source_dir)
+        .args(["build", "--locked", "--release", "--target", &target])
+        .status()
+        .expect("unable to build rustup");
+
     let bin_name = format!("rustup-init{EXE_SUFFIX}");
     let source_bin = rustup_source_dir
         .join("target")
@@ -170,7 +184,7 @@ fn exe_path() -> &'static Path {
     })
 }
 
-fn restore_env_vars(vars: &[(&str, Option<String>)]) {
+fn restore_env_vars(vars: &EnvPairs) {
     for (key, val) in vars {
         if let Some(v) = val {
             env::set_var(key, v);
@@ -180,7 +194,42 @@ fn restore_env_vars(vars: &[(&str, Option<String>)]) {
     }
 }
 
+pub enum Profile {
+    PreInit,
+    InitDefault,
+}
+
+impl Profile {
+    pub fn run(&self, cfg: &TestConfig) {
+        match self {
+            Profile::PreInit => (),
+            Profile::InitDefault => {
+                let rustup_update_root =
+                    url::Url::from_directory_path(cfg.mocked_server_root.join("rustup")).unwrap();
+
+                cfg.execute_with_env(
+                    &[
+                        "-y",
+                        "init",
+                        "--no-modify-path",
+                        "--rustup-update-root",
+                        rustup_update_root.as_str(),
+                    ],
+                    [("PATH", "")],
+                );
+            }
+        }
+    }
+}
+
 pub fn run<F>(test: F)
+where
+    F: FnOnce(&TestConfig) -> () + panic::UnwindSafe,
+{
+    run_with_profile(Profile::PreInit, test)
+}
+
+pub fn run_with_profile<F>(profile: Profile, test: F)
 where
     F: FnOnce(&TestConfig) -> () + panic::UnwindSafe,
 {
@@ -190,6 +239,9 @@ where
 
     let cfg = TestConfig::init();
     let backup = cfg.setup_env();
+
+    profile.run(&cfg);
+
     panic::catch_unwind(|| test(&cfg)).unwrap();
     restore_env_vars(&backup);
 }

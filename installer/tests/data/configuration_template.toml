@@ -9,15 +9,6 @@ rustup_update_root = "http://example.com/"
 proxy = "http://username:password@example.com:1234"
 no_proxy = "localhost"
 
-# Cargo related settings will be loaded from "cargo_home/config{.toml}"
-[settings.cargo]
-git_fetch_with_cli = true
-check_revoke = false
-default_registry = "mirror"
-
-[settings.cargo.registries.mirror]
-index = "http://mirror.example.com"
-
 [installation]
 rustup = "1.26.0"
 

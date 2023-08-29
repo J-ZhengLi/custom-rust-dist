@@ -70,17 +70,6 @@ pub(crate) enum Subcommands {
             ]
         )]
         input: Option<String>,
-        /// Use default settings
-        #[arg(
-            short,
-            long,
-            action = ArgAction::SetTrue,
-            conflicts_with_all = [
-                "cargo_home", "rustup_home", "rustup_dist_server", "rustup_update_root",
-                "proxy", "no_proxy", "git_fetch_with_cli", "check_revoke", "input",
-            ]
-        )]
-        default: Option<bool>,
     },
     /// Install rustup, rust toolchain, or various tools
     Install {

@@ -109,7 +109,7 @@ const EXT: &str = ".exe";
 const EXT: &str = "";
 
 fn rustup_already_installed() -> bool {
-    utils::standard_output(format!("rustup{EXT}"), &["-V"]).is_ok()
+    utils::standard_output(format!("rustup{EXT}"), &[""]).is_ok()
 }
 
 fn download_and_install_rustup(
@@ -167,8 +167,8 @@ fn download_and_install_rustup(
     }
 
     info!("setting up rustup...");
-    // TODO: find a way to forward error messages to current console.
-    utils::execute_for_output_with_env(&installer_dest, &args, env_vars)?;
+    let output = utils::execute_for_output_with_env(&installer_dest, &args, env_vars)?;
+    utils::forward_output(output)?;
     info!("rustup successfully installed");
 
     Ok(())

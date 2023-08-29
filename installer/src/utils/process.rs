@@ -1,4 +1,5 @@
 use std::ffi::OsStr;
+use std::io::Write;
 use std::process::{Command, Output};
 
 use anyhow::{Context, Result};
@@ -79,4 +80,10 @@ where
         .envs(env)
         .output()
         .with_context(|| exec_err!(program, args, ""))
+}
+
+pub(crate) fn forward_output(output: Output) -> Result<()> {
+    std::io::stdout().write_all(&output.stdout)?;
+    std::io::stderr().write_all(&output.stderr)?;
+    Ok(())
 }

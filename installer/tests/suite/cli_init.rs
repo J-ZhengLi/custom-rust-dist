@@ -4,8 +4,8 @@ use std::collections::HashMap;
 
 #[test]
 fn init_default_no_rustup() {
-    // a clean env is needed
-    let env = HashMap::from([("PATH", ""), ("CARGO_HOME", ""), ("RUSTUP_HOME", "")]);
+    // a clean path is needed
+    let env = HashMap::from([("PATH", "")]);
 
     run(|cfg| {
         let rustup_update_root =
@@ -15,6 +15,7 @@ fn init_default_no_rustup() {
             &[
                 "-y",
                 "init",
+                "--no-modify-path",
                 "--rustup-update-root",
                 rustup_update_root.as_str(),
             ],

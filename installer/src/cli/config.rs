@@ -79,29 +79,19 @@ pub(super) fn process(subcommand: &Subcommands, opt: GlobalOpt) -> Result<()> {
         check_revoke,
         registry,
         input,
-        default,
     } = subcommand else { return Ok(()) };
 
-    let maybe_config = steps::load_config().ok();
-    let create_new = maybe_config.is_none();
-    let mut existing_config = &mut maybe_config.unwrap_or_default();
+    let Ok(mut existing_config) = steps::load_config() else {
+        bail!("no configuration file detected, use `init` command instead")
+    };
 
     if *list {
-        if !opt.quiet && create_new {
-            warn!("no configuration file detected, showing default configuration instead");
-        }
         list_config(&existing_config.settings, opt);
         return Ok(());
     }
     if let Some(cfg_path_str) = input {
-        import_config(cfg_path_str, existing_config, create_new, opt)?;
+        import_config(cfg_path_str, &mut existing_config, opt)?;
         return Ok(());
-    }
-    if let Some(true) = default {
-        if !overriding("override with default", create_new, opt)? {
-            return Ok(());
-        }
-        return apply_settings(existing_config, Settings::default(), opt);
     }
 
     let mut temp_settings = existing_config.settings.clone();
@@ -163,7 +153,7 @@ pub(super) fn process(subcommand: &Subcommands, opt: GlobalOpt) -> Result<()> {
         temp_settings.cargo = Some(cargo_settings.clone());
     }
 
-    apply_settings(existing_config, temp_settings, opt)
+    apply_settings(&mut existing_config, temp_settings, opt)
 }
 
 /// Format program settings ([`Settings`]), and prints them.
@@ -232,12 +222,7 @@ fn registries_string(settings: &Settings) -> String {
     format!("[{content}]")
 }
 
-fn import_config(
-    path_str: &str,
-    existing: &mut Configuration,
-    create_new: bool,
-    opt: GlobalOpt,
-) -> Result<()> {
+fn import_config(path_str: &str, existing: &mut Configuration, opt: GlobalOpt) -> Result<()> {
     let cfg_path = Path::new(path_str);
     if !cfg_path.is_file() {
         bail!(
@@ -247,7 +232,7 @@ fn import_config(
     }
     let importing_cfg: Configuration = load_toml(cfg_path)?;
 
-    if !overriding("overide", create_new, opt)? {
+    if !overriding("overide", opt)? {
         return Ok(());
     }
     if !opt.quiet && importing_cfg.installation.is_some() {
@@ -285,16 +270,15 @@ fn apply_settings(conf: &mut Configuration, mut setts: Settings, opt: GlobalOpt)
 
 /// Ask confirmation whether or not to override existing configuration, e.g.
 /// returning `Ok(true)` means it will be overrided.
-fn overriding(msg: &str, create_new: bool, opt: GlobalOpt) -> Result<bool> {
-    if !create_new {
-        if !opt.quiet {
-            warn!("existing configuration detected");
-        }
-        if !opt.yes && !cli_common::confirm(&format!("{msg}? (y/n)"), false)? {
-            return Ok(false);
-        }
+fn overriding(msg: &str, opt: GlobalOpt) -> Result<bool> {
+    if !opt.quiet {
+        warn!("existing configuration detected");
     }
-    Ok(true)
+    if !opt.yes && !cli_common::confirm(&format!("{msg}? (y/n)"), false)? {
+        Ok(false)
+    } else {
+        Ok(true)
+    }
 }
 
 fn show_settings_diff(old: &Settings, new: &Settings) {
