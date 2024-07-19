@@ -1,9 +1,15 @@
+//! Contains all the definition of command line arguments.
+
 mod install;
 mod uninstall;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
+/// Master struct for command line args.
+///
+/// NOTE: If you changed anything in this struct, or any other child types that related to
+/// this struct, make sure the README doc is updated as well.
 #[derive(Parser)]
 #[command(version, about, arg_required_else_help = true)]
 struct CliOpt {
