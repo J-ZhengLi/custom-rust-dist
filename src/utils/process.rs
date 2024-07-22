@@ -1,3 +1,4 @@
+use std::env;
 use std::ffi::OsStr;
 use std::io::Write;
 use std::process::{Command, Output};
@@ -81,4 +82,12 @@ pub fn forward_output(output: Output) -> Result<()> {
     std::io::stdout().write_all(&output.stdout)?;
     std::io::stderr().write_all(&output.stderr)?;
     Ok(())
+}
+
+pub fn cmd_exist(cmd: &str) -> bool {
+    let cmd = format!("{cmd}{}", env::consts::EXE_SUFFIX);
+    let path = env::var_os("PATH").unwrap_or_default();
+    env::split_paths(&path)
+        .map(|p| p.join(&cmd))
+        .any(|p| p.exists())
 }
