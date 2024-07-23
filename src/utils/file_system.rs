@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use std::env;
 use std::fs;
+use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
 /// Get a path to user's "home" directory.
@@ -14,7 +15,7 @@ pub fn home_dir() -> PathBuf {
     home::home_dir().expect("home directory cannot be determined.")
 }
 
-/// Get a path to the root directory of this program.
+/// Get a path to the root directory of this program, typically `$HOME/<PKG_NAME>`.
 ///
 /// # Panic
 ///
@@ -75,4 +76,17 @@ pub fn to_nomalized_abspath<P: AsRef<Path> + Into<PathBuf>>(path: P) -> Result<P
     }
 
     Ok(nomalized_path)
+}
+
+pub fn write_file<P: AsRef<Path>>(path: P, content: &str, append: bool) -> Result<()> {
+    let mut options = fs::OpenOptions::new();
+    if append {
+        options.append(true);
+    } else {
+        options.truncate(true).write(true);
+    }
+    let mut file = options.create(true).open(path)?;
+    writeln!(file, "{content}")?;
+    file.sync_data()?;
+    Ok(())
 }

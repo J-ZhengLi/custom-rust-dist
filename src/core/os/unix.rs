@@ -1,19 +1,78 @@
-use crate::core::{Configuration, Preinstallation};
-use anyhow::Result;
+use crate::{
+    core::{InstallConfiguration, Installation, UninstallConfiguration, Uninstallation},
+    utils,
+};
+use anyhow::{anyhow, Context, Result};
 
-impl Preinstallation for Configuration {
-    fn config_cargo() -> Result<()> {
+impl Installation for InstallConfiguration {
+    // On linux, persistent env vars needs to be written in `.profile`, `.bash_profile`, etc.
+    // Rustup already did all the dirty work by writting an entry in those files
+    // to invoke `$CARGO_HOME/env.{sh|fish}`. Sadly we'll have to re-implement a similar procedure here,
+    // because rustup will not write those file if a user has choose to pass `--no-modify-path`.
+    // Which is not ideal for env vars such as `RUSTUP_DIST_SERVER`.
+    fn config_rustup_env_vars(&self) -> Result<()> {
+        let vars_raw = self.env_vars()?;
+        for sh in shell::get_available_shells() {
+            // Shell commands to set env var, such as `export KEY='val'`
+            let vars_shell_lines = vars_raw
+                .iter()
+                .map(|(k, v)| sh.env_var_string(k, v))
+                .collect::<Vec<_>>()
+                .join("\n");
+            // This string will be wrapped in a certain identifier comments.
+            let vars_shell_string = sh.script_content(&vars_shell_lines);
+            for rc in sh.update_rcs() {
+                let vars_to_write = match utils::read_to_string(&rc) {
+                    // Assume env configuration exist if the section label presents.
+                    Ok(content) if content.contains(shell::RC_FILE_SECTION_END) => continue,
+                    Ok(content) if !content.ends_with('\n') => &format!("\n{}", &vars_shell_string),
+                    _ => &vars_shell_string,
+                };
+
+                // Ok to append env config section now
+                utils::write_file(&rc, vars_to_write, true).with_context(|| {
+                    format!(
+                        "failed to append environment vars to shell profile: '{}'",
+                        rc.display()
+                    )
+                })?;
+            }
+        }
         Ok(())
     }
+}
 
-    fn config_rustup_env_vars() -> Result<()> {
-        // On linux, persistent env vars needs to be written in `.profile`, `.bash_profile`, etc.
-        // Rustup already did all the dirty work by writting an entry in those files
-        // to invoke `$CARGO_HOME/env.{sh|fish}`. Sadly we'll have to re-implement a similar procedure here,
-        // because rustup will not write those file if a user has choose to pass `--no-modify-path`.
-        // Which is not ideal for env vars such as `RUSTUP_DIST_SERVER`.
+impl Uninstallation for UninstallConfiguration {
+    // This is basically removing the section marked with `rustup config section` in shell profiles.
+    fn remove_rustup_env_vars(&self) -> Result<()> {
+        for sh in shell::get_available_shells() {
+            for rc in sh.rcfiles().iter().filter(|rc| rc.is_file()) {
+                let content = utils::read_to_string(rc)?;
+                let new_content = remove_sub_string_between(
+                    content,
+                    shell::RC_FILE_SECTION_START,
+                    &format!("{}\n", shell::RC_FILE_SECTION_END)
+                ).ok_or_else(
+                    || anyhow!(
+                        "unable to remove rustup config section from shell profile: '{}'. \
+                        This could mean that the section was already removed, or the section label is broken, \
+                        please try manually removing any command wrapped within comments that saying \
+                        'rustup config section' if there are any.",
+                        rc.display()
+                    )
+                )?;
+                utils::write_file(rc, &new_content, false)?;
+            }
+        }
         Ok(())
     }
+}
+
+fn remove_sub_string_between(mut input: String, start: &str, end: &str) -> Option<String> {
+    let start_pos = input.find(start)?;
+    let end_pos = input.find(end)? + end.len();
+    input.drain(start_pos..=end_pos);
+    Some(input)
 }
 
 /// Unix shell module, contains methods that are dedicated in configuring rustup env vars.
@@ -24,6 +83,11 @@ mod shell {
     use crate::utils;
     use anyhow::{bail, Result};
     use std::{env, path::PathBuf};
+
+    type Shell = Box<dyn UnixShell>;
+
+    pub(super) const RC_FILE_SECTION_START: &str = "# ===== rustup config section START =====";
+    pub(super) const RC_FILE_SECTION_END: &str = "# ===== rustup config section END =====";
 
     pub(super) trait UnixShell {
         // Detects if a shell "exists". Users have multiple shells, so an "eager"
@@ -37,33 +101,27 @@ mod shell {
         // Gives rcs that should be written to.
         fn update_rcs(&self) -> Vec<PathBuf>;
 
-        // Writes the relevant env file.
-        fn env_script(&self, raw_content: &str) -> ShellScript {
-            let content = format!(
-                "\n\
-                # ===== rustup config section START =====\n\
-                {raw_content}\n
-                # ===== rustup config section END =====\n"
-            );
-            ShellScript {
-                name: "env",
-                content,
-            }
+        /// Format a shell command to set env var.
+        fn env_var_string(&self, key: &'static str, val: &str) -> String {
+            format!("export {key}='{val}'")
         }
-    }
 
-    #[derive(Debug, PartialEq)]
-    pub(super) struct ShellScript {
-        content: String,
-        name: &'static str,
+        /// Wraps given content between a pair of identifiers.
+        ///
+        /// Such identifiers are comments defined as [`RC_FILE_SECTION_START`] and [`RC_FILE_SECTION_END`].
+        fn script_content(&self, raw_content: &str) -> String {
+            format!(
+                "{RC_FILE_SECTION_START}\n\
+                {raw_content}\n\
+                {RC_FILE_SECTION_END}\n"
+            )
+        }
     }
 
     struct Posix;
     struct Bash;
     struct Zsh;
     struct Fish;
-
-    type Shell = Box<dyn UnixShell>;
 
     impl UnixShell for Posix {
         fn does_exist(&self) -> bool {
@@ -174,6 +232,10 @@ mod shell {
             res
         }
 
+        fn env_var_string(&self, key: &'static str, val: &str) -> String {
+            format!("set -Ux {key} {val}")
+        }
+
         fn update_rcs(&self) -> Vec<PathBuf> {
             // The first rcfile takes precedence.
             match self.rcfiles().into_iter().next() {
@@ -192,5 +254,48 @@ mod shell {
         ];
 
         supported_shells.into_iter().filter(|sh| sh.does_exist())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::shell;
+
+    #[test]
+    fn remove_labeled_section() {
+        let mock_profile = "\
+#
+# ~/.bash_profile
+#
+
+[[ -f ~/.bashrc ]] && . ~/.bashrc
+
+# ===== rustup config section START =====
+export CARGO_HOME='/path/to/cargo'
+export RUSTUP_HOME='/path/to/rustup'
+export RUSTUP_DIST_SERVER='https://example.com'
+export RUSTUP_UPDATE_ROOT='https://example.com/rustup'
+# ===== rustup config section END =====
+. \"$HOME/.cargo/env\"
+";
+
+        let new = super::remove_sub_string_between(
+            mock_profile.to_string(),
+            shell::RC_FILE_SECTION_START,
+            shell::RC_FILE_SECTION_END,
+        )
+        .unwrap();
+        assert_eq!(
+            new,
+            "\
+#
+# ~/.bash_profile
+#
+
+[[ -f ~/.bashrc ]] && . ~/.bashrc
+
+. \"$HOME/.cargo/env\"
+"
+        );
     }
 }
