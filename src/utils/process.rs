@@ -1,3 +1,4 @@
+use std::env;
 use std::ffi::OsStr;
 use std::io::Write;
 use std::process::{Command, Output};
@@ -81,4 +82,21 @@ pub fn forward_output(output: Output) -> Result<()> {
     std::io::stdout().write_all(&output.stdout)?;
     std::io::stderr().write_all(&output.stderr)?;
     Ok(())
+}
+
+#[derive(Clone, Debug)]
+pub enum Process {
+    OsProcess,
+}
+
+impl Process {
+    pub fn os() -> Self {
+        Self::OsProcess
+    }
+
+    pub fn var(&self, key: &str) -> Result<String, env::VarError> {
+        match self {
+            Process::OsProcess => env::var(key),
+        }
+    }
 }

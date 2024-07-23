@@ -12,3 +12,4 @@ indicatif = "0.17"
 reqwest = { version = "0.12", features = ["blocking"] }
 serde = { version = "1", features = ["derive"] }
 url = "2"
+libc = "0.2"
