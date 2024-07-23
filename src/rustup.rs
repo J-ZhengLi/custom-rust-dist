@@ -19,7 +19,7 @@ impl Rustup {
     pub fn new(process: &Process) -> Self {
         let host_triple = match HostTriple::from_host(process) {
             Some(host_triple) => host_triple,
-            None => todo!("Do warning processing"),
+            None => panic!("Failed to get local host triple."),
         };
         Self {
             triple: host_triple,
@@ -27,16 +27,14 @@ impl Rustup {
     }
 
     pub fn download(&self, dest: &Path) {
-        let download_url = match url::Url::parse(&format!(
+        let download_url = url::Url::parse(&format!(
             "{}/{}/{}/{}",
             RUSTUP_UPDATE_ROOT, "dist", self.triple, RUSTUP_INIT
-        )) {
-            Ok(url) => url,
-            Err(_) => todo!("Do warning processing"),
-        };
+        ))
+        .expect("Failed to init rustup download url");
         match download_from_start(RUSTUP_INIT, &download_url, dest) {
             Ok(_) => (),
-            Err(_) => todo!("Do warning processing"),
+            Err(e) => panic!("Failed to download rustup, cause: {:?}", e),
         }
     }
 }
