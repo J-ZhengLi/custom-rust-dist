@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{fmt, ops::Deref};
 
 use crate::utils::Process;
 
@@ -32,16 +32,16 @@ static TRIPLE_MIPS64_UNKNOWN_LINUX_GNUABI64: &str = "mips64-unknown-linux-gnuabi
 static TRIPLE_MIPS64_UNKNOWN_LINUX_GNUABI64: &str = "mips64el-unknown-linux-gnuabi64";
 
 #[derive(Debug)]
-pub struct TargetTriple(String);
+pub struct HostTriple(String);
 
-impl TargetTriple {
+impl HostTriple {
     pub fn new(name: impl Into<String>) -> Self {
         Self(name.into())
     }
 
     pub(crate) fn from_host(process: &Process) -> Option<Self> {
         #[cfg(windows)]
-        fn inner() -> Option<TargetTriple> {
+        fn inner() -> Option<HostTriple> {
             use std::mem;
 
             /// Get the host architecture using `IsWow64Process2`. This function
@@ -113,11 +113,11 @@ impl TargetTriple {
             // Default to msvc
             let arch = arch_primary().or_else(arch_fallback)?;
             let msvc_triple = format!("{arch}-pc-windows-msvc");
-            Some(TargetTriple(msvc_triple))
+            Some(HostTriple(msvc_triple))
         }
 
         #[cfg(not(windows))]
-        fn inner() -> Option<TargetTriple> {
+        fn inner() -> Option<HostTriple> {
             use std::ffi::CStr;
             use std::mem;
 
@@ -153,7 +153,7 @@ impl TargetTriple {
                 _ => None,
             };
 
-            host_triple.map(TargetTriple::new)
+            host_triple.map(HostTriple::new)
         }
 
         if let Ok(triple) = process.var("XUANWU_OVERRIDE_HOST_TRPLE") {
@@ -164,10 +164,16 @@ impl TargetTriple {
     }
 }
 
-impl Deref for TargetTriple {
+impl Deref for HostTriple {
     type Target = str;
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl fmt::Display for HostTriple {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 

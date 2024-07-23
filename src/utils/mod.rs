@@ -6,10 +6,12 @@
 mod download;
 mod file_system;
 mod process;
+mod triple;
 
 pub use download::cli;
 pub use file_system::*;
 pub use process::*;
+pub use triple::HostTriple;
 
 use anyhow::{Context, Result};
 use url::Url;
