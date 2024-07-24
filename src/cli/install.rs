@@ -15,8 +15,8 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
     // TODO: Try read config from install options.
     let config = InstallConfiguration::default();
     config.init()?;
-    // TODO: handle configurations
     config.config_rustup_env_vars()?;
+    config.config_cargo()?;
     // TODO: download rustup then install
     // TODO: install rust toolchian via rustup
     // TODO: install third-party tools via cargo that got installed by rustup

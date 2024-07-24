@@ -5,6 +5,8 @@ use anyhow::{Context, Result};
 use crate::utils::cli::download_from_start;
 use crate::utils::HostTriple;
 
+// FIXME: remove this `allow` before 0.1.0 release.
+#[allow(unused)]
 const RUSTUP_DIST_SERVER: &str = "https://mirrors.tuna.tsinghua.edu.cn/rustup";
 const RUSTUP_UPDATE_ROOT: &str = "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup";
 
