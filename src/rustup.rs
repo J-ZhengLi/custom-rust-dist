@@ -1,7 +1,9 @@
 use std::path::Path;
 
+use anyhow::{Context, Result};
+
 use crate::utils::cli::download_from_start;
-use crate::utils::{HostTriple, Process};
+use crate::utils::HostTriple;
 
 const RUSTUP_DIST_SERVER: &str = "https://mirrors.tuna.tsinghua.edu.cn/rustup";
 const RUSTUP_UPDATE_ROOT: &str = "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup";
@@ -16,8 +18,8 @@ pub struct Rustup {
 }
 
 impl Rustup {
-    pub fn new(process: &Process) -> Self {
-        let host_triple = match HostTriple::from_host(process) {
+    pub fn new() -> Self {
+        let host_triple = match HostTriple::from_host() {
             Some(host_triple) => host_triple,
             None => panic!("Failed to get local host triple."),
         };
@@ -26,15 +28,12 @@ impl Rustup {
         }
     }
 
-    pub fn download(&self, dest: &Path) {
+    pub fn download(&self, dest: &Path) -> Result<()> {
         let download_url = url::Url::parse(&format!(
             "{}/{}/{}/{}",
             RUSTUP_UPDATE_ROOT, "dist", self.triple, RUSTUP_INIT
         ))
-        .expect("Failed to init rustup download url");
-        match download_from_start(RUSTUP_INIT, &download_url, dest) {
-            Ok(_) => (),
-            Err(e) => panic!("Failed to download rustup, cause: {:?}", e),
-        }
+        .context("Failed to init rustup download url")?;
+        download_from_start(RUSTUP_INIT, &download_url, dest).context("Failed to download rustup")
     }
 }

@@ -1,6 +1,4 @@
-use std::{fmt, ops::Deref};
-
-use crate::utils::Process;
+use std::{env, fmt, ops::Deref};
 
 // Linux hosts don't indicate clib in uname, however binaries only
 // run on boxes with the same clib, as expected.
@@ -39,7 +37,7 @@ impl HostTriple {
         Self(name.into())
     }
 
-    pub(crate) fn from_host(process: &Process) -> Option<Self> {
+    pub(crate) fn from_host() -> Option<Self> {
         #[cfg(windows)]
         fn inner() -> Option<HostTriple> {
             use std::mem;
@@ -156,7 +154,7 @@ impl HostTriple {
             host_triple.map(HostTriple::new)
         }
 
-        if let Ok(triple) = process.var("XUANWU_OVERRIDE_HOST_TRPLE") {
+        if let Ok(triple) = env::var("XUANWU_OVERRIDE_HOST_TRPLE") {
             Some(Self(triple))
         } else {
             inner()
