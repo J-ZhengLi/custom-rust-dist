@@ -1,5 +1,8 @@
 use crate::{
-    core::{InstallConfiguration, Installation, UninstallConfiguration, Uninstallation},
+    core::{
+        cargo_config::CargoConfig, InstallConfiguration, Installation, UninstallConfiguration,
+        Uninstallation,
+    },
     utils,
 };
 use anyhow::{anyhow, Context, Result};
@@ -38,6 +41,21 @@ impl Installation for InstallConfiguration {
                 })?;
             }
         }
+        Ok(())
+    }
+
+    fn config_cargo(&self) -> Result<()> {
+        let mut config = CargoConfig::new();
+        if let Some((name, url)) = &self.cargo_registry {
+            config.add_source(name, url.to_owned(), true);
+        }
+
+        let config_toml = config.to_toml()?;
+        if !config_toml.trim().is_empty() {
+            let config_path = self.cargo_home().join("config.toml");
+            utils::write_file(config_path, &config_toml, false)?;
+        }
+
         Ok(())
     }
 }
