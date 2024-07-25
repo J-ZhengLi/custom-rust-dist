@@ -3,12 +3,17 @@
 //! Including configuration, toolchain, toolset management.
 
 mod cargo_config;
+mod manifest;
 mod os;
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use serde::{de::DeserializeOwned, Serialize};
+use toml::{de, ser};
 use url::Url;
+
+use crate::utils;
 
 /// Contains definition of installation steps, including pre-install configs.
 ///
@@ -98,3 +103,31 @@ pub(crate) trait Uninstallation {
 // NB: Currently, there's no uninstall configurations, this struct is only
 // used for abstract purpose.
 pub(crate) struct UninstallConfiguration;
+
+#[allow(unused)]
+pub(crate) trait TomlParser {
+    /// Deserialize a certain type from [`str`] value.
+    fn from_str(from: &str) -> Result<Self>
+    where
+        Self: Sized + DeserializeOwned,
+    {
+        Ok(de::from_str(from)?)
+    }
+
+    /// Serialize data of a type into [`String`].
+    fn to_toml(&self) -> Result<String>
+    where
+        Self: Sized + Serialize,
+    {
+        Ok(ser::to_string(self)?)
+    }
+
+    /// Load TOML data directly from a certain file path.
+    fn load<P: AsRef<Path>>(path: P) -> Result<Self>
+    where
+        Self: Sized + DeserializeOwned,
+    {
+        let raw = utils::read_to_string(path)?;
+        Self::from_str(&raw)
+    }
+}
