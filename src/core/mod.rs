@@ -10,19 +10,12 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use url::Url;
 
-use crate::utils;
-
 /// Contains definition of installation steps, including pre-install configs.
 ///
 /// Make sure to always call `init()` as it creates essential folders to
 /// hold the installation files.
 pub(crate) trait Installation {
-    fn init(&self) -> Result<()> {
-        // Create a new folder to hold installation
-        let folder = utils::installer_home();
-        utils::mkdirs(folder)?;
-        Ok(())
-    }
+    fn init(&self) -> Result<()>;
     /// Configure environment variables for `rustup`.
     ///
     /// This will set persistent environment variables including
@@ -36,7 +29,7 @@ pub(crate) trait Installation {
 
 #[derive(Debug)]
 pub(crate) struct InstallConfiguration {
-    cargo_registry: Option<(String, Url)>,
+    pub(crate) cargo_registry: Option<(String, Url)>,
     /// Path to install everything.
     ///
     /// Note that this folder will includes `.cargo` and `.rustup` folders as well.
@@ -44,20 +37,9 @@ pub(crate) struct InstallConfiguration {
     /// So, even if the user didn't specify any install path, a pair of env vars will still
     /// be written (CARGO_HOME and RUSTUP_HOME), as they will be located in a sub folder of `$HOME`,
     /// which is [`installer_home`](utils::installer_home).
-    install_dir: PathBuf,
-    rustup_dist_server: Option<String>,
-    rustup_update_root: Option<String>,
-}
-
-impl Default for InstallConfiguration {
-    fn default() -> Self {
-        Self {
-            install_dir: utils::installer_home(),
-            rustup_dist_server: None,
-            rustup_update_root: None,
-            cargo_registry: None,
-        }
-    }
+    pub(crate) install_dir: PathBuf,
+    pub(crate) rustup_dist_server: Option<Url>,
+    pub(crate) rustup_update_root: Option<Url>,
 }
 
 impl InstallConfiguration {
@@ -84,12 +66,12 @@ impl InstallConfiguration {
         let mut env_vars: Vec<(&str, String)> = self
             .rustup_dist_server
             .clone()
-            .map(|s| ("RUSTUP_DIST_SERVER", s))
+            .map(|s| ("RUSTUP_DIST_SERVER", s.to_string()))
             .into_iter()
             .chain(
                 self.rustup_update_root
                     .clone()
-                    .map(|s| ("RUSTUP_UPDATE_ROOT", s))
+                    .map(|s| ("RUSTUP_UPDATE_ROOT", s.to_string()))
                     .into_iter(),
             )
             .collect();
@@ -109,12 +91,7 @@ pub(crate) trait Uninstallation {
     fn remove_rustup_env_vars(&self) -> Result<()>;
     /// The last step of uninstallation, this will remove the binary itself, along with
     /// the folder it's in.
-    fn remove_self(&self) -> Result<()> {
-        // FIXME: Remove the binary itself, as it might causing failure of `remove_dir_all`.
-        // remove the installer home dir
-        std::fs::remove_dir_all(utils::installer_home())?;
-        Ok(())
-    }
+    fn remove_self(&self) -> Result<()>;
 }
 
 /// Configurations to use when installing.
