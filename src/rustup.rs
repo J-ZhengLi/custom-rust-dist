@@ -19,8 +19,8 @@ pub struct Rustup {
     triple: HostTriple,
 }
 
-impl Rustup {
-    pub fn new() -> Self {
+impl Default for Rustup {
+    fn default() -> Self {
         let host_triple = match HostTriple::from_host() {
             Some(host_triple) => host_triple,
             None => panic!("Failed to get local host triple."),
@@ -28,6 +28,12 @@ impl Rustup {
         Self {
             triple: host_triple,
         }
+    }
+}
+
+impl Rustup {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn download(&self, dest: &Path) -> Result<()> {
