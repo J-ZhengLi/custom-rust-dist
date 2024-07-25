@@ -2,8 +2,9 @@
 
 use serde::{ser::SerializeMap, Serialize};
 use std::collections::BTreeMap;
-use toml::ser;
 use url::Url;
+
+use super::TomlParser;
 
 /// A simple struct representing the fields in `config.toml`.
 ///
@@ -17,6 +18,8 @@ pub(crate) struct CargoConfig {
     #[serde(serialize_with = "serialize_source_map")]
     source: BTreeMap<String, Source>,
 }
+
+impl TomlParser for CargoConfig {}
 
 // FIXME: remove this `allow` before 0.1.0 release.
 #[allow(unused)]
@@ -70,10 +73,6 @@ impl CargoConfig {
 
         self
     }
-
-    pub(crate) fn to_toml(&self) -> anyhow::Result<String> {
-        Ok(ser::to_string(self)?)
-    }
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -92,7 +91,6 @@ pub(crate) struct CargoHttpConfig {
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct Source {
     pub(crate) replace_with: Option<String>,
-    #[serde(serialize_with = "serialize_url_opt")]
     pub(crate) registry: Option<Url>,
 }
 
@@ -112,19 +110,10 @@ where
     }
 }
 
-fn serialize_url_opt<S>(url: &Option<Url>, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    match url.to_owned() {
-        Some(u) => serializer.serialize_some(u.as_str()),
-        None => serializer.serialize_none(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::CargoConfig;
+    use crate::core::TomlParser;
 
     #[test]
     fn cargo_config_default_serialize() {

@@ -2,8 +2,8 @@ use std::{path::PathBuf, sync::OnceLock};
 
 use crate::{
     core::{
-        cargo_config::CargoConfig, InstallConfiguration, Installation, UninstallConfiguration,
-        Uninstallation,
+        cargo_config::CargoConfig, InstallConfiguration, Installation, TomlParser,
+        UninstallConfiguration, Uninstallation,
     },
     utils,
 };
