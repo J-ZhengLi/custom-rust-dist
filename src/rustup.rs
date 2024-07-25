@@ -5,6 +5,8 @@ use anyhow::{Context, Result};
 use crate::utils::cli::download_from_start;
 use crate::utils::HostTriple;
 
+// FIXME: remove this `allow` before 0.1.0 release.
+#[allow(unused)]
 const RUSTUP_DIST_SERVER: &str = "https://mirrors.tuna.tsinghua.edu.cn/rustup";
 const RUSTUP_UPDATE_ROOT: &str = "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup";
 
@@ -17,8 +19,8 @@ pub struct Rustup {
     triple: HostTriple,
 }
 
-impl Rustup {
-    pub fn new() -> Self {
+impl Default for Rustup {
+    fn default() -> Self {
         let host_triple = match HostTriple::from_host() {
             Some(host_triple) => host_triple,
             None => panic!("Failed to get local host triple."),
@@ -26,6 +28,12 @@ impl Rustup {
         Self {
             triple: host_triple,
         }
+    }
+}
+
+impl Rustup {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn download(&self, dest: &Path) -> Result<()> {
