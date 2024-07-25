@@ -25,7 +25,7 @@ impl Installation for InstallConfiguration {
         let self_exe = std::env::current_exe()?;
         let cargo_bin_dir = self.cargo_home().join("bin");
         utils::mkdirs(&cargo_bin_dir)?;
-        utils::copy_to(&self_exe, &cargo_bin_dir)?;
+        utils::copy_to(self_exe, &cargo_bin_dir)?;
 
         INIT_ONCE.get_or_init(|| ());
         Ok(())
