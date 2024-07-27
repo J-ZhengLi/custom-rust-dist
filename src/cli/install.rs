@@ -1,8 +1,10 @@
 //! Separated module to handle installation related behaviors in command line.
 
+use std::collections::BTreeMap;
+
 use crate::{
-    core::{InstallConfiguration, Installation},
-    utils,
+    core::manifest::RustToolchain, core::manifest::ToolsetManifest, core::InstallConfiguration,
+    core::Installation, rustup::Rustup, utils,
 };
 
 use super::{GlobalOpt, Subcommands};
@@ -38,8 +40,16 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
     config.init()?;
     config.config_rustup_env_vars()?;
     config.config_cargo()?;
-    // TODO: download rustup then install
-    // TODO: install rust toolchian via rustup
+
+    // TODO: Download manifest form remote server.
+    let manifest = ToolsetManifest {
+        rust: RustToolchain::new("stable"),
+        target: BTreeMap::default(),
+        tools: BTreeMap::default(),
+    };
+
+    Rustup::init().download_toolchain(&config, &manifest)?;
+
     // TODO: install third-party tools via cargo that got installed by rustup
 
     unimplemented!("`install` is not fully yet implemented.")

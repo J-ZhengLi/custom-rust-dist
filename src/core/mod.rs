@@ -3,7 +3,7 @@
 //! Including configuration, toolchain, toolset management.
 
 mod cargo_config;
-mod manifest;
+pub mod manifest;
 mod os;
 
 use std::path::{Path, PathBuf};
