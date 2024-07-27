@@ -1,7 +1,8 @@
 use std::env;
 use std::ffi::OsStr;
+use std::fmt::Debug;
 use std::io::Write;
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 
 use anyhow::{Context, Result};
 
@@ -90,4 +91,66 @@ pub fn cmd_exist(cmd: &str) -> bool {
     env::split_paths(&path)
         .map(|p| p.join(&cmd))
         .any(|p| p.exists())
+}
+
+/// Execute a command as child process, wait for it to finish then collect its std output.
+pub fn cmd_output<P, A>(program: P, args: &[A]) -> Result<()>
+where
+    P: AsRef<OsStr> + Debug,
+    A: AsRef<OsStr>,
+{
+    let child = Command::new(program.as_ref())
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|_| panic!("Failed to spawn {:?} process.", program));
+
+    let output = child.wait_with_output().expect("Failed to read stdout");
+
+    // 检查子进程的退出状态
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!(
+            "{:?} failed with error: {}",
+            program,
+            stderr
+        ));
+    }
+
+    Ok(())
+}
+
+/// Execute a command as child process with input, wait for it to finish then collect its std output.
+pub fn cmd_output_with_input<P, A>(program: P, args: &[A], input: &[u8]) -> Result<()>
+where
+    P: AsRef<OsStr> + Debug,
+    A: AsRef<OsStr>,
+{
+    let mut child = Command::new(program.as_ref())
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap_or_else(|_| panic!("Failed to spawn {:?} process.", program));
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin
+            .write_all(input)
+            .unwrap_or_else(|_| panic!("Failed to spawn {:?} process.", program))
+    }
+
+    let output = child.wait_with_output().expect("Failed to read stdout");
+
+    // 检查子进程的退出状态
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow::anyhow!(
+            "{:?} failed with error: {}",
+            program,
+            stderr
+        ));
+    }
+
+    Ok(())
 }

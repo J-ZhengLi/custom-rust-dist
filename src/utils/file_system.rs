@@ -103,3 +103,21 @@ where
     fs::copy(from, dest)?;
     Ok(())
 }
+
+/// Set file permissions (executable)
+/// rwxr-xr-x: 0o755
+#[cfg(not(windows))]
+pub fn create_executable_file(path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    // 设置文件权限为可执行
+    let metadata = std::fs::metadata(path)?;
+    let mut permissions = metadata.permissions();
+    permissions.set_mode(0o755); // rwxr-xr-x
+    std::fs::set_permissions(path, permissions)?;
+    Ok(())
+}
+
+#[cfg(windows)]
+pub fn create_executable_file(path: &str, content: &str) -> Result<()> {
+    Ok(())
+}
