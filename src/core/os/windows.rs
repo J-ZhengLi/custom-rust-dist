@@ -10,6 +10,8 @@ use crate::{
     utils,
 };
 use anyhow::{bail, Result};
+use winapi::shared::minwindef;
+use winapi::um::winuser;
 
 use super::{ensure_init_call, install_dir_from_exe_path, INIT_ONCE};
 
@@ -49,6 +51,8 @@ impl Installation for InstallConfiguration {
                 );
             }
         }
+
+        update_env();
 
         Ok(())
     }
@@ -106,6 +110,8 @@ impl Uninstallation for UninstallConfiguration {
             }
         }
 
+        update_env();
+
         Ok(())
     }
 
@@ -120,6 +126,22 @@ impl Uninstallation for UninstallConfiguration {
         // use the rustup way.
         remove_self_()?;
         Ok(())
+    }
+}
+
+/// Broadcast environment changes to other processes,
+/// required after making env changes.
+fn update_env() {
+    unsafe {
+        winuser::SendMessageTimeoutA(
+            winuser::HWND_BROADCAST,
+            winuser::WM_SETTINGCHANGE,
+            0 as minwindef::WPARAM,
+            "Environment\0".as_ptr() as minwindef::LPARAM,
+            winuser::SMTO_ABORTIFHUNG,
+            5000,
+            std::ptr::null_mut(),
+        );
     }
 }
 
