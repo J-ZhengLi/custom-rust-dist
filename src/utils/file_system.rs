@@ -118,6 +118,6 @@ pub fn create_executable_file(path: &Path) -> Result<()> {
 }
 
 #[cfg(windows)]
-pub fn create_executable_file(path: &str, content: &str) -> Result<()> {
+pub fn create_executable_file(_path: &Path) -> Result<()> {
     Ok(())
 }

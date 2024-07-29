@@ -4,8 +4,9 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use reqwest::blocking::{Client, ClientBuilder};
+use reqwest::header::USER_AGENT;
 use reqwest::Proxy;
 use url::Url;
 
@@ -61,7 +62,18 @@ impl<T: Sized> DownloadOpt<T> {
             return Ok(());
         }
 
-        let mut resp = self.client.get(url.as_ref()).send()?;
+        let mut resp = self
+            .client
+            .get(url.as_ref())
+            .header(USER_AGENT, env!("CARGO_PKG_NAME"))
+            .send()?;
+        let status = resp.status();
+        if !status.is_success() {
+            bail!(
+                "failed to receive surver response when downloading '{}': {status}",
+                self.name
+            );
+        }
         let total_size = resp
             .content_length()
             .ok_or_else(|| anyhow!("unable to get file length of '{}'", url.as_str()))?;
