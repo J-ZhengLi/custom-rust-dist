@@ -16,6 +16,10 @@ url = { version = "2", features = ["serde"] }
 libc = "0.2"
 toml = "0.8.15"
 
+[target."cfg(windows)".dependencies]
+winreg = "0.52.0"
+winapi = { version = "0.3", features = ["winuser"] }
+
 [target."cfg(windows)".dependencies.windows-sys]
 features = [
   "Win32_Foundation",

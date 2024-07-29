@@ -15,6 +15,21 @@ use url::Url;
 
 use crate::utils;
 
+macro_rules! declare_env_vars {
+    ($($key:ident),+) => {
+        $(pub(crate) const $key: &str = stringify!($key);)*
+        #[cfg(windows)]
+        pub(crate) static ALL_VARS: &[&str] = &[$($key),+];
+    };
+}
+
+declare_env_vars!(
+    CARGO_HOME,
+    RUSTUP_HOME,
+    RUSTUP_DIST_SERVER,
+    RUSTUP_UPDATE_ROOT
+);
+
 /// Contains definition of installation steps, including pre-install configs.
 ///
 /// Make sure to always call `init()` as it creates essential folders to
@@ -71,17 +86,17 @@ impl InstallConfiguration {
         let mut env_vars: Vec<(&str, String)> = self
             .rustup_dist_server
             .clone()
-            .map(|s| ("RUSTUP_DIST_SERVER", s.to_string()))
+            .map(|s| (RUSTUP_DIST_SERVER, s.to_string()))
             .into_iter()
             .chain(
                 self.rustup_update_root
                     .clone()
-                    .map(|s| ("RUSTUP_UPDATE_ROOT", s.to_string()))
+                    .map(|s| (RUSTUP_UPDATE_ROOT, s.to_string()))
                     .into_iter(),
             )
             .collect();
-        env_vars.push(("CARGO_HOME", cargo_home));
-        env_vars.push(("RUSTUP_HOME", rustup_home));
+        env_vars.push((CARGO_HOME, cargo_home));
+        env_vars.push((RUSTUP_HOME, rustup_home));
 
         Ok(env_vars)
     }
