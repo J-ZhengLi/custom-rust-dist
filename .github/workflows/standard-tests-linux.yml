@@ -1,0 +1,26 @@
+name: Standard Tests
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux-check:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build
+      run: cargo build --workspace --verbose
+    - name: Clippy check
+      run: cargo clippy --all
+    - name: Formatting check
+      run: cargo fmt --all --check
+    - name: Run tests
+      run: cargo test --verbose

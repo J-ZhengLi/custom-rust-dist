@@ -18,6 +18,7 @@ use crate::utils;
 macro_rules! declare_env_vars {
     ($($key:ident),+) => {
         $(pub(crate) const $key: &str = stringify!($key);)*
+        #[cfg(windows)]
         pub(crate) static ALL_VARS: &[&str] = &[$($key),+];
     };
 }
