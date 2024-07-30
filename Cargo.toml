@@ -15,6 +15,7 @@ serde = { version = "1", features = ["derive"] }
 url = { version = "2", features = ["serde"] }
 libc = "0.2"
 toml = "0.8.15"
+tempfile = "3"
 
 [target."cfg(windows)".dependencies]
 winreg = "0.52.0"
