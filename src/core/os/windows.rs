@@ -4,8 +4,8 @@ use std::process::Command;
 
 use crate::{
     core::{
-        cargo_config::CargoConfig, InstallConfiguration, Installation, TomlParser,
-        UninstallConfiguration, Uninstallation,
+        cargo_config::CargoConfig, manifest::ToolsetManifest, InstallConfiguration, Installation,
+        TomlParser, UninstallConfiguration, Uninstallation,
     },
     utils,
 };
@@ -73,6 +73,17 @@ impl Installation for InstallConfiguration {
 
             let config_path = cargo_home.join("config.toml");
             utils::write_file(config_path, &config_toml, false)?;
+        }
+
+        Ok(())
+    }
+
+    fn install_tools(&self, manifest: &ToolsetManifest) -> Result<()> {
+        // TODO: Install MSVC build tools
+        // TODO: Install VS-Code
+        let tools_to_install = manifest.current_target_tools();
+        for (name, tool) in tools_to_install {
+            println!("installing '{name}': {tool:?}");
         }
 
         Ok(())

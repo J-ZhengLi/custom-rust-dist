@@ -1,10 +1,12 @@
 //! Separated module to handle installation related behaviors in command line.
 
-use std::collections::BTreeMap;
-
 use crate::{
-    core::manifest::RustToolchain, core::manifest::ToolsetManifest, core::InstallConfiguration,
-    core::Installation, rustup::Rustup, utils,
+    core::{
+        manifest::{RustToolchain, TargetedTools, ToolsetManifest},
+        InstallConfiguration, Installation,
+    },
+    rustup::Rustup,
+    utils,
 };
 
 use super::{GlobalOpt, Subcommands};
@@ -44,8 +46,7 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
     // TODO: Download manifest form remote server.
     let manifest = ToolsetManifest {
         rust: RustToolchain::new("stable"),
-        target: BTreeMap::default(),
-        tools: BTreeMap::default(),
+        tools: TargetedTools::default(),
     };
 
     Rustup::init().download_toolchain(&config, &manifest)?;

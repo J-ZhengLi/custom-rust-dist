@@ -4,3 +4,6 @@ Cargo.lock
 
 # Workspace configuration for VS-Code
 .vscode/
+
+# Tests artifacts
+tests/cache/

@@ -9,6 +9,7 @@ mod os;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
+use manifest::ToolsetManifest;
 use serde::{de::DeserializeOwned, Serialize};
 use toml::{de, ser};
 use url::Url;
@@ -45,6 +46,16 @@ pub(crate) trait Installation {
     ///
     /// This will write a `config.toml` file to `CARGO_HOME`.
     fn config_cargo(&self) -> Result<()>;
+    #[allow(unused)]
+    /// Steps to install third-party softwares (excluding the ones that requires `cargo install`).
+    fn install_tools(&self, manifest: &ToolsetManifest) -> Result<()> {
+        Ok(())
+    }
+    #[allow(unused)]
+    /// Steps to install `cargo` compatible softwares, should only be called after toolchain installation.
+    fn cargo_install(&self, manifest: &ToolsetManifest) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -69,6 +80,10 @@ impl InstallConfiguration {
 
     pub(crate) fn rustup_home(&self) -> PathBuf {
         self.install_dir.join(".rustup")
+    }
+
+    pub(crate) fn _temp_root(&self) -> PathBuf {
+        self.install_dir.join("temp")
     }
 
     pub(crate) fn env_vars(&self) -> Result<Vec<(&'static str, String)>> {
