@@ -307,7 +307,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
                 (
                     &"cargo-llvm-cov".into(),
                     &ToolInfo::Url {
-                        url: "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz".parse().unwrap(),
+                        url: "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-pc-windows-msvc.zip".parse().unwrap(),
                         version: Some("0.6.11".into())
                     }
                 ),
