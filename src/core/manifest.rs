@@ -17,6 +17,32 @@ pub(crate) struct ToolsetManifest {
 
 impl TomlParser for ToolsetManifest {}
 
+impl ToolsetManifest {
+    /// Get a map of [`Tool`] that are available only in current target.
+    pub(crate) fn current_target_tools(&self) -> BTreeMap<&String, &ToolInfo> {
+        let cur_target = env!("TARGET");
+        self.target
+            .get(cur_target)
+            .map(|tools| {
+                tools
+                    .tools
+                    .iter()
+                    .filter_map(|toolname| {
+                        self.tools
+                            .get_key_value(toolname)
+                            .and_then(|(name, tool)| match tool {
+                                Tool::General(toolinfo) => Some((name, toolinfo)),
+                                Tool::WithTarget(targeted_info) => targeted_info
+                                    .get(cur_target)
+                                    .map(|toolinfo| (name, toolinfo)),
+                            })
+                    })
+                    .collect::<BTreeMap<_, _>>()
+            })
+            .unwrap_or_default()
+    }
+}
+
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 pub(crate) struct RustToolchain {
     pub(crate) version: String,
@@ -48,6 +74,13 @@ impl From<Vec<String>> for TargetTools {
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(untagged)]
 pub(crate) enum Tool {
+    WithTarget(BTreeMap<String, ToolInfo>),
+    General(ToolInfo),
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub(crate) enum ToolInfo {
     Normal {
         version: String,
     },
@@ -134,34 +167,209 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
             tools: BTreeMap::from_iter([
                 (
                     "t1".into(),
-                    Tool::Normal {
+                    Tool::General(ToolInfo::Normal {
                         version: "0.1.0".into(),
-                    },
+                    }),
                 ),
                 (
                     "t2".into(),
-                    Tool::Path {
+                    Tool::General(ToolInfo::Path {
                         path: PathBuf::from("/path/to/local"),
-                    },
+                    }),
                 ),
                 (
                     "t3".into(),
-                    Tool::Url {
+                    Tool::General(ToolInfo::Url {
                         url: Url::parse("https://example.com/path/to/tool").unwrap(),
-                    },
+                    }),
                 ),
                 (
                     "t4".into(),
-                    Tool::Git {
+                    Tool::General(ToolInfo::Git {
                         git: Url::parse("https://git.example.com/org/tool").unwrap(),
                         branch: Some("stable".into()),
                         tag: None,
                         rev: None,
-                    },
+                    }),
                 ),
             ]),
         };
 
         assert_eq!(ToolsetManifest::from_str(input).unwrap(), expected);
+    }
+
+    #[test]
+    fn deserialize_realworld_manifest() {
+        let input = include_str!("../../tests/data/toolset_manifest.toml");
+        let expected = ToolsetManifest {
+            rust: RustToolchain {
+                version: "1.80.0".into(),
+                profile: Some("minimal".into()),
+                components: Some(vec!["clippy-preview".into(), "rustfmt".into()]),
+            },
+            target: BTreeMap::from_iter([
+                (
+                    "x86_64-pc-windows-msvc".into(),
+                    vec!["buildtools".into(), "cargo-llvm-cov".into(), "vscode".into(), "vscode-rust-analyzer".into(), "cargo-expand".into()].into(),
+                ),
+                (
+                    "x86_64-pc-windows-gnu".into(),
+                    vec!["mingw".into(), "vscode".into(), "vscode-rust-analyzer".into(), "cargo-expand".into()].into(),
+                ),
+                (
+                    "x86_64-unknown-linux-gnu".into(),
+                    vec!["cargo-llvm-cov".into(), "flamegraph".into(), "cargo-expand".into()].into(),
+                ),
+                (
+                    "aarch64-apple-darwin".into(),
+                    vec!["cargo-llvm-cov".into(), "flamegraph".into(), "cargo-expand".into()].into(),
+                ),
+            ]),
+            tools: BTreeMap::from_iter([
+                (
+                    "buildtools".into(),
+                    Tool::General(ToolInfo::Path {
+                        path: "tests/cache/BuildTools-With-SDK.zip".into(),
+                    }),
+                ),
+                (
+                    "mingw".into(),
+                    Tool::General(ToolInfo::Path {
+                        path: PathBuf::from("tests/cache/x86_64-13.2.0-release-posix-seh-msvcrt-rt_v11-rev1.7z"),
+                    }),
+                ),
+                (
+                    "cargo-expand".into(),
+                    Tool::General(ToolInfo::Normal {
+                        version: "1.0.88".into(),
+                    }),
+                ),
+                (
+                    "flamegraph".into(),
+                    Tool::General(ToolInfo::Git {
+                        git: Url::parse("https://github.com/flamegraph-rs/flamegraph").unwrap(),
+                        branch: None,
+                        tag: Some("v0.6.5".into()),
+                        rev: None,
+                    }),
+                ),
+                (
+                    "vscode".into(),
+                    Tool::WithTarget(BTreeMap::from([
+                        (
+                            "x86_64-pc-windows-msvc".into(),
+                            ToolInfo::Path {
+                                path: PathBuf::from("tests/cache/VSCode-win32-x64-1.91.1.zip"),
+                            }
+                        ),
+                        (
+                            "x86_64-pc-windows-gnu".into(),
+                            ToolInfo::Path {
+                                path: PathBuf::from("tests/cache/VSCode-win32-x64-1.91.1.zip"),
+                            }
+                        )
+                    ])),
+                ),
+                (
+                    "vscode-rust-analyzer".into(),
+                    Tool::WithTarget(BTreeMap::from([
+                        (
+                            "x86_64-pc-windows-msvc".into(),
+                            ToolInfo::Path {
+                                path: PathBuf::from("tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix"),
+                            }
+                        ),
+                        (
+                            "x86_64-pc-windows-gnu".into(),
+                            ToolInfo::Path {
+                                path: PathBuf::from("tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix"),
+                            }
+                        )
+                    ])),
+                ),
+                (
+                    "cargo-llvm-cov".into(),
+                    Tool::WithTarget(BTreeMap::from([
+                        (
+                            "x86_64-pc-windows-msvc".into(),
+                            ToolInfo::Url {
+                                url: Url::parse("https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-pc-windows-msvc.zip").unwrap(),
+                            }
+                        ),
+                        (
+                            "x86_64-unknown-linux-gnu".into(),
+                            ToolInfo::Url {
+                                url: Url::parse("https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz").unwrap(),
+                            }
+                        ),
+                        (
+                            "aarch64-apple-darwin".into(),
+                            ToolInfo::Url {
+                                url: Url::parse("https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-aarch64-apple-darwin.tar.gz").unwrap(),
+                            }
+                        ),
+                    ])),
+                ),
+            ]),
+        };
+        assert_eq!(ToolsetManifest::from_str(input).unwrap(), expected);
+    }
+
+    #[test]
+    fn current_target_tools_are_correct() {
+        let input = include_str!("../../tests/data/toolset_manifest.toml");
+        let manifest = ToolsetManifest::from_str(input).unwrap();
+        let tools = manifest.current_target_tools();
+
+        #[cfg(all(windows, target_env = "gnu"))]
+        assert_eq!(
+            tools,
+            BTreeMap::from([
+                (
+                    &"mingw".into(),
+                    &ToolInfo::Path {
+                        path: PathBuf::from(
+                            "tests/cache/x86_64-13.2.0-release-posix-seh-msvcrt-rt_v11-rev1.7z"
+                        )
+                    }
+                ),
+                (
+                    &"vscode".into(),
+                    &ToolInfo::Path {
+                        path: PathBuf::from("tests/cache/VSCode-win32-x64-1.91.1.zip")
+                    }
+                ),
+                (
+                    &"vscode-rust-analyzer".into(),
+                    &ToolInfo::Path {
+                        path: "tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix".into()
+                    }
+                ),
+                (
+                    &"cargo-expand".into(),
+                    &ToolInfo::Normal {
+                        version: "1.0.88".into()
+                    }
+                ),
+            ])
+        );
+
+        #[cfg(all(windows, target_env = "msvc"))]
+        assert_eq!(tools, BTreeMap::from([
+            (&"buildtools".into(), &ToolInfo::Path { path: PathBuf::from("tests/cache/BuildTools-With-SDK.zip") }),
+            (&"cargo-llvm-cov".into(), &ToolInfo::Url { url: "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-pc-windows-msvc.zip".parse().unwrap() }),
+            (&"vscode".into(), &ToolInfo::Path { path: PathBuf::from("tests/cache/VSCode-win32-x64-1.91.1.zip") }),
+            (&"vscode-rust-analyzer".into(), &ToolInfo::Path { path: "tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix".into() }),
+            (&"cargo-expand".into(), &ToolInfo::Normal { version: "1.0.88".into() }),
+        ]));
+
+        #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
+        assert_eq!(tools, BTreeMap::from([
+            (&"cargo-llvm-cov".into(), &ToolInfo::Url { url: "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz".parse().unwrap() }),
+            (&"flamegraph".into(), &ToolInfo::Git { git: "https://github.com/flamegraph-rs/flamegraph".parse().unwrap(), tag: Some("v0.6.5".into()), branch: None, rev: None }),
+            (&"cargo-expand".into(), &ToolInfo::Normal { version: "1.0.88".into() }),
+        ]));
+
+        // TODO: Add test for macos.
     }
 }
