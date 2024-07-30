@@ -3,48 +3,25 @@ version = "1.80.0"
 profile = "minimal"
 components = ["clippy-preview", "rustfmt"]
 
-[target.x86_64-pc-windows-msvc]
-tools = ["buildtools", "cargo-llvm-cov", "vscode", "vscode-rust-analyzer", "cargo-expand"]
-
-[target.x86_64-pc-windows-gnu]
-tools = ["mingw", "vscode", "vscode-rust-analyzer", "cargo-expand"]
-
-[target.x86_64-unknown-linux-gnu]
-tools = ["cargo-llvm-cov", "flamegraph", "cargo-expand"]
-
-[target.aarch64-apple-darwin]
-tools = ["cargo-llvm-cov", "flamegraph", "cargo-expand"]
-
-[tools]
+[tools.target.x86_64-pc-windows-msvc]
 buildtools = { path = "tests/cache/BuildTools-With-SDK.zip", version = "1" }
-mingw = { path = "tests/cache/x86_64-13.2.0-release-posix-seh-msvcrt-rt_v11-rev1.7z", version = "13.2.0" }
+cargo-llvm-cov = { url = "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-pc-windows-msvc.zip", version = "0.6.11" }
+vscode = { path = "tests/cache/VSCode-win32-x64-1.91.1.zip", version = "1.91.1" }
+vscode-rust-analyzer = { path = "tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix", version = "0.4.2054" }
 cargo-expand = "1.0.88"
+
+[tools.target.x86_64-pc-windows-gnu]
+mingw = { path = "tests/cache/x86_64-13.2.0-release-posix-seh-msvcrt-rt_v11-rev1.7z", version = "13.2.0" }
+vscode = { path = "tests/cache/VSCode-win32-x64-1.91.1.zip", version = "1.91.1" }
+vscode-rust-analyzer = { path = "tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix", version = "0.4.2054" }
+cargo-expand = "1.0.88"
+
+[tools.target.x86_64-unknown-linux-gnu]
+cargo-llvm-cov = { url = "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz", version = "0.6.11" }
 flamegraph = { git = "https://github.com/flamegraph-rs/flamegraph", tag = "v0.6.5" }
+cargo-expand = "1.0.88"
 
-[tools.vscode.target.x86_64-pc-windows-msvc]
-path = "tests/cache/VSCode-win32-x64-1.91.1.zip"
-version = "1.91.1"
-
-[tools.vscode.target.x86_64-pc-windows-gnu]
-path = "tests/cache/VSCode-win32-x64-1.91.1.zip"
-version = "1.91.1"
-
-[tools.vscode-rust-analyzer.target.x86_64-pc-windows-msvc]
-path = "tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix"
-version = "0.4.2054"
-
-[tools.vscode-rust-analyzer.target.x86_64-pc-windows-gnu]
-path = "tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix"
-version = "0.4.2054"
-
-[tools.cargo-llvm-cov.target.x86_64-pc-windows-msvc]
-url = "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-pc-windows-msvc.zip"
-version = "0.6.11"
-
-[tools.cargo-llvm-cov.target.x86_64-unknown-linux-gnu]
-url = "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz"
-version = "0.6.11"
-
-[tools.cargo-llvm-cov.target.aarch64-apple-darwin]
-url = "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-aarch64-apple-darwin.tar.gz"
-version = "0.6.11"
+[tools.target.aarch64-apple-darwin]
+cargo-llvm-cov = { url = "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-aarch64-apple-darwin.tar.gz", version = "0.6.11" }
+flamegraph = { git = "https://github.com/flamegraph-rs/flamegraph", tag = "v0.6.5" }
+cargo-expand = "1.0.88"
