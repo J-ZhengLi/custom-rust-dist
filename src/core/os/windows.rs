@@ -4,8 +4,10 @@ use std::process::Command;
 
 use crate::{
     core::{
-        cargo_config::CargoConfig, manifest::ToolsetManifest, InstallConfiguration, Installation,
-        TomlParser, UninstallConfiguration, Uninstallation,
+        cargo_config::CargoConfig,
+        install,
+        manifest::{ToolInfo, ToolsetManifest},
+        InstallConfiguration, Installation, TomlParser, UninstallConfiguration, Uninstallation,
     },
     utils,
 };
@@ -16,19 +18,21 @@ use winapi::um::winuser;
 use super::{ensure_init_call, install_dir_from_exe_path, INIT_ONCE};
 
 impl Installation for InstallConfiguration {
-    fn init(&self) -> Result<()> {
-        // Create a new folder to hold installation
-        let folder = &self.install_dir;
-        utils::mkdirs(folder)?;
+    fn init(&self, dry_run: bool) -> Result<()> {
+        if !dry_run {
+            // Create a new folder to hold installation
+            let folder = &self.install_dir;
+            utils::mkdirs(folder)?;
 
-        // Create a copy of this binary to install dir
-        let self_exe = std::env::current_exe()?;
-        let cargo_bin_dir = self.cargo_home().join("bin");
-        utils::mkdirs(&cargo_bin_dir)?;
-        utils::copy_to(self_exe, &cargo_bin_dir)?;
+            // Create a copy of this binary to install dir
+            let self_exe = std::env::current_exe()?;
+            let cargo_bin_dir = self.cargo_home().join("bin");
+            utils::mkdirs(&cargo_bin_dir)?;
+            utils::copy_file_to(self_exe, &cargo_bin_dir)?;
 
-        // Create registry entry to add this program into "installed programs".
-        rustup::do_add_to_programs()?;
+            // Create registry entry to add this program into "installed programs".
+            rustup::do_add_to_programs()?;
+        }
 
         INIT_ONCE.get_or_init(|| ());
         Ok(())
@@ -79,11 +83,19 @@ impl Installation for InstallConfiguration {
     }
 
     fn install_tools(&self, manifest: &ToolsetManifest) -> Result<()> {
+        ensure_init_call();
+
         // TODO: Install MSVC build tools
         // TODO: Install VS-Code
         let tools_to_install = manifest.current_target_tools();
         for (name, tool) in tools_to_install {
+            // Ignore tools that need to be installed using `cargo install`
+            if matches!(tool, ToolInfo::Version(_) | ToolInfo::Git { .. }) {
+                continue;
+            }
+
             println!("installing '{name}': {tool:?}");
+            install::install_tool(self, name, tool)?;
         }
 
         Ok(())

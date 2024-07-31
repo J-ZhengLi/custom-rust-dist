@@ -3,6 +3,7 @@
 //! Including configuration, toolchain, toolset management.
 
 mod cargo_config;
+mod install;
 pub mod manifest;
 mod os;
 
@@ -36,7 +37,7 @@ declare_env_vars!(
 /// Make sure to always call `init()` as it creates essential folders to
 /// hold the installation files.
 pub(crate) trait Installation {
-    fn init(&self) -> Result<()>;
+    fn init(&self, dry_run: bool) -> Result<()>;
     /// Configure environment variables for `rustup`.
     ///
     /// This will set persistent environment variables including
@@ -71,18 +72,58 @@ pub(crate) struct InstallConfiguration {
     pub(crate) install_dir: PathBuf,
     pub(crate) rustup_dist_server: Option<Url>,
     pub(crate) rustup_update_root: Option<Url>,
+    /// Indicates whether `cargo` was already installed, useful when installing third-party tools.
+    cargo_is_installed: bool,
+}
+
+impl Default for InstallConfiguration {
+    fn default() -> Self {
+        Self {
+            install_dir: utils::home_dir().join(env!("CARGO_PKG_NAME")),
+            cargo_registry: None,
+            rustup_dist_server: None,
+            rustup_update_root: None,
+            cargo_is_installed: false,
+        }
+    }
 }
 
 impl InstallConfiguration {
+    pub(crate) fn new(install_dir: PathBuf) -> Self {
+        Self {
+            install_dir,
+            ..Default::default()
+        }
+    }
+
+    pub(crate) fn cargo_registry(mut self, registry: Option<(String, Url)>) -> Self {
+        self.cargo_registry = registry;
+        self
+    }
+
+    pub(crate) fn rustup_dist_server(mut self, url: Option<Url>) -> Self {
+        self.rustup_dist_server = url;
+        self
+    }
+
+    pub(crate) fn rustup_update_root(mut self, url: Option<Url>) -> Self {
+        self.rustup_update_root = url;
+        self
+    }
+
     pub(crate) fn cargo_home(&self) -> PathBuf {
         self.install_dir.join(".cargo")
+    }
+
+    pub(crate) fn cargo_bin(&self) -> PathBuf {
+        self.cargo_home().join("bin")
     }
 
     pub(crate) fn rustup_home(&self) -> PathBuf {
         self.install_dir.join(".rustup")
     }
 
-    pub(crate) fn _temp_root(&self) -> PathBuf {
+    pub(crate) fn temp_root(&self) -> PathBuf {
         self.install_dir.join("temp")
     }
 

@@ -79,7 +79,7 @@ pub(crate) enum UninstallCommand {
 /// Contain options that are accessed globally.
 ///
 /// Such as `--verbose`, `--quiet`, `--yes`.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct GlobalOpt {
     pub verbose: bool,
     pub quiet: bool,
