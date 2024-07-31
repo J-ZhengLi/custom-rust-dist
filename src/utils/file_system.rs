@@ -82,26 +82,79 @@ pub fn write_file<P: AsRef<Path>>(path: P, content: &str, append: bool) -> Resul
     Ok(())
 }
 
-/// Copy a path to an existing directory.
+/// Copy a file into an existing directory.
+///
+/// Returns the path to pasted file.
 ///
 /// # Errors
 /// Return `Err` if `to` location does not exist, or [`fs::copy`] operation fails.
-pub fn copy_to<P, Q>(from: P, to: Q) -> Result<()>
+pub fn copy_file_to<P, Q>(from: P, to: Q) -> Result<PathBuf>
 where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
+    assert!(
+        from.as_ref().is_file(),
+        "Interal Error: '{}' is not a path to file, \
+        but `copy_file_to` only works with file path, try using `copy_to` instead.",
+        from.as_ref().display()
+    );
+
+    copy_to(from, to)
+}
+
+/// Copy file or directory into an existing directory.
+///
+/// Similar to [`copy_file_to`], except this will recursively copy directory as well.
+pub fn copy_to<P, Q>(from: P, to: Q) -> Result<PathBuf>
+where
+    P: AsRef<Path>,
+    Q: AsRef<Path>,
+{
+    fn copy_dir_(src: &Path, dest: &Path) -> Result<()> {
+        fs::create_dir(dest)?;
+        for maybe_entry in src.read_dir()? {
+            let entry = maybe_entry?;
+            let src = entry.path();
+            let dest = dest.join(entry.file_name());
+            if entry.file_type()?.is_dir() {
+                copy_dir_(&src, &dest)?;
+            } else {
+                fs::copy(&src, &dest)?;
+            }
+        }
+        Ok(())
+    }
+
     if !to.as_ref().is_dir() {
         bail!("'{}' is not a directory", to.as_ref().display());
     }
+
     let dest = to.as_ref().join(from.as_ref().file_name().ok_or_else(|| {
         anyhow!(
             "path '{}' does not have a file name",
             from.as_ref().display()
         )
     })?);
-    fs::copy(from, dest)?;
-    Ok(())
+
+    if from.as_ref().is_file() {
+        fs::copy(&from, &dest).with_context(|| {
+            format!(
+                "could not copy file '{}' to directory '{}'",
+                from.as_ref().display(),
+                to.as_ref().display()
+            )
+        })?;
+    } else {
+        copy_dir_(from.as_ref(), &dest).with_context(|| {
+            format!(
+                "could not copy directory '{}' as a subfolder in '{}'",
+                from.as_ref().display(),
+                to.as_ref().display()
+            )
+        })?;
+    }
+    Ok(dest)
 }
 
 /// Set file permissions (executable)
