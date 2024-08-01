@@ -4,6 +4,7 @@
 
 mod cargo_config;
 mod install;
+mod install_instructions;
 pub mod manifest;
 mod os;
 

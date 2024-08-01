@@ -174,3 +174,32 @@ pub fn create_executable_file(path: &Path) -> Result<()> {
 pub fn create_executable_file(_path: &Path) -> Result<()> {
     Ok(())
 }
+
+/// Attempts to read a directory path, then return a list of paths
+/// that are inside the given directory, including sub folders.
+pub fn walk_dir(dir: &Path) -> Result<Vec<PathBuf>> {
+    fn collect_paths_(dir: &Path, paths: &mut Vec<PathBuf>) -> Result<()> {
+        for dir_entry in dir.read_dir()?.flatten() {
+            paths.push(dir_entry.path());
+            if matches!(dir_entry.file_type(), Ok(ty) if ty.is_dir()) {
+                collect_paths_(&dir_entry.path(), paths)?;
+            }
+        }
+        Ok(())
+    }
+    let mut paths = vec![];
+    collect_paths_(dir, &mut paths)?;
+    Ok(paths)
+}
+
+pub fn is_executable<P: AsRef<Path>>(path: P) -> bool {
+    #[cfg(windows)]
+    let is_executable_ext = matches!(
+        path.as_ref().extension().and_then(|ext| ext.to_str()),
+        Some("exe")
+    );
+    #[cfg(not(windows))]
+    let is_executable_ext = path.extension().is_none();
+
+    path.as_ref().is_file() && is_executable_ext
+}

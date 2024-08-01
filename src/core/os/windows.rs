@@ -93,8 +93,7 @@ impl Installation for InstallConfiguration {
             if matches!(tool, ToolInfo::Version(_) | ToolInfo::Git { .. }) {
                 continue;
             }
-
-            println!("installing '{name}': {tool:?}");
+            println!("installing '{name}'");
             install::install_tool(self, name, tool)?;
         }
 

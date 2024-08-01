@@ -16,6 +16,7 @@ url = { version = "2", features = ["serde"] }
 libc = "0.2"
 toml = "0.8.15"
 tempfile = "3"
+zip = "2"
 
 [target."cfg(windows)".dependencies]
 winreg = "0.52.0"
