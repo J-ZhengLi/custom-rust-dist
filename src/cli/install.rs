@@ -1,9 +1,11 @@
 //! Separated module to handle installation related behaviors in command line.
 
+use std::path::PathBuf;
+
 use crate::{
     core::{
         manifest::{RustToolchain, TargetedTools, ToolsetManifest},
-        InstallConfiguration, Installation,
+        InstallConfiguration, Installation, TomlParser,
     },
     rustup::Rustup,
     utils,
@@ -43,16 +45,18 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
     config.config_cargo()?;
 
     // TODO: Download manifest form remote server.
-    let manifest = ToolsetManifest {
-        rust: RustToolchain::new("stable"),
-        tools: TargetedTools::default(),
-    };
+    let manifest = ToolsetManifest::load(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("data")
+            .join("toolset_manifest.toml"),
+    )?;
 
     // This step taking cares of requirements, such as `MSVC`.
     // Also third-party app such as `VS Code`.
     config.install_tools(&manifest)?;
 
-    Rustup::init().download_toolchain(&config, &manifest)?;
+    // Rustup::init().download_toolchain(&config, &manifest)?;
 
     // TODO: install third-party tools via cargo that got installed by rustup
 

@@ -10,34 +10,26 @@ use reqwest::header::USER_AGENT;
 use reqwest::Proxy;
 use url::Url;
 
+use super::progress_bar::ProgressIndicator;
+
 fn client_builder() -> ClientBuilder {
     Client::builder()
         .timeout(Duration::from_secs(30))
         .connection_verbose(false)
 }
 
-/// Convinent struct with methods that are useful to indicate download progress.
-pub struct DownloadIndicator<T: Sized> {
-    /// A start/initializing function which will be called once before downloading.
-    pub start: fn(u64, &str) -> Result<T>,
-    /// A update function that will be called after each downloaded chunk.
-    pub update: fn(&T, u64),
-    /// A function that will be called once after a successful download.
-    pub stop: fn(&T),
-}
-
 pub struct DownloadOpt<T: Sized> {
     /// The verbose name of the file to download.
     pub name: String,
     client: Client,
-    pub handler: Option<DownloadIndicator<T>>,
+    pub handler: Option<ProgressIndicator<T>>,
 }
 
 impl<T: Sized> DownloadOpt<T> {
     pub fn new(
         name: String,
         proxy: Option<Proxy>,
-        handler: Option<DownloadIndicator<T>>,
+        handler: Option<ProgressIndicator<T>>,
     ) -> Result<Self> {
         let client = if let Some(proxy) = proxy {
             client_builder().proxy(proxy).build()?
@@ -81,7 +73,7 @@ impl<T: Sized> DownloadOpt<T> {
         let maybe_indicator = self
             .handler
             .as_ref()
-            .and_then(|h| (h.start)(total_size, &self.name).ok());
+            .and_then(|h| (h.start)(total_size, format!("downloading '{}'", &self.name)).ok());
 
         let (mut downloaded_len, mut file) = if resume {
             let file = OpenOptions::new()
@@ -116,7 +108,10 @@ impl<T: Sized> DownloadOpt<T> {
             } else {
                 if let Some(indicator) = &maybe_indicator {
                     // safe to unwrap, because indicator won't exist if self.handler is none
-                    (self.handler.as_ref().unwrap().stop)(indicator);
+                    (self.handler.as_ref().unwrap().stop)(
+                        indicator,
+                        format!("'{}' successfully downloaded.", &self.name),
+                    );
                 }
 
                 return Ok(());
@@ -125,51 +120,13 @@ impl<T: Sized> DownloadOpt<T> {
     }
 }
 
-pub mod cli {
-    use std::path::Path;
-
-    use super::{DownloadIndicator, DownloadOpt, Result};
-    use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-    use url::Url;
-
-    /// [CLI only] Create a new progress bar to indicate download progress.
-    pub fn progress_bar_indicator() -> DownloadIndicator<ProgressBar> {
-        fn start(total: u64, name: &str) -> Result<ProgressBar> {
-            let pb = ProgressBar::new(total);
-            pb.set_style(
-                ProgressStyle::with_template(
-                    "{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({eta})"
-                )?
-                .with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write| {
-                    write!(w, "{:.1}s", state.eta().as_secs_f64()).expect("unable to display progress bar")
-                })
-                .progress_chars("#>-")
-            );
-            pb.set_message(format!("Downloading '{name}'"));
-            Ok(pb)
-        }
-        fn update(pb: &ProgressBar, pos: u64) {
-            pb.set_position(pos);
-        }
-        fn stop(pb: &ProgressBar) {
-            pb.finish_with_message("Download finished");
-        }
-
-        DownloadIndicator {
-            start,
-            update,
-            stop,
-        }
-    }
-
-    /// Download a file without resuming.
-    pub fn download_from_start<S: ToString>(name: S, url: &Url, dest: &Path) -> Result<()> {
-        let dl_opt = DownloadOpt::new(
-            name.to_string(),
-            // Keep proxy to `None` for now.
-            None,
-            Some(progress_bar_indicator()),
-        )?;
-        dl_opt.download_file(url, dest, false)
-    }
+/// Download a file without resuming.
+pub fn download_from_start<S: ToString>(name: S, url: &Url, dest: &Path) -> Result<()> {
+    let dl_opt = DownloadOpt::new(
+        name.to_string(),
+        // Keep proxy to `None` for now.
+        None,
+        Some(ProgressIndicator::new()),
+    )?;
+    dl_opt.download_file(url, dest, false)
 }
