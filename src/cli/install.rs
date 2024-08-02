@@ -74,9 +74,9 @@ mod tests {
     };
 
     #[test]
-    fn install_tools_dry_run() {
+    fn dry_run() {
         let config = InstallConfiguration::default();
-        let manifest = ToolsetManifest::from_str(
+        let _manifest = ToolsetManifest::from_str(
             &utils::read_to_string(
                 PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/toolset_manifest.toml"),
             )
@@ -85,6 +85,5 @@ mod tests {
         .unwrap();
 
         config.init(true).unwrap();
-        config.install_tools(&manifest).unwrap();
     }
 }

@@ -11,7 +11,7 @@ pub(crate) mod unix;
 pub(crate) mod windows;
 
 use anyhow::{bail, Context, Result};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 /// Indicate whether if the [`Installation::init`] was called.
@@ -63,4 +63,11 @@ fn ensure_init_call() {
         INIT_ONCE.get().is_some(),
         "Internal Error: `Installation::init` should be called first"
     );
+}
+
+pub(crate) fn add_to_path(path: &Path) -> Result<()> {
+    #[cfg(windows)]
+    windows::add_to_path(path)?;
+
+    Ok(())
 }

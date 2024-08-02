@@ -1,6 +1,6 @@
 // FIXME: Too much repeating code, generalize some of the trait methods.
 
-use std::process::Command;
+use std::{os::windows::ffi::OsStrExt, path::Path, process::Command};
 
 use crate::{
     core::{
@@ -11,7 +11,7 @@ use crate::{
     },
     utils,
 };
-use anyhow::{bail, Result};
+use anyhow::Result;
 use winapi::shared::minwindef;
 use winapi::um::winuser;
 
@@ -30,6 +30,9 @@ impl Installation for InstallConfiguration {
             utils::mkdirs(&cargo_bin_dir)?;
             utils::copy_file_to(self_exe, &cargo_bin_dir)?;
 
+            // Create tools directory to store third party tools
+            utils::mkdirs(self.tools_dir())?;
+
             // Create registry entry to add this program into "installed programs".
             rustup::do_add_to_programs()?;
         }
@@ -43,17 +46,7 @@ impl Installation for InstallConfiguration {
 
         let vars_raw = self.env_vars()?;
         for (key, val) in vars_raw {
-            // Setting env var by calling `setx` command.
-            // NB: If `setx` ever causes problem, replace this with a much safer way,
-            // which is using `winapi`+`winreg` like what rustup does.
-            // Note calling `setx` and `reg` is significantly slower than using windows api.
-            let output = utils::output("setx", &[key, &val])?;
-            if !output.status.success() {
-                bail!(
-                    "unable to set environment variables: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                );
-            }
+            rustup::set_env_var(key, val.encode_utf16().collect())?;
         }
 
         update_env();
@@ -102,34 +95,9 @@ impl Installation for InstallConfiguration {
 }
 
 impl Uninstallation for UninstallConfiguration {
-    // On windows, we are calling `reg delete` to remove a specific variable
-    // that we have set on user environment.
-    // NB: If `reg delete` ever causes problem, replace this with a much safer way,
-    // which is using `winapi`+`winreg` like what rustup does.
     fn remove_rustup_env_vars(&self) -> Result<()> {
         for var_to_remove in crate::core::ALL_VARS {
-            let query_output = utils::output(
-                "reg",
-                &[
-                    "query",
-                    "HKEY_CURRENT_USER\\Environment",
-                    "/v",
-                    var_to_remove,
-                ],
-            )?;
-            // Remove only if it could be found, meaning we did actually set it.
-            if query_output.status.success() {
-                let _ = utils::stdout_output(
-                    "reg",
-                    &[
-                        "delete",
-                        "HKEY_CURRENT_USER\\Environment",
-                        "/f",
-                        "/v",
-                        var_to_remove,
-                    ],
-                )?;
-            }
+            rustup::set_env_var(*var_to_remove, vec![])?;
         }
 
         update_env();
@@ -188,6 +156,24 @@ fn remove_self_() -> Result<()> {
     yolo(cmd);
 }
 
+pub(super) fn add_to_path(path: &Path) -> Result<()> {
+    let Some(old_path) = rustup::get_windows_path_var()? else {
+        return Ok(());
+    };
+    let path_bytes = path.as_os_str().encode_wide().collect::<Vec<_>>();
+    let mut new_path = path_bytes;
+    new_path.push(b';' as u16);
+    new_path.extend_from_slice(&old_path);
+
+    // Apply the new path
+    rustup::set_env_var("PATH", new_path)?;
+
+    // Sync changes
+    update_env();
+
+    Ok(())
+}
+
 mod rustup {
     use std::env;
     use std::ffi::OsString;
@@ -195,7 +181,7 @@ mod rustup {
     use std::sync::OnceLock;
 
     use anyhow::{anyhow, Context, Result};
-    use winreg::enums::{RegType, HKEY_CURRENT_USER};
+    use winreg::enums::{RegType, HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
     use winreg::{RegKey, RegValue};
 
     static UNINSTALL_ENTRY: OnceLock<String> = OnceLock::new();
@@ -281,5 +267,55 @@ mod rustup {
             Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(e) => Err(anyhow!(e)),
         }
+    }
+
+    fn environment() -> Result<RegKey> {
+        RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey_with_flags("Environment", KEY_READ | KEY_WRITE)
+            .context("Failed opening Environment key")
+    }
+
+    // Get the windows PATH variable out of the registry as a String. If
+    // this returns None then the PATH variable is not a string and we
+    // should not mess with it.
+    pub(super) fn get_windows_path_var() -> Result<Option<Vec<u16>>> {
+        let environment = environment()?;
+
+        let reg_value = environment.get_raw_value("PATH");
+        match reg_value {
+            Ok(val) => {
+                if let Some(s) = from_winreg_value(&val) {
+                    Ok(Some(s))
+                } else {
+                    println!(
+                        "the registry key HKEY_CURRENT_USER\\Environment\\PATH is not a string. \
+                        Not modifying the PATH variable"
+                    );
+                    Ok(None)
+                }
+            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Some(Vec::new())),
+            Err(e) => Err(anyhow!(e)),
+        }
+    }
+
+    pub(super) fn set_env_var(key: &str, val: Vec<u16>) -> Result<()> {
+        let env = environment()?;
+
+        if val.is_empty() {
+            // Don't do anything if the variable doesn't exist
+            if env.get_raw_value(key).is_err() {
+                return Ok(());
+            }
+            env.delete_value(key)?;
+        } else {
+            let reg_value = RegValue {
+                bytes: to_winreg_bytes(val),
+                vtype: RegType::REG_EXPAND_SZ,
+            };
+            env.set_raw_value(key, &reg_value)?;
+        }
+
+        Ok(())
     }
 }

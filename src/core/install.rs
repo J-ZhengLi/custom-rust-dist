@@ -1,6 +1,6 @@
 use super::{manifest::ToolInfo, InstallConfiguration, CARGO_HOME, RUSTUP_HOME};
 use crate::{
-    core::install_instructions,
+    core::custom_instructions,
     utils::{self, Extractable},
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -142,18 +142,16 @@ enum ToolInstaller<'a> {
     /// ├─── bin/
     /// ├─── ...
     /// ```
-    /// Path to `root` representing the `tool/` directory. Which is the dir
-    /// containing `bin/`.
-    DirWithBin { root: &'a Path, bin_dir: PathBuf },
+    DirWithBin { name: &'a str, bin_dir: PathBuf },
     /// We have a custom "script" for how to deal with such directory.
-    Custom(&'a str),
+    Custom { name: &'a str, path: &'a Path },
 }
 
 impl<'a> ToolInstaller<'a> {
     fn from_path(name: &'a str, path: &'a Path) -> Result<Self> {
         // Step 1: Looking for custom install instruction
-        if install_instructions::SUPPORTED_TOOLS.contains(&name) {
-            return Ok(Self::Custom(name));
+        if custom_instructions::SUPPORTED_TOOLS.contains(&name) {
+            return Ok(Self::Custom { name, path });
         }
 
         // Step 2: Identify from file extension (if it's a file ofc).
@@ -178,10 +176,7 @@ impl<'a> ToolInstaller<'a> {
         //      Throw these executable files into cargo bin folder
         // 2. Directory contains sub-directory, which look like `bin/ lib/ etc/ ...`
         //      Throw and merge this directories into cargo home. (might be bad, therefore we need a `Manifest.in`!!!)
-        // 3. Directory doesn't fit both the previous characteristics but there is
-        //    a custom installation instruction in the code base
-        //      Use the custom instruction to install this tool
-        // 4. Directory doesn't fit all previous characteristics.
+        // 3. Directory doesn't fit all previous characteristics.
         //      We don't know how to install this tool, throw an error instead.
         else {
             // Step 3: read directory to find characteristics.
@@ -190,7 +185,7 @@ impl<'a> ToolInstaller<'a> {
             // Then assuming this is `UsrDirs` type installer.
             if let Some(bin_dir) = entries.iter().find(|path| path.ends_with("bin")) {
                 return Ok(Self::DirWithBin {
-                    root: path,
+                    name,
                     bin_dir: bin_dir.to_owned(),
                 });
             }
@@ -213,8 +208,28 @@ impl<'a> ToolInstaller<'a> {
                     utils::copy_file_to(exe, config.cargo_bin())?;
                 }
             }
+            Self::Custom { name, path } => {
+                custom_instructions::install(name, path, config)?;
+            }
+            Self::DirWithBin { name, bin_dir } => {
+                install_dir_with_bin_(config, name, bin_dir)?;
+            }
             _ => unimplemented!(),
         }
         Ok(())
     }
+}
+
+/// Installing [`ToolInstaller::DirWithBin`], with a couple steps:
+/// - Move the `tool_dir` to [`tools_dir`](InstallConfiguration::tools_dir).
+/// - Add the `bin_dir` to PATH
+fn install_dir_with_bin_(config: &InstallConfiguration, name: &str, bin_dir: &Path) -> Result<()> {
+    let dir = config.tools_dir().join(name);
+    // Safe to unwrap, because we already checked the `bin` dir is inside `tool_dir`
+    let tool_dir = bin_dir.parent().unwrap();
+
+    utils::move_to(tool_dir, &dir)?;
+
+    let bin_dir_after_move = dir.join("bin");
+    super::os::add_to_path(&bin_dir_after_move)
 }

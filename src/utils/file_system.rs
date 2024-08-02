@@ -203,3 +203,14 @@ pub fn is_executable<P: AsRef<Path>>(path: P) -> bool {
 
     path.as_ref().is_file() && is_executable_ext
 }
+
+/// Move `src` path to `dest`.
+pub fn move_to(src: &Path, dest: &Path) -> Result<()> {
+    fs::rename(src, dest).with_context(|| {
+        format!(
+            "failed when moving '{}' to '{}'",
+            src.display(),
+            dest.display()
+        )
+    })
+}
