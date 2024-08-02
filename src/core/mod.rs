@@ -3,10 +3,11 @@
 //! Including configuration, toolchain, toolset management.
 
 mod cargo_config;
+mod custom_instructions;
 mod install;
-mod install_instructions;
 pub mod manifest;
 mod os;
+mod uninstall;
 
 use std::path::{Path, PathBuf};
 
@@ -126,6 +127,10 @@ impl InstallConfiguration {
 
     pub(crate) fn temp_root(&self) -> PathBuf {
         self.install_dir.join("temp")
+    }
+
+    pub(crate) fn tools_dir(&self) -> PathBuf {
+        self.install_dir.join("tools")
     }
 
     pub(crate) fn env_vars(&self) -> Result<Vec<(&'static str, String)>> {

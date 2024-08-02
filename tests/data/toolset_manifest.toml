@@ -11,7 +11,7 @@ vscode-rust-analyzer = { path = "tests/cache/rust-lang.rust-analyzer-0.4.2054@wi
 cargo-expand = "1.0.88"
 
 [tools.target.x86_64-pc-windows-gnu]
-# mingw = { path = "tests/cache/x86_64-13.2.0-release-posix-seh-msvcrt-rt_v11-rev1.7z", version = "13.2.0" }
+mingw64 = { path = "tests/cache/x86_64-13.2.0-release-posix-seh-msvcrt-rt_v11-rev1.7z", version = "13.2.0" }
 vscode = { path = "tests/cache/VSCode-win32-x64-1.91.1.zip", version = "1.91.1" }
 # vscode-rust-analyzer = { path = "tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix", version = "0.4.2054" }
 # cargo-expand = "1.0.88"
