@@ -13,6 +13,13 @@ use dirs::desktop_dir;
 
 #[cfg(windows)]
 pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> {
+    // Stop 0: Check if vs-code already exist
+    let already_exist = utils::cmd_exist("code");
+    if already_exist {
+        println!("skipping Visual Studio Code installation, no need to re-install");
+        return Ok(());
+    }
+
     // Step 1: Move the root of the directory into `tools` directory
     let vscode_dir = config.tools_dir().join("vscode");
     utils::move_to(path, &vscode_dir)?;
@@ -45,6 +52,7 @@ pub(super) fn install(_path: &Path, _config: &InstallConfiguration) -> Result<()
 }
 
 #[cfg(windows)]
-pub(super) fn uninstall() -> Result<()> {
+pub(super) fn _uninstall() -> Result<()> {
+    // TODO: Remove shortcut, remove from PATH
     Ok(())
 }

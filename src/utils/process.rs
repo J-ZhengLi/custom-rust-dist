@@ -9,8 +9,8 @@ use anyhow::{Context, Result};
 macro_rules! exec_err {
     ($p:expr, $args:expr, $ext_msg:expr) => {
         anyhow::anyhow!(
-            "error occured when executing command `{:?} {:?}`{}",
-            $p.as_ref(),
+            "error occured when executing command `{} {}`{}",
+            $p.as_ref().to_string_lossy().to_string(),
             $args
                 .iter()
                 .map(|oss| oss.as_ref().to_string_lossy().to_string())
@@ -75,10 +75,9 @@ where
 }
 
 pub fn cmd_exist(cmd: &str) -> bool {
-    let cmd = format!("{cmd}{}", env::consts::EXE_SUFFIX);
     let path = env::var_os("PATH").unwrap_or_default();
     env::split_paths(&path)
-        .map(|p| p.join(&cmd))
+        .map(|p| p.join(cmd))
         .any(|p| p.exists())
 }
 

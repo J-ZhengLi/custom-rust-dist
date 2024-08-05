@@ -97,7 +97,7 @@ impl Installation for InstallConfiguration {
 impl Uninstallation for UninstallConfiguration {
     fn remove_rustup_env_vars(&self) -> Result<()> {
         for var_to_remove in crate::core::ALL_VARS {
-            rustup::set_env_var(*var_to_remove, vec![])?;
+            rustup::set_env_var(var_to_remove, vec![])?;
         }
 
         update_env();

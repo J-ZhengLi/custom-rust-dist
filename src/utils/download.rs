@@ -10,7 +10,7 @@ use reqwest::header::USER_AGENT;
 use reqwest::Proxy;
 use url::Url;
 
-use super::progress_bar::ProgressIndicator;
+use super::progress_bar::{ProgressIndicator, Style};
 
 fn client_builder() -> ClientBuilder {
     Client::builder()
@@ -70,10 +70,14 @@ impl<T: Sized> DownloadOpt<T> {
             .content_length()
             .ok_or_else(|| anyhow!("unable to get file length of '{}'", url.as_str()))?;
 
-        let maybe_indicator = self
-            .handler
-            .as_ref()
-            .and_then(|h| (h.start)(total_size, format!("downloading '{}'", &self.name)).ok());
+        let maybe_indicator = self.handler.as_ref().and_then(|h| {
+            (h.start)(
+                total_size,
+                format!("downloading '{}'", &self.name),
+                Style::Bytes,
+            )
+            .ok()
+        });
 
         let (mut downloaded_len, mut file) = if resume {
             let file = OpenOptions::new()
