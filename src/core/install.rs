@@ -4,7 +4,10 @@ use crate::{
     utils::{self, Extractable},
 };
 use anyhow::{anyhow, bail, Context, Result};
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 use tempfile::TempDir;
 
 // TODO: Write version info after installing each tool,
@@ -90,10 +93,15 @@ pub(crate) fn install_tool(
 }
 
 fn try_install_from_path(config: &InstallConfiguration, name: &str, path: &Path) -> Result<()> {
+    if !path.exists() {
+        bail!(
+            "unable to install '{name}' because the path to it's installer '{}' does not exist.",
+            path.display()
+        );
+    }
+
     let temp_dir = create_temp_dir(config, name)?;
-
     let tool_installer_path = extract_or_copy_to(path, temp_dir.path())?;
-
     let tool_installer = ToolInstaller::from_path(name, &tool_installer_path)
         .with_context(|| format!("no install method for tool '{name}'"))?;
     tool_installer.install(config)?;
@@ -134,8 +142,7 @@ enum ToolInstaller<'a> {
     /// ```
     Executables(Vec<PathBuf>),
     /// Plugin file, such as `.vsix` files for Visual Studio.
-    // TODO: Have a plugin kind, instead of just for visual studio.
-    Plugin(&'a Path),
+    Plugin { kind: PluginType, path: &'a Path },
     /// Directory containing `bin` subfolder:
     /// ```text
     /// tool/
@@ -149,6 +156,12 @@ enum ToolInstaller<'a> {
 
 impl<'a> ToolInstaller<'a> {
     fn from_path(name: &'a str, path: &'a Path) -> Result<Self> {
+        if !path.exists() {
+            bail!(
+                "the installer path for '{name}' specified as '{}' does not exist.",
+                path.display()
+            );
+        }
         // Step 1: Looking for custom install instruction
         if custom_instructions::SUPPORTED_TOOLS.contains(&name) {
             return Ok(Self::Custom { name, path });
@@ -165,7 +178,10 @@ impl<'a> ToolInstaller<'a> {
                         // TODO: When installing, invoke `vscode` plugin install command,
                         // this must be handled after `VS-Code` has been installed,
                         // we might need a `requirements` field in the manifest.
-                        return Ok(Self::Plugin(path));
+                        return Ok(Self::Plugin {
+                            kind: ext.parse()?,
+                            path,
+                        });
                     }
                     _ => bail!("failed to install '{name}': unknown file format '{ext}'"),
                 }
@@ -214,7 +230,12 @@ impl<'a> ToolInstaller<'a> {
             Self::DirWithBin { name, bin_dir } => {
                 install_dir_with_bin_(config, name, bin_dir)?;
             }
-            _ => unimplemented!(),
+            Self::Plugin { kind, path } => {
+                // First, we need to "cache" to installer, so that we could uninstall with it.
+                utils::copy_file_to(path, config.tools_dir())?;
+                // Then, run the installation command.
+                kind.install_plugin(path)?;
+            }
         }
         Ok(())
     }
@@ -232,4 +253,56 @@ fn install_dir_with_bin_(config: &InstallConfiguration, name: &str, bin_dir: &Pa
 
     let bin_dir_after_move = dir.join("bin");
     super::os::add_to_path(&bin_dir_after_move)
+}
+
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+enum PluginType {
+    Vsix,
+}
+
+static VSCODE_FAMILY: &[&str] = &[
+    "code",
+    "code-oss",
+    "code-exploration",
+    "vscode-huawei",
+    "wecode",
+];
+
+impl FromStr for PluginType {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "vsix" => Ok(Self::Vsix),
+            _ => bail!("unsupprted plugin file type '{s}'"),
+        }
+    }
+}
+
+impl PluginType {
+    fn install_plugin(&self, plugin_path: &Path) -> Result<()> {
+        match self {
+            PluginType::Vsix => {
+                let executables_to_check = VSCODE_FAMILY
+                    .iter()
+                    .flat_map(|s| {
+                        if cfg!(windows) {
+                            vec![format!("{s}.cmd"), format!("{s}.exe")]
+                        } else {
+                            vec![s.to_string()]
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                for program in executables_to_check {
+                    if utils::cmd_exist(&program) {
+                        utils::stdout_output(
+                            &program,
+                            &["--install-extension", utils::path_to_str(plugin_path)?],
+                        )?;
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
 }

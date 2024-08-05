@@ -3,10 +3,7 @@
 use std::path::PathBuf;
 
 use crate::{
-    core::{
-        manifest::{RustToolchain, TargetedTools, ToolsetManifest},
-        InstallConfiguration, Installation, TomlParser,
-    },
+    core::{manifest::ToolsetManifest, InstallConfiguration, Installation, TomlParser},
     rustup::Rustup,
     utils,
 };
@@ -56,7 +53,7 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
     // Also third-party app such as `VS Code`.
     config.install_tools(&manifest)?;
 
-    // Rustup::init().download_toolchain(&config, &manifest)?;
+    Rustup::init().download_toolchain(&config, &manifest)?;
 
     // TODO: install third-party tools via cargo that got installed by rustup
 

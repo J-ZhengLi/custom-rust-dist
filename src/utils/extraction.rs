@@ -3,6 +3,8 @@ use std::io::Write;
 use std::path::Path;
 use std::str::FromStr;
 
+use crate::utils::progress_bar::Style;
+
 use super::progress_bar::ProgressIndicator;
 
 #[derive(Debug, Clone, Copy)]
@@ -82,6 +84,7 @@ fn extract_zip<T: Sized>(path: &Path, root: &Path, indicator: ProgressIndicator<
     let bar = (indicator.start)(
         zip_len.try_into()?,
         format!("extracting file '{}'", path.display()),
+        Style::Len,
     )?;
 
     for i in 0..zip_len {
@@ -131,7 +134,11 @@ fn extract_7z<T: Sized>(path: &Path, root: &Path, indicator: ProgressIndicator<T
     let mut extracted_len: u64 = 0;
 
     // Init progress bar
-    let bar = (indicator.start)(sz_len, format!("extracting file '{}'", path.display()))?;
+    let bar = (indicator.start)(
+        sz_len,
+        format!("extracting file '{}'", path.display()),
+        Style::Bytes,
+    )?;
 
     sz_reader.for_each_entries(|entry, reader| {
         let mut buf = [0_u8; 1024];

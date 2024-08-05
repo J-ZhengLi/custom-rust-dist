@@ -23,6 +23,7 @@ sevenz-rust = "0.6.1"
 [target."cfg(windows)".dependencies]
 winreg = "0.52.0"
 winapi = { version = "0.3", features = ["winuser"] }
+cc = "1"
 
 [target."cfg(windows)".dependencies.windows-sys]
 features = [

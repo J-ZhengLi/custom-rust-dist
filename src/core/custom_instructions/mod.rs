@@ -12,10 +12,10 @@ macro_rules! declare_instrcutions {
             }
         }
 
-        pub(crate) fn uninstall(tool: &str) -> anyhow::Result<()> {
+        pub(crate) fn _uninstall(tool: &str) -> anyhow::Result<()> {
             match tool {
                 $(
-                    stringify!($name) => $name::uninstall(),
+                    stringify!($name) => $name::_uninstall(),
                 )*
                 _ => anyhow::bail!("no custom uninstall instruction for '{tool}'")
             }

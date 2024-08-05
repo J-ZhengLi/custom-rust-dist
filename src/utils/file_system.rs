@@ -126,6 +126,13 @@ where
         Ok(())
     }
 
+    if !from.as_ref().exists() {
+        bail!(
+            "failed to copy '{}': path does not exist",
+            from.as_ref().display()
+        );
+    }
+
     if !to.as_ref().is_dir() {
         bail!("'{}' is not a directory", to.as_ref().display());
     }
