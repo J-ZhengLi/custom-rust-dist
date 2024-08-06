@@ -78,3 +78,62 @@ fn extracting_normal_7z() {
     assert!(temp_dir.path().join("f3").join("bbb.md").is_file());
     assert!(temp_dir.path().join("f3").join("ccc").is_file());
 }
+
+#[test]
+fn extracting_simple_gz() {
+    let temp_dir = extract_to_temp("simple_gz.tar.gz");
+
+    assert!(temp_dir.path().join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("bbb.txt").is_file());
+    assert!(temp_dir.path().join("ccc.txt").is_file());
+}
+
+#[test]
+fn extracting_single_file_gz() {
+    let temp_dir = extract_to_temp("single_file.tar.gz");
+
+    assert!(temp_dir.path().join("aaa.txt").is_file());
+}
+
+#[test]
+fn extracting_normal_gz() {
+    let temp_dir = extract_to_temp("gz_with_sub_folders.tar.gz");
+
+    assert!(temp_dir.path().join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("bbb.txt").is_file());
+    assert!(temp_dir.path().join("f1").is_dir());
+    assert!(temp_dir.path().join("f1").join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("f1").join("bbb.txt").is_file());
+    assert!(temp_dir.path().join("f2").is_dir());
+    assert!(temp_dir.path().join("f2").join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("f3").is_dir());
+    assert!(temp_dir.path().join("f3").join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("f3").join("bbb.md").is_file());
+    assert!(temp_dir.path().join("f3").join("ccc").is_file());
+}
+
+#[test]
+fn extracting_simple_xz() {
+    let temp_dir = extract_to_temp("simple_xz.tar.xz");
+
+    assert!(temp_dir.path().join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("bbb.txt").is_file());
+    assert!(temp_dir.path().join("ccc.txt").is_file());
+}
+
+#[test]
+fn extracting_normal_xz() {
+    let temp_dir = extract_to_temp("xz_with_sub_folders.tar.xz");
+
+    assert!(temp_dir.path().join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("bbb.txt").is_file());
+    assert!(temp_dir.path().join("f1").is_dir());
+    assert!(temp_dir.path().join("f1").join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("f1").join("bbb.txt").is_file());
+    assert!(temp_dir.path().join("f2").is_dir());
+    assert!(temp_dir.path().join("f2").join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("f3").is_dir());
+    assert!(temp_dir.path().join("f3").join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("f3").join("bbb.md").is_file());
+    assert!(temp_dir.path().join("f3").join("ccc").is_file());
+}

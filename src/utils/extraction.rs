@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context, Result};
-use std::io::Write;
+use common_path::common_path_all;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::str::FromStr;
 
@@ -59,7 +60,22 @@ impl Extractable<'_> {
         match self.kind {
             ExtractableKind::Zip => extract_zip(self.path, root, indicator),
             ExtractableKind::SevenZ => extract_7z(self.path, root, indicator),
-            _ => unimplemented!("extracting tarball is not implemented"),
+            ExtractableKind::Gz => {
+                use flate2::read::GzDecoder;
+
+                let tar_file = std::fs::File::open(self.path)?;
+                let tar_gz = GzDecoder::new(tar_file);
+                let mut archive = tar::Archive::new(tar_gz);
+                extract_tar(&mut archive, self.path, root, indicator)
+            }
+            ExtractableKind::Xz => {
+                use xz2::read::XzDecoder;
+
+                let tar_file = std::fs::File::open(self.path)?;
+                let tar_gz = XzDecoder::new(tar_file);
+                let mut archive = tar::Archive::new(tar_gz);
+                extract_tar(&mut archive, self.path, root, indicator)
+            }
         }
     }
 }
@@ -107,7 +123,7 @@ fn extract_zip<T: Sized>(path: &Path, root: &Path, indicator: ProgressIndicator<
         {
             use std::os::unix::fs::PermissionsExt;
             if let Some(mode) = zip_file.unix_mode() {
-                std::fs::set_permissions(&out_path, std::fs::Permissions::from_mod(mode))?;
+                std::fs::set_permissions(&out_path, std::fs::Permissions::from_mode(mode))?;
             }
         }
 
@@ -176,6 +192,78 @@ fn extract_7z<T: Sized>(path: &Path, root: &Path, indicator: ProgressIndicator<T
         // NB: sevenz-rust does not support `unix-mode` like `zip` does, so we might ended up
         // mess up the extracted file's permission... let's hope that never happens.
     })?;
+
+    // Stop progress bar's progress
+    (indicator.stop)(&bar, "extraction complete.".into());
+
+    Ok(())
+}
+
+fn extract_tar<T: Sized, R: Read>(
+    archive: &mut tar::Archive<R>,
+    path: &Path,
+    root: &Path,
+    indicator: ProgressIndicator<T>,
+) -> Result<()> {
+    #[cfg(unix)]
+    archive.set_preserve_permissions(true);
+
+    let entries = archive.entries()?.collect::<Vec<_>>();
+    // Find common prefix so we can skip them and reserve the only "important" parts.
+    // Fxxk this, wtf are these types!!!!!
+    let common_prefix = {
+        if entries.len() < 2 {
+            None
+        } else {
+            let all_paths = entries
+                .iter()
+                .filter_map(|entry| entry.as_ref().ok())
+                .filter_map(|f| f.path().map(|p| p.to_path_buf()).ok())
+                .collect::<Vec<_>>();
+            common_path_all(all_paths.iter().map(|pb| pb.as_path()))
+        }
+    };
+
+    let total_len: u64 = entries.len().try_into()?;
+    // Init progress bar
+    let bar = (indicator.start)(
+        total_len,
+        format!("extracting file '{}'", path.display()),
+        Style::Len,
+    )?;
+
+    for (idx, maybe_entry) in entries.into_iter().enumerate() {
+        let mut entry = maybe_entry?;
+        let entry_path = if let Some(prefix) = &common_prefix {
+            entry.path()?.strip_prefix(prefix)?.to_path_buf()
+        } else {
+            entry.path()?.to_path_buf()
+        };
+        let out_path = root.join(&entry_path);
+        println!("out_path: {}", out_path.display());
+
+        if entry.header().entry_type().is_dir() {
+            super::mkdirs(&out_path).with_context(|| {
+                format!(
+                    "failed to create directory when extracting '{}'",
+                    path.display()
+                )
+            })?;
+        } else {
+            ensure_parent_dir(&out_path).with_context(|| {
+                format!(
+                    "failed to create directory when extracting '{}'",
+                    path.display()
+                )
+            })?;
+
+            let mut out_file = std::fs::File::create(&out_path)?;
+            std::io::copy(&mut entry, &mut out_file)?;
+        }
+
+        // Update progress bar
+        (indicator.update)(&bar, u64::try_from(idx)? + 1);
+    }
 
     // Stop progress bar's progress
     (indicator.stop)(&bar, "extraction complete.".into());

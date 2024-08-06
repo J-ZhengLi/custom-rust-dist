@@ -12,7 +12,7 @@ mod uninstall;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use manifest::ToolsetManifest;
+use manifest::{ToolInfo, ToolsetManifest};
 use serde::{de::DeserializeOwned, Serialize};
 use toml::{de, ser};
 use url::Url;
@@ -39,7 +39,6 @@ declare_env_vars!(
 /// Make sure to always call `init()` as it creates essential folders to
 /// hold the installation files.
 pub(crate) trait Installation {
-    fn init(&self, dry_run: bool) -> Result<()>;
     /// Configure environment variables for `rustup`.
     ///
     /// This will set persistent environment variables including
@@ -49,11 +48,6 @@ pub(crate) trait Installation {
     ///
     /// This will write a `config.toml` file to `CARGO_HOME`.
     fn config_cargo(&self) -> Result<()>;
-    #[allow(unused)]
-    /// Steps to install third-party softwares (excluding the ones that requires `cargo install`).
-    fn install_tools(&self, manifest: &ToolsetManifest) -> Result<()> {
-        Ok(())
-    }
     #[allow(unused)]
     /// Steps to install `cargo` compatible softwares, should only be called after toolchain installation.
     fn cargo_install(&self, manifest: &ToolsetManifest) -> Result<()> {
@@ -91,11 +85,32 @@ impl Default for InstallConfiguration {
 }
 
 impl InstallConfiguration {
-    pub(crate) fn new(install_dir: PathBuf) -> Self {
-        Self {
+    pub(crate) fn init(install_dir: PathBuf, dry_run: bool) -> Result<Self> {
+        let this = Self {
             install_dir,
             ..Default::default()
+        };
+
+        if !dry_run {
+            // Create a new folder to hold installation
+            let folder = &this.install_dir;
+            utils::mkdirs(folder)?;
+
+            // Create a copy of this binary to install dir
+            let self_exe = std::env::current_exe()?;
+            let cargo_bin_dir = this.cargo_home().join("bin");
+            utils::mkdirs(&cargo_bin_dir)?;
+            utils::copy_file_to(self_exe, &cargo_bin_dir)?;
+
+            // Create tools directory to store third party tools
+            utils::mkdirs(this.tools_dir())?;
+
+            #[cfg(windows)]
+            // Create registry entry to add this program into "installed programs".
+            os::windows::rustup::do_add_to_programs()?;
         }
+
+        Ok(this)
     }
 
     pub(crate) fn cargo_registry(mut self, registry: Option<(String, Url)>) -> Self {
@@ -161,6 +176,21 @@ impl InstallConfiguration {
         env_vars.push((RUSTUP_HOME, rustup_home));
 
         Ok(env_vars)
+    }
+
+    /// Steps to install third-party softwares (excluding the ones that requires `cargo install`).
+    pub(crate) fn install_tools(&self, manifest: &ToolsetManifest) -> Result<()> {
+        let tools_to_install = manifest.current_target_tools();
+        for (name, tool) in tools_to_install {
+            // Ignore tools that need to be installed using `cargo install`
+            if matches!(tool, ToolInfo::Version(_) | ToolInfo::Git { .. }) {
+                continue;
+            }
+            println!("installing '{name}'");
+            install::install_tool(self, name, tool)?;
+        }
+
+        Ok(())
     }
 }
 

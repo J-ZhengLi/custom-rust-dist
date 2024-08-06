@@ -33,11 +33,10 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
         .unwrap_or_else(utils::home_dir)
         .join(env!("CARGO_PKG_NAME"));
 
-    let config = InstallConfiguration::new(install_dir)
+    let config = InstallConfiguration::init(install_dir, false)?
         .cargo_registry(cargo_registry)
         .rustup_dist_server(rustup_dist_server.to_owned())
         .rustup_update_root(rustup_update_root.to_owned());
-    config.init(false)?;
     config.config_rustup_env_vars()?;
     config.config_cargo()?;
 
@@ -66,13 +65,20 @@ mod tests {
 
     use super::InstallConfiguration;
     use crate::{
-        core::{manifest::ToolsetManifest, Installation, TomlParser},
+        core::{manifest::ToolsetManifest, TomlParser},
         utils,
     };
 
     #[test]
     fn dry_run() {
-        let config = InstallConfiguration::default();
+        let mut cache_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        cache_dir.push("tests");
+        cache_dir.push("cache");
+
+        std::fs::create_dir_all(&cache_dir).unwrap();
+
+        let install_root = tempfile::Builder::new().tempdir_in(&cache_dir).unwrap();
+        let _config = InstallConfiguration::init(install_root.path().to_path_buf(), true).unwrap();
         let _manifest = ToolsetManifest::from_str(
             &utils::read_to_string(
                 PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/toolset_manifest.toml"),
@@ -80,7 +86,5 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
-
-        config.init(true).unwrap();
     }
 }
