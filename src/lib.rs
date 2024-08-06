@@ -1,5 +1,4 @@
 #![deny(unused_must_use)]
-#![deny(warnings)]
 
 pub mod cli;
 mod core;

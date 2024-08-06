@@ -5,10 +5,10 @@ use anyhow::{Context, Result};
 
 use crate::core::manifest::ToolsetManifest;
 use crate::core::InstallConfiguration;
-use crate::utils::cli::download_from_start;
 use crate::utils::cmd_output;
 use crate::utils::cmd_output_with_input;
 use crate::utils::create_executable_file;
+use crate::utils::download_from_start;
 use crate::utils::HostTriple;
 
 // FIXME: remove this `allow` before 0.1.0 release.
