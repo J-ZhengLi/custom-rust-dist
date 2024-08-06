@@ -18,32 +18,7 @@ use winapi::um::winuser;
 use super::{ensure_init_call, install_dir_from_exe_path, INIT_ONCE};
 
 impl Installation for InstallConfiguration {
-    fn init(&self, dry_run: bool) -> Result<()> {
-        if !dry_run {
-            // Create a new folder to hold installation
-            let folder = &self.install_dir;
-            utils::mkdirs(folder)?;
-
-            // Create a copy of this binary to install dir
-            let self_exe = std::env::current_exe()?;
-            let cargo_bin_dir = self.cargo_home().join("bin");
-            utils::mkdirs(&cargo_bin_dir)?;
-            utils::copy_file_to(self_exe, &cargo_bin_dir)?;
-
-            // Create tools directory to store third party tools
-            utils::mkdirs(self.tools_dir())?;
-
-            // Create registry entry to add this program into "installed programs".
-            rustup::do_add_to_programs()?;
-        }
-
-        INIT_ONCE.get_or_init(|| ());
-        Ok(())
-    }
-
     fn config_rustup_env_vars(&self) -> Result<()> {
-        ensure_init_call();
-
         let vars_raw = self.env_vars()?;
         for (key, val) in vars_raw {
             rustup::set_env_var(key, val.encode_utf16().collect())?;
@@ -55,8 +30,6 @@ impl Installation for InstallConfiguration {
     }
 
     fn config_cargo(&self) -> Result<()> {
-        ensure_init_call();
-
         let mut config = CargoConfig::new();
         if let Some((name, url)) = &self.cargo_registry {
             config.add_source(name, url.to_owned(), true);
@@ -70,24 +43,6 @@ impl Installation for InstallConfiguration {
 
             let config_path = cargo_home.join("config.toml");
             utils::write_file(config_path, &config_toml, false)?;
-        }
-
-        Ok(())
-    }
-
-    fn install_tools(&self, manifest: &ToolsetManifest) -> Result<()> {
-        ensure_init_call();
-
-        // TODO: Install MSVC build tools
-        // TODO: Install VS-Code
-        let tools_to_install = manifest.current_target_tools();
-        for (name, tool) in tools_to_install {
-            // Ignore tools that need to be installed using `cargo install`
-            if matches!(tool, ToolInfo::Version(_) | ToolInfo::Git { .. }) {
-                continue;
-            }
-            println!("installing '{name}'");
-            install::install_tool(self, name, tool)?;
         }
 
         Ok(())
@@ -174,7 +129,7 @@ pub(super) fn add_to_path(path: &Path) -> Result<()> {
     Ok(())
 }
 
-mod rustup {
+pub(crate) mod rustup {
     use std::env;
     use std::ffi::OsString;
     use std::os::windows::ffi::{OsStrExt, OsStringExt};
@@ -195,7 +150,7 @@ mod rustup {
         })
     }
 
-    pub(super) fn do_add_to_programs() -> Result<()> {
+    pub(crate) fn do_add_to_programs() -> Result<()> {
         use std::path::PathBuf;
 
         let key = RegKey::predef(HKEY_CURRENT_USER)

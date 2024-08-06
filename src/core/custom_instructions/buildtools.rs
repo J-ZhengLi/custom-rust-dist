@@ -1,10 +1,23 @@
-use std::path::{Path, PathBuf};
-use anyhow::{anyhow, bail, Result};
+use std::path::Path;
+use anyhow::Result;
 use crate::core::InstallConfiguration;
-use crate::utils;
 
 #[cfg(windows)]
 pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> {
+    use std::path::PathBuf;
+    use crate::utils;
+    use anyhow::{anyhow, bail};
+
+    fn any_existing_child_path(root: &Path, childs: &[&str]) -> Option<PathBuf> {
+        for child in childs {
+            let child_path = root.join(child);
+            if child_path.exists() {
+                return Some(child_path);
+            }
+        }
+        None
+    }
+
     // Step 1: Check if user has already installed any of the two MSVC component.
     // FIXME: This should be checked before extraction instead.
     let missing_components = windows_related::get_missing_build_tools_components();
@@ -68,16 +81,7 @@ pub(super) fn _uninstall() -> Result<()> {
     Ok(())
 }
 
-fn any_existing_child_path(root: &Path, childs: &[&str]) -> Option<PathBuf> {
-    for child in childs {
-        let child_path = root.join(child);
-        if child_path.exists() {
-            return Some(child_path);
-        }
-    }
-    None
-}
-
+#[cfg(windows)]
 // TODO: move these code that are copied... *ahem* inspired from `rustup` into `utils`
 mod windows_related {
     use crate::utils::HostTriple;

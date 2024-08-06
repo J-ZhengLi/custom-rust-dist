@@ -12,13 +12,6 @@ pub(crate) mod windows;
 
 use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
-
-/// Indicate whether if the [`Installation::init`] was called.
-///
-/// If calling `.get()` on this lock returns a `None`, meaning it hasn't been
-/// initialized, which leads to a conclusion that `init` was indeed not called.
-static INIT_ONCE: OnceLock<()> = OnceLock::new();
 
 /// Try getting the installation root judging be current executable path.
 //
@@ -44,30 +37,16 @@ fn install_dir_from_exe_path() -> Result<PathBuf> {
         make sure this binary is in its original location before running uninstall."
         );
     }
-    if !maybe_install_dir.ends_with(env!("CARGO_PKG_NAME")) {
-        // Check if the install dir's name is correct. This could fail if someone has
-        // put this binary in an arbitrary folder, then run uninstallation, which
-        // resulted in removing unintended directories.
-        bail!(
-            "directory '{}' does not seems like the currect install root, \
-        make sure this binary is in its original location before running uninstall.",
-            maybe_install_dir.display()
-        );
-    }
 
     Ok(maybe_install_dir)
-}
-
-fn ensure_init_call() {
-    assert!(
-        INIT_ONCE.get().is_some(),
-        "Internal Error: `Installation::init` should be called first"
-    );
 }
 
 pub(crate) fn add_to_path(path: &Path) -> Result<()> {
     #[cfg(windows)]
     windows::add_to_path(path)?;
+
+    #[cfg(unix)]
+    unix::add_to_path(path)?;
 
     Ok(())
 }

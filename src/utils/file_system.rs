@@ -206,7 +206,7 @@ pub fn is_executable<P: AsRef<Path>>(path: P) -> bool {
         Some("exe")
     );
     #[cfg(not(windows))]
-    let is_executable_ext = path.extension().is_none();
+    let is_executable_ext = path.as_ref().extension().is_none();
 
     path.as_ref().is_file() && is_executable_ext
 }

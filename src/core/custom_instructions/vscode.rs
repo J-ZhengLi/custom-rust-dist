@@ -7,12 +7,13 @@
 
 use std::path::Path;
 use crate::core::InstallConfiguration;
-use crate::{core::os::add_to_path, utils};
 use anyhow::Result;
-use dirs::desktop_dir;
 
 #[cfg(windows)]
 pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> {
+    use crate::{core::os::add_to_path, utils};
+    use dirs::desktop_dir;
+
     // Stop 0: Check if vs-code already exist
     let already_exist = utils::cmd_exist("code");
     if already_exist {
@@ -52,6 +53,12 @@ pub(super) fn install(_path: &Path, _config: &InstallConfiguration) -> Result<()
 }
 
 #[cfg(windows)]
+pub(super) fn _uninstall() -> Result<()> {
+    // TODO: Remove shortcut, remove from PATH
+    Ok(())
+}
+
+#[cfg(not(windows))]
 pub(super) fn _uninstall() -> Result<()> {
     // TODO: Remove shortcut, remove from PATH
     Ok(())
