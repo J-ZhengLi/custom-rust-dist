@@ -19,7 +19,7 @@ jobs:
     - name: Build
       run: cargo build --workspace --verbose
     - name: Clippy check
-      run: cargo clippy --all
+      run: cargo clippy --all -- -D warnings
     - name: Formatting check
       run: cargo fmt --all --check
     - name: Run tests

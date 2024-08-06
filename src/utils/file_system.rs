@@ -82,26 +82,86 @@ pub fn write_file<P: AsRef<Path>>(path: P, content: &str, append: bool) -> Resul
     Ok(())
 }
 
-/// Copy a path to an existing directory.
+/// Copy a file into an existing directory.
+///
+/// Returns the path to pasted file.
 ///
 /// # Errors
 /// Return `Err` if `to` location does not exist, or [`fs::copy`] operation fails.
-pub fn copy_to<P, Q>(from: P, to: Q) -> Result<()>
+pub fn copy_file_to<P, Q>(from: P, to: Q) -> Result<PathBuf>
 where
     P: AsRef<Path>,
     Q: AsRef<Path>,
 {
+    assert!(
+        from.as_ref().is_file(),
+        "Interal Error: '{}' is not a path to file, \
+        but `copy_file_to` only works with file path, try using `copy_to` instead.",
+        from.as_ref().display()
+    );
+
+    copy_to(from, to)
+}
+
+/// Copy file or directory into an existing directory.
+///
+/// Similar to [`copy_file_to`], except this will recursively copy directory as well.
+pub fn copy_to<P, Q>(from: P, to: Q) -> Result<PathBuf>
+where
+    P: AsRef<Path>,
+    Q: AsRef<Path>,
+{
+    fn copy_dir_(src: &Path, dest: &Path) -> Result<()> {
+        fs::create_dir(dest)?;
+        for maybe_entry in src.read_dir()? {
+            let entry = maybe_entry?;
+            let src = entry.path();
+            let dest = dest.join(entry.file_name());
+            if entry.file_type()?.is_dir() {
+                copy_dir_(&src, &dest)?;
+            } else {
+                fs::copy(&src, &dest)?;
+            }
+        }
+        Ok(())
+    }
+
+    if !from.as_ref().exists() {
+        bail!(
+            "failed to copy '{}': path does not exist",
+            from.as_ref().display()
+        );
+    }
+
     if !to.as_ref().is_dir() {
         bail!("'{}' is not a directory", to.as_ref().display());
     }
+
     let dest = to.as_ref().join(from.as_ref().file_name().ok_or_else(|| {
         anyhow!(
             "path '{}' does not have a file name",
             from.as_ref().display()
         )
     })?);
-    fs::copy(from, dest)?;
-    Ok(())
+
+    if from.as_ref().is_file() {
+        fs::copy(&from, &dest).with_context(|| {
+            format!(
+                "could not copy file '{}' to directory '{}'",
+                from.as_ref().display(),
+                to.as_ref().display()
+            )
+        })?;
+    } else {
+        copy_dir_(from.as_ref(), &dest).with_context(|| {
+            format!(
+                "could not copy directory '{}' as a subfolder in '{}'",
+                from.as_ref().display(),
+                to.as_ref().display()
+            )
+        })?;
+    }
+    Ok(dest)
 }
 
 /// Set file permissions (executable)
@@ -120,4 +180,44 @@ pub fn create_executable_file(path: &Path) -> Result<()> {
 #[cfg(windows)]
 pub fn create_executable_file(_path: &Path) -> Result<()> {
     Ok(())
+}
+
+/// Attempts to read a directory path, then return a list of paths
+/// that are inside the given directory, including sub folders.
+pub fn walk_dir(dir: &Path) -> Result<Vec<PathBuf>> {
+    fn collect_paths_(dir: &Path, paths: &mut Vec<PathBuf>) -> Result<()> {
+        for dir_entry in dir.read_dir()?.flatten() {
+            paths.push(dir_entry.path());
+            if matches!(dir_entry.file_type(), Ok(ty) if ty.is_dir()) {
+                collect_paths_(&dir_entry.path(), paths)?;
+            }
+        }
+        Ok(())
+    }
+    let mut paths = vec![];
+    collect_paths_(dir, &mut paths)?;
+    Ok(paths)
+}
+
+pub fn is_executable<P: AsRef<Path>>(path: P) -> bool {
+    #[cfg(windows)]
+    let is_executable_ext = matches!(
+        path.as_ref().extension().and_then(|ext| ext.to_str()),
+        Some("exe")
+    );
+    #[cfg(not(windows))]
+    let is_executable_ext = path.as_ref().extension().is_none();
+
+    path.as_ref().is_file() && is_executable_ext
+}
+
+/// Move `src` path to `dest`.
+pub fn move_to(src: &Path, dest: &Path) -> Result<()> {
+    fs::rename(src, dest).with_context(|| {
+        format!(
+            "failed when moving '{}' to '{}'",
+            src.display(),
+            dest.display()
+        )
+    })
 }
