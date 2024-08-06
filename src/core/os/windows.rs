@@ -4,10 +4,8 @@ use std::{os::windows::ffi::OsStrExt, path::Path, process::Command};
 
 use crate::{
     core::{
-        cargo_config::CargoConfig,
-        install,
-        manifest::{ToolInfo, ToolsetManifest},
-        InstallConfiguration, Installation, TomlParser, UninstallConfiguration, Uninstallation,
+        cargo_config::CargoConfig, InstallConfiguration, Installation, TomlParser,
+        UninstallConfiguration, Uninstallation,
     },
     utils,
 };
@@ -15,7 +13,7 @@ use anyhow::Result;
 use winapi::shared::minwindef;
 use winapi::um::winuser;
 
-use super::{ensure_init_call, install_dir_from_exe_path, INIT_ONCE};
+use super::install_dir_from_exe_path;
 
 impl Installation for InstallConfiguration {
     fn config_rustup_env_vars(&self) -> Result<()> {

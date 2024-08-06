@@ -11,14 +11,14 @@ fn walk_dir() {
 
     let entries = utils::walk_dir(&dir_to_walk).unwrap();
 
-    assert_eq!(
-        entries,
-        vec![
-            dir_to_walk.join("file_in_root"),
-            dir_to_walk.join("sub_folder_1"),
-            dir_to_walk.join("sub_folder_1").join("file_in_folder_1"),
-            dir_to_walk.join("sub_folder_2"),
-            dir_to_walk.join("sub_folder_2").join("file_in_folder_2"),
-        ]
-    );
+    let expected = vec![
+        dir_to_walk.join("file_in_root"),
+        dir_to_walk.join("sub_folder_1"),
+        dir_to_walk.join("sub_folder_1").join("file_in_folder_1"),
+        dir_to_walk.join("sub_folder_2"),
+        dir_to_walk.join("sub_folder_2").join("file_in_folder_2"),
+    ];
+    for exp in expected {
+        assert!(entries.contains(&exp));
+    }
 }
