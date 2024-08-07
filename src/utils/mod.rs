@@ -25,6 +25,20 @@ pub fn parse_url(url: &str) -> Result<Url> {
     Url::parse(url).with_context(|| format!("failed to parse url: {url}"))
 }
 
+/// Basically [`Url::join`], but will insert a forward slash (`/`) to the root if necessary.
+///
+/// [`Url::join`] will replace the last part of a root if the root does not have trailing slash,
+/// and this function is to make sure of that, so the `root` will always join with `s`.
+pub fn force_url_join(root: &Url, s: &str) -> Result<Url> {
+    let result = if root.as_str().ends_with('/') {
+        root.join(s)?
+    } else {
+        Url::parse(&format!("{}/{s}", root.as_str()))?
+    };
+
+    Ok(result)
+}
+
 /// Flip `Option<Result<T, E>>` to `Result<Option<T>, E>`
 pub fn flip_option_result<T, E>(x: Option<Result<T, E>>) -> Result<Option<T>, E> {
     x.map_or(Ok(None), |v| v.map(Some))
