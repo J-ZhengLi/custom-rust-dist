@@ -68,7 +68,7 @@ impl InstallConfiguration {
 
             #[cfg(windows)]
             // Create registry entry to add this program into "installed programs".
-            os::windows::rustup::do_add_to_programs()?;
+            super::os::windows::do_add_to_programs()?;
         }
 
         Ok(this)
