@@ -6,7 +6,7 @@
 //! there's currently no suitable solution other than execute some commands to hack it.
 
 use std::path::Path;
-use crate::core::InstallConfiguration;
+use crate::core::install::InstallConfiguration;
 use anyhow::Result;
 
 #[cfg(windows)]

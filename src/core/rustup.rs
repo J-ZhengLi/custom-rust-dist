@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 
-use crate::core::manifest::ToolsetManifest;
-use crate::core::InstallConfiguration;
+use super::install::InstallConfiguration;
+use super::parser::manifest::ToolsetManifest;
 use crate::utils::cmd_output;
 use crate::utils::cmd_output_with_input;
 use crate::utils::create_executable_file;
@@ -44,6 +44,7 @@ impl Default for Rustup {
 
 impl Rustup {
     pub fn init() -> Self {
+        std::env::remove_var("RUSTUP_TOOLCHAIN");
         Self::default()
     }
 
