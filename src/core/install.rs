@@ -1,4 +1,9 @@
-use super::{manifest::ToolInfo, InstallConfiguration, CARGO_HOME, RUSTUP_HOME};
+use super::{
+    parser::cargo_config::CargoConfig,
+    parser::manifest::{ToolInfo, ToolsetManifest},
+    parser::TomlParser,
+    CARGO_HOME, RUSTUP_DIST_SERVER, RUSTUP_HOME, RUSTUP_UPDATE_ROOT,
+};
 use crate::{
     core::custom_instructions,
     utils::{self, Extractable},
@@ -9,14 +14,172 @@ use std::{
     str::FromStr,
 };
 use tempfile::TempDir;
+use url::Url;
+
+#[derive(Debug)]
+pub(crate) struct InstallConfiguration {
+    pub(crate) cargo_registry: Option<(String, Url)>,
+    /// Path to install everything.
+    ///
+    /// Note that this folder will includes `.cargo` and `.rustup` folders as well.
+    /// And the default location will be `$HOME` directory (`%USERPROFILE%` on windows).
+    /// So, even if the user didn't specify any install path, a pair of env vars will still
+    /// be written (CARGO_HOME and RUSTUP_HOME), as they will be located in a sub folder of `$HOME`,
+    /// which is [`installer_home`](utils::installer_home).
+    pub(crate) install_dir: PathBuf,
+    pub(crate) rustup_dist_server: Option<Url>,
+    pub(crate) rustup_update_root: Option<Url>,
+    /// Indicates whether `cargo` was already installed, useful when installing third-party tools.
+    cargo_is_installed: bool,
+}
+
+impl Default for InstallConfiguration {
+    fn default() -> Self {
+        Self {
+            install_dir: utils::home_dir().join(env!("CARGO_PKG_NAME")),
+            cargo_registry: None,
+            rustup_dist_server: None,
+            rustup_update_root: None,
+            cargo_is_installed: false,
+        }
+    }
+}
+
+impl InstallConfiguration {
+    pub(crate) fn init(install_dir: PathBuf, dry_run: bool) -> Result<Self> {
+        let this = Self {
+            install_dir,
+            ..Default::default()
+        };
+
+        if !dry_run {
+            // Create a new folder to hold installation
+            let folder = &this.install_dir;
+            utils::mkdirs(folder)?;
+
+            // Create a copy of this binary to install dir
+            let self_exe = std::env::current_exe()?;
+            let cargo_bin_dir = this.cargo_home().join("bin");
+            utils::mkdirs(&cargo_bin_dir)?;
+            utils::copy_file_to(self_exe, &cargo_bin_dir)?;
+
+            // Create tools directory to store third party tools
+            utils::mkdirs(this.tools_dir())?;
+
+            #[cfg(windows)]
+            // Create registry entry to add this program into "installed programs".
+            super::os::windows::do_add_to_programs()?;
+        }
+
+        Ok(this)
+    }
+
+    pub(crate) fn cargo_registry(mut self, registry: Option<(String, Url)>) -> Self {
+        self.cargo_registry = registry;
+        self
+    }
+
+    pub(crate) fn rustup_dist_server(mut self, url: Option<Url>) -> Self {
+        self.rustup_dist_server = url;
+        self
+    }
+
+    pub(crate) fn rustup_update_root(mut self, url: Option<Url>) -> Self {
+        self.rustup_update_root = url;
+        self
+    }
+
+    pub(crate) fn cargo_home(&self) -> PathBuf {
+        self.install_dir.join(".cargo")
+    }
+
+    pub(crate) fn cargo_bin(&self) -> PathBuf {
+        self.cargo_home().join("bin")
+    }
+
+    pub(crate) fn rustup_home(&self) -> PathBuf {
+        self.install_dir.join(".rustup")
+    }
+
+    pub(crate) fn temp_root(&self) -> PathBuf {
+        self.install_dir.join("temp")
+    }
+
+    pub(crate) fn tools_dir(&self) -> PathBuf {
+        self.install_dir.join("tools")
+    }
+
+    pub(crate) fn env_vars(&self) -> Result<Vec<(&'static str, String)>> {
+        let cargo_home = self
+            .cargo_home()
+            .to_str()
+            .map(ToOwned::to_owned)
+            .context("`install-dir` cannot contains invalid unicodes")?;
+        // This `unwrap` is safe here because we've already make sure the `install_dir`'s path can be
+        // converted to string with the `cargo_home` variable.
+        let rustup_home = self.rustup_home().to_str().unwrap().to_string();
+        // Clippy suggest removing `into_iter`, which might be a bug, as removing it prevent
+        // `.chain` method being used.
+        #[allow(clippy::useless_conversion)]
+        let mut env_vars: Vec<(&str, String)> = self
+            .rustup_dist_server
+            .clone()
+            .map(|s| (RUSTUP_DIST_SERVER, s.to_string()))
+            .into_iter()
+            .chain(
+                self.rustup_update_root
+                    .clone()
+                    .map(|s| (RUSTUP_UPDATE_ROOT, s.to_string()))
+                    .into_iter(),
+            )
+            .collect();
+        env_vars.push((CARGO_HOME, cargo_home));
+        env_vars.push((RUSTUP_HOME, rustup_home));
+
+        Ok(env_vars)
+    }
+
+    /// Steps to install third-party softwares (excluding the ones that requires `cargo install`).
+    pub(crate) fn install_tools(&self, manifest: &ToolsetManifest) -> Result<()> {
+        let tools_to_install = manifest.current_target_tools();
+        for (name, tool) in tools_to_install {
+            // Ignore tools that need to be installed using `cargo install`
+            if matches!(tool, ToolInfo::Version(_) | ToolInfo::Git { .. }) {
+                continue;
+            }
+            println!("installing '{name}'");
+            install_tool(self, name, tool)?;
+        }
+
+        Ok(())
+    }
+
+    /// Configuration options for `cargo`.
+    ///
+    /// This will write a `config.toml` file to `CARGO_HOME`.
+    pub(crate) fn config_cargo(&self) -> Result<()> {
+        let mut config = CargoConfig::new();
+        if let Some((name, url)) = &self.cargo_registry {
+            config.add_source(name, url.to_owned(), true);
+        }
+
+        let config_toml = config.to_toml()?;
+        if !config_toml.trim().is_empty() {
+            // make sure cargo_home dir exists
+            let cargo_home = self.cargo_home();
+            utils::mkdirs(&cargo_home)?;
+
+            let config_path = cargo_home.join("config.toml");
+            utils::write_file(config_path, &config_toml, false)?;
+        }
+
+        Ok(())
+    }
+}
 
 // TODO: Write version info after installing each tool,
 // which is later used for updating.
-pub(crate) fn install_tool(
-    config: &InstallConfiguration,
-    name: &str,
-    tool: &ToolInfo,
-) -> Result<()> {
+fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> Result<()> {
     match tool {
         ToolInfo::Version(ver) if config.cargo_is_installed => {
             let output = utils::output_with_env(

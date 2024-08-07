@@ -1,16 +1,13 @@
 use std::{env, path::Path};
 
 use super::install_dir_from_exe_path;
-use crate::{
-    core::{
-        cargo_config::CargoConfig, InstallConfiguration, Installation, TomlParser,
-        UninstallConfiguration, Uninstallation,
-    },
-    utils,
-};
+use crate::core::install::InstallConfiguration;
+use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
+use crate::core::EnvConfig;
+use crate::utils;
 use anyhow::{anyhow, Context, Result};
 
-impl Installation for InstallConfiguration {
+impl EnvConfig for InstallConfiguration {
     // On linux, persistent env vars needs to be written in `.profile`, `.bash_profile`, etc.
     // Rustup already did all the dirty work by writting an entry in those files
     // to invoke `$CARGO_HOME/env.{sh|fish}`. Sadly we'll have to re-implement a similar procedure here,
@@ -48,25 +45,6 @@ impl Installation for InstallConfiguration {
         // Update vars for current process
         for (key, val) in vars_raw {
             env::set_var(key, val);
-        }
-
-        Ok(())
-    }
-
-    fn config_cargo(&self) -> Result<()> {
-        let mut config = CargoConfig::new();
-        if let Some((name, url)) = &self.cargo_registry {
-            config.add_source(name, url.to_owned(), true);
-        }
-
-        let config_toml = config.to_toml()?;
-        if !config_toml.trim().is_empty() {
-            // make sure cargo_home dir exists
-            let cargo_home = self.cargo_home();
-            utils::mkdirs(&cargo_home)?;
-
-            let config_path = cargo_home.join("config.toml");
-            utils::write_file(config_path, &config_toml, false)?;
         }
 
         Ok(())

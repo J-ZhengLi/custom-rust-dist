@@ -2,46 +2,24 @@
 
 use std::{os::windows::ffi::OsStrExt, path::Path, process::Command};
 
-use crate::{
-    core::{
-        cargo_config::CargoConfig, InstallConfiguration, Installation, TomlParser,
-        UninstallConfiguration, Uninstallation,
-    },
-    utils,
-};
+use super::install_dir_from_exe_path;
+use crate::core::install::InstallConfiguration;
+use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
+use crate::core::EnvConfig;
 use anyhow::Result;
 use winapi::shared::minwindef;
 use winapi::um::winuser;
 
-use super::install_dir_from_exe_path;
+pub(crate) use rustup::*;
 
-impl Installation for InstallConfiguration {
+impl EnvConfig for InstallConfiguration {
     fn config_rustup_env_vars(&self) -> Result<()> {
         let vars_raw = self.env_vars()?;
         for (key, val) in vars_raw {
-            rustup::set_env_var(key, val.encode_utf16().collect())?;
+            set_env_var(key, val.encode_utf16().collect())?;
         }
 
         update_env();
-
-        Ok(())
-    }
-
-    fn config_cargo(&self) -> Result<()> {
-        let mut config = CargoConfig::new();
-        if let Some((name, url)) = &self.cargo_registry {
-            config.add_source(name, url.to_owned(), true);
-        }
-
-        let config_toml = config.to_toml()?;
-        if !config_toml.trim().is_empty() {
-            // make sure cargo_home dir exists
-            let cargo_home = self.cargo_home();
-            utils::mkdirs(&cargo_home)?;
-
-            let config_path = cargo_home.join("config.toml");
-            utils::write_file(config_path, &config_toml, false)?;
-        }
 
         Ok(())
     }
@@ -50,7 +28,7 @@ impl Installation for InstallConfiguration {
 impl Uninstallation for UninstallConfiguration {
     fn remove_rustup_env_vars(&self) -> Result<()> {
         for var_to_remove in crate::core::ALL_VARS {
-            rustup::set_env_var(var_to_remove, vec![])?;
+            set_env_var(var_to_remove, vec![])?;
         }
 
         update_env();
@@ -104,13 +82,13 @@ fn remove_self_() -> Result<()> {
         .args(["/C", "rmdir", "/s", "/q"])
         .arg(&installed_dir);
 
-    rustup::do_remove_from_programs()?;
+    do_remove_from_programs()?;
 
     yolo(cmd);
 }
 
 pub(super) fn add_to_path(path: &Path) -> Result<()> {
-    let Some(old_path) = rustup::get_windows_path_var()? else {
+    let Some(old_path) = get_windows_path_var()? else {
         return Ok(());
     };
     let path_bytes = path.as_os_str().encode_wide().collect::<Vec<_>>();
@@ -119,7 +97,7 @@ pub(super) fn add_to_path(path: &Path) -> Result<()> {
     new_path.extend_from_slice(&old_path);
 
     // Apply the new path
-    rustup::set_env_var("PATH", new_path)?;
+    set_env_var("PATH", new_path)?;
 
     // Sync changes
     update_env();

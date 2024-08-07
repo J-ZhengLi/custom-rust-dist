@@ -2,5 +2,4 @@
 
 pub mod cli;
 mod core;
-pub mod rustup;
 pub mod utils;
