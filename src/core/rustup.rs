@@ -2,24 +2,20 @@ use std::path::Path;
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use url::Url;
 
 use super::install::InstallConfiguration;
 use super::parser::manifest::ToolsetManifest;
+use crate::utils;
 use crate::utils::cmd_output;
-use crate::utils::cmd_output_with_input;
 use crate::utils::create_executable_file;
 use crate::utils::download_from_start;
 use crate::utils::HostTriple;
 
-// FIXME: remove this `allow` before 0.1.0 release.
-#[allow(unused)]
-const RUSTUP_DIST_SERVER: &str = "https://mirrors.tuna.tsinghua.edu.cn/rustup";
-const RUSTUP_UPDATE_ROOT: &str = "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup";
-
 #[cfg(windows)]
-const RUSTUP_INIT: &str = "rustup-init.exe";
+pub(crate) const RUSTUP_INIT: &str = "rustup-init.exe";
 #[cfg(not(windows))]
-const RUSTUP_INIT: &str = "rustup-init";
+pub(crate) const RUSTUP_INIT: &str = "rustup-init";
 
 #[cfg(windows)]
 const RUSTUP: &str = "rustup.exe";
@@ -27,7 +23,7 @@ const RUSTUP: &str = "rustup.exe";
 const RUSTUP: &str = "rustup";
 
 pub struct Rustup {
-    triple: HostTriple,
+    pub triple: HostTriple,
 }
 
 impl Default for Rustup {
@@ -43,30 +39,30 @@ impl Default for Rustup {
 }
 
 impl Rustup {
-    pub fn init() -> Self {
+    pub(crate) fn init() -> Self {
         std::env::remove_var("RUSTUP_TOOLCHAIN");
         Self::default()
     }
 
-    fn download_rustup_init(&self, dest: &Path) -> Result<()> {
-        let download_url = url::Url::parse(&format!(
-            "{}/{}/{}/{}",
-            RUSTUP_UPDATE_ROOT, "dist", self.triple, RUSTUP_INIT
-        ))
-        .context("Failed to init rustup download url.")?;
+    pub(crate) fn download_rustup_init(&self, dest: &Path, server: &Url) -> Result<()> {
+        let download_url =
+            utils::force_url_join(server, &format!("dist/{}/{RUSTUP_INIT}", self.triple))
+                .context("Failed to init rustup download url.")?;
         download_from_start(RUSTUP_INIT, &download_url, dest).context("Failed to download rustup.")
     }
 
-    fn generate_rustup(&self, rustup_init: &PathBuf) -> Result<()> {
-        let args = ["--default-toolchain", "none"];
-        let input = b"\n";
-        cmd_output_with_input(rustup_init, &args, input)
+    pub(crate) fn generate_rustup(&self, rustup_init: &PathBuf) -> Result<()> {
+        let args = ["--default-toolchain", "none", "-y"];
+        cmd_output(rustup_init, &args)
     }
 
     fn download_rust_toolchain(&self, rustup: &Path, manifest: &ToolsetManifest) -> Result<()> {
         // TODO: check local manifest.
         let version = manifest.rust.version.clone();
-        let args = ["toolchain", "install", &version, "--no-self-update"];
+        let mut args = vec!["toolchain", "install", &version, "--no-self-update"];
+        if let Some(profile) = &manifest.rust.profile {
+            args.extend(["--profile", profile]);
+        }
         cmd_output(rustup, &args)
     }
 
@@ -80,9 +76,11 @@ impl Rustup {
         config: &InstallConfiguration,
         manifest: &ToolsetManifest,
     ) -> Result<()> {
-        let rustup_init = config.install_dir.join(RUSTUP_INIT);
+        // We are putting the binary here so that it will be deleted automatically after done.
+        let temp_dir = config.create_temp_dir("rustup-init")?;
+        let rustup_init = temp_dir.path().join(RUSTUP_INIT);
         // Download rustup-init.
-        self.download_rustup_init(&rustup_init)?;
+        self.download_rustup_init(&rustup_init, config.rustup_update_root)?;
         // File permission
         create_executable_file(&rustup_init)?;
         // Install rustup.

@@ -1,7 +1,10 @@
 use super::{
-    parser::cargo_config::CargoConfig,
-    parser::manifest::{ToolInfo, ToolsetManifest},
-    parser::TomlParser,
+    parser::{
+        cargo_config::CargoConfig,
+        manifest::{ToolInfo, ToolsetManifest},
+        TomlParser,
+    },
+    rustup::Rustup,
     CARGO_HOME, RUSTUP_DIST_SERVER, RUSTUP_HOME, RUSTUP_UPDATE_ROOT,
 };
 use crate::{
@@ -16,8 +19,28 @@ use std::{
 use tempfile::TempDir;
 use url::Url;
 
+macro_rules! declare_unfallible_url {
+    ($($name:ident($global:ident) -> $val:literal);+) => {
+        $(
+            static $global: std::sync::OnceLock<url::Url> = std::sync::OnceLock::new();
+            pub(crate) fn $name() -> &'static url::Url {
+                $global.get_or_init(|| {
+                    url::Url::parse($val).expect(
+                        &format!("Internal Error: static variable '{}' cannot be parse to URL", $val)
+                    )
+                })
+            }
+        )*
+    };
+}
+
+declare_unfallible_url!(
+    default_rustup_dist_server(DEFAULT_RUSTUP_DIST_SERVER) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup";
+    default_rustup_update_root(DEFAULT_RUSTUP_UPDATE_ROOT) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
+);
+
 #[derive(Debug)]
-pub(crate) struct InstallConfiguration {
+pub(crate) struct InstallConfiguration<'a> {
     pub(crate) cargo_registry: Option<(String, Url)>,
     /// Path to install everything.
     ///
@@ -27,25 +50,25 @@ pub(crate) struct InstallConfiguration {
     /// be written (CARGO_HOME and RUSTUP_HOME), as they will be located in a sub folder of `$HOME`,
     /// which is [`installer_home`](utils::installer_home).
     pub(crate) install_dir: PathBuf,
-    pub(crate) rustup_dist_server: Option<Url>,
-    pub(crate) rustup_update_root: Option<Url>,
+    pub(crate) rustup_dist_server: &'a Url,
+    pub(crate) rustup_update_root: &'a Url,
     /// Indicates whether `cargo` was already installed, useful when installing third-party tools.
     cargo_is_installed: bool,
 }
 
-impl Default for InstallConfiguration {
+impl Default for InstallConfiguration<'_> {
     fn default() -> Self {
         Self {
             install_dir: utils::home_dir().join(env!("CARGO_PKG_NAME")),
             cargo_registry: None,
-            rustup_dist_server: None,
-            rustup_update_root: None,
+            rustup_dist_server: default_rustup_dist_server(),
+            rustup_update_root: default_rustup_update_root(),
             cargo_is_installed: false,
         }
     }
 }
 
-impl InstallConfiguration {
+impl<'a> InstallConfiguration<'a> {
     pub(crate) fn init(install_dir: PathBuf, dry_run: bool) -> Result<Self> {
         let this = Self {
             install_dir,
@@ -79,12 +102,12 @@ impl InstallConfiguration {
         self
     }
 
-    pub(crate) fn rustup_dist_server(mut self, url: Option<Url>) -> Self {
+    pub(crate) fn rustup_dist_server(mut self, url: &'a Url) -> Self {
         self.rustup_dist_server = url;
         self
     }
 
-    pub(crate) fn rustup_update_root(mut self, url: Option<Url>) -> Self {
+    pub(crate) fn rustup_update_root(mut self, url: &'a Url) -> Self {
         self.rustup_update_root = url;
         self
     }
@@ -118,25 +141,22 @@ impl InstallConfiguration {
         // This `unwrap` is safe here because we've already make sure the `install_dir`'s path can be
         // converted to string with the `cargo_home` variable.
         let rustup_home = self.rustup_home().to_str().unwrap().to_string();
-        // Clippy suggest removing `into_iter`, which might be a bug, as removing it prevent
-        // `.chain` method being used.
-        #[allow(clippy::useless_conversion)]
-        let mut env_vars: Vec<(&str, String)> = self
-            .rustup_dist_server
-            .clone()
-            .map(|s| (RUSTUP_DIST_SERVER, s.to_string()))
-            .into_iter()
-            .chain(
-                self.rustup_update_root
-                    .clone()
-                    .map(|s| (RUSTUP_UPDATE_ROOT, s.to_string()))
-                    .into_iter(),
-            )
-            .collect();
-        env_vars.push((CARGO_HOME, cargo_home));
-        env_vars.push((RUSTUP_HOME, rustup_home));
 
+        let env_vars: Vec<(&str, String)> = vec![
+            (RUSTUP_DIST_SERVER, self.rustup_dist_server.to_string()),
+            (RUSTUP_UPDATE_ROOT, self.rustup_update_root.to_string()),
+            (CARGO_HOME, cargo_home),
+            (RUSTUP_HOME, rustup_home),
+        ];
         Ok(env_vars)
+    }
+
+    /// Install rust's toolchain manager `rustup` with a default toolchain
+    pub(crate) fn install_rust(&mut self, manifest: &ToolsetManifest) -> Result<()> {
+        println!("installing rustup and rust toolchain");
+        Rustup::init().download_toolchain(self, manifest)?;
+        self.cargo_is_installed = true;
+        Ok(())
     }
 
     /// Steps to install third-party softwares (excluding the ones that requires `cargo install`).
@@ -149,6 +169,19 @@ impl InstallConfiguration {
             }
             println!("installing '{name}'");
             install_tool(self, name, tool)?;
+        }
+
+        Ok(())
+    }
+
+    /// Steps to install `cargo` compatible softwares, should only be called after toolchain installation.
+    pub(crate) fn cargo_install(&self, manifest: &ToolsetManifest) -> Result<()> {
+        let tools_to_install = manifest.current_target_tools();
+        for (name, tool) in tools_to_install {
+            if matches!(tool, ToolInfo::Version(_) | ToolInfo::Git { .. }) {
+                println!("installing '{name}'");
+                install_tool(self, name, tool)?;
+            }
         }
 
         Ok(())
@@ -175,6 +208,18 @@ impl InstallConfiguration {
 
         Ok(())
     }
+
+    /// Creates a temporary directory under `install_dir/temp`, with a certain prefix.
+    pub(crate) fn create_temp_dir(&self, prefix: &str) -> Result<TempDir> {
+        let root = self.temp_root();
+        // Ensure temp directory
+        utils::mkdirs(&root)?;
+
+        tempfile::Builder::new()
+            .prefix(&format!("{prefix}_"))
+            .tempdir_in(&root)
+            .with_context(|| format!("unable to create temp directory under '{}'", root.display()))
+    }
 }
 
 // TODO: Write version info after installing each tool,
@@ -198,29 +243,21 @@ fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> R
             tag,
             rev,
         } if config.cargo_is_installed => {
-            let branch_opt = branch
-                .as_ref()
-                .map(|s| format!("--branch {s}"))
-                .unwrap_or_default();
-            let tag_opt = tag
-                .as_ref()
-                .map(|s| format!("--tag {s}"))
-                .unwrap_or_default();
-            let rev_opt = rev
-                .as_ref()
-                .map(|s| format!("--rev {s}"))
-                .unwrap_or_default();
+            let mut args = vec!["install", "--git", git.as_str()];
+
+            if let Some(s) = &branch {
+                args.extend(["--branch", s]);
+            }
+            if let Some(s) = &tag {
+                args.extend(["--tag", s]);
+            }
+            if let Some(s) = &rev {
+                args.extend(["--rev", s]);
+            }
 
             let output = utils::output_with_env(
                 "cargo",
-                &[
-                    "install",
-                    "--git",
-                    git.as_str(),
-                    &branch_opt,
-                    &tag_opt,
-                    &rev_opt,
-                ],
+                &args,
                 [
                     (CARGO_HOME, utils::path_to_str(&config.cargo_home())?),
                     (RUSTUP_HOME, utils::path_to_str(&config.rustup_home())?),
@@ -233,7 +270,7 @@ fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> R
         // so then we can have the `resume download` feature.
         ToolInfo::Url { url, .. } => {
             // TODO: Download first
-            let temp_dir = create_temp_dir(config, "download")?;
+            let temp_dir = config.create_temp_dir("download")?;
 
             let downloaded_file_name = url
                 .path_segments()
@@ -263,23 +300,12 @@ fn try_install_from_path(config: &InstallConfiguration, name: &str, path: &Path)
         );
     }
 
-    let temp_dir = create_temp_dir(config, name)?;
+    let temp_dir = config.create_temp_dir(name)?;
     let tool_installer_path = extract_or_copy_to(path, temp_dir.path())?;
     let tool_installer = ToolInstaller::from_path(name, &tool_installer_path)
         .with_context(|| format!("no install method for tool '{name}'"))?;
     tool_installer.install(config)?;
     Ok(())
-}
-
-fn create_temp_dir(config: &InstallConfiguration, prefix: &str) -> Result<TempDir> {
-    let root = config.temp_root();
-    // Ensure temp directory
-    utils::mkdirs(&root)?;
-
-    tempfile::Builder::new()
-        .prefix(&format!("{prefix}_"))
-        .tempdir_in(&root)
-        .with_context(|| format!("unable to create temp directory under '{}'", root.display()))
 }
 
 /// Perform extraction or copy action base on the given path.
@@ -467,5 +493,25 @@ impl PluginType {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn declare_unfallible_url_macro() {
+        let default_dist_server = default_rustup_dist_server();
+        let default_update_root = default_rustup_update_root();
+
+        assert_eq!(
+            default_dist_server.as_str(),
+            "https://mirrors.tuna.tsinghua.edu.cn/rustup"
+        );
+        assert_eq!(
+            default_update_root.as_str(),
+            "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
+        );
     }
 }
