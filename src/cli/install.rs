@@ -2,11 +2,12 @@
 
 use std::path::PathBuf;
 
-use crate::{
-    core::{manifest::ToolsetManifest, InstallConfiguration, Installation, TomlParser},
-    rustup::Rustup,
-    utils,
-};
+use crate::core::install::InstallConfiguration;
+use crate::core::parser::manifest::ToolsetManifest;
+use crate::core::parser::TomlParser;
+use crate::core::rustup::Rustup;
+use crate::core::EnvConfig;
+use crate::utils;
 
 use super::{GlobalOpt, Subcommands};
 
@@ -63,11 +64,8 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
 mod tests {
     use std::path::PathBuf;
 
-    use super::InstallConfiguration;
-    use crate::{
-        core::{manifest::ToolsetManifest, TomlParser},
-        utils,
-    };
+    use super::{InstallConfiguration, TomlParser, ToolsetManifest};
+    use crate::utils;
 
     #[test]
     fn dry_run() {

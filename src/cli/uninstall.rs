@@ -1,9 +1,7 @@
 //! Separated module to handle uninstallation in command line.
 
-use crate::{
-    cli::UninstallCommand,
-    core::{UninstallConfiguration, Uninstallation},
-};
+use crate::cli::UninstallCommand;
+use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
 
 use super::{GlobalOpt, Subcommands};
 

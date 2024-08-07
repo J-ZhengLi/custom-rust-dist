@@ -112,8 +112,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::CargoConfig;
-    use crate::core::TomlParser;
+    use super::{CargoConfig, TomlParser};
 
     #[test]
     fn cargo_config_default_serialize() {
