@@ -2,20 +2,16 @@
 
 use std::{os::windows::ffi::OsStrExt, path::Path, process::Command};
 
-use crate::{
-    core::{
-        cargo_config::CargoConfig, InstallConfiguration, Installation, TomlParser,
-        UninstallConfiguration, Uninstallation,
-    },
-    utils,
-};
-use anyhow::Result;
+use super::install_dir_from_exe_path;
+use crate::core::install::InstallConfiguration;
+use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
+use crate::core::EnvConfig;
+use crate::utils;
+use anyhow::{anyhow, Context, Result};
 use winapi::shared::minwindef;
 use winapi::um::winuser;
 
-use super::install_dir_from_exe_path;
-
-impl Installation for InstallConfiguration {
+impl EnvConfig for InstallConfiguration {
     fn config_rustup_env_vars(&self) -> Result<()> {
         let vars_raw = self.env_vars()?;
         for (key, val) in vars_raw {
@@ -23,25 +19,6 @@ impl Installation for InstallConfiguration {
         }
 
         update_env();
-
-        Ok(())
-    }
-
-    fn config_cargo(&self) -> Result<()> {
-        let mut config = CargoConfig::new();
-        if let Some((name, url)) = &self.cargo_registry {
-            config.add_source(name, url.to_owned(), true);
-        }
-
-        let config_toml = config.to_toml()?;
-        if !config_toml.trim().is_empty() {
-            // make sure cargo_home dir exists
-            let cargo_home = self.cargo_home();
-            utils::mkdirs(&cargo_home)?;
-
-            let config_path = cargo_home.join("config.toml");
-            utils::write_file(config_path, &config_toml, false)?;
-        }
 
         Ok(())
     }

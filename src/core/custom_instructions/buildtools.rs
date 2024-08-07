@@ -1,6 +1,6 @@
 use std::path::Path;
 use anyhow::Result;
-use crate::core::InstallConfiguration;
+use crate::core::install::InstallConfiguration;
 
 #[cfg(windows)]
 pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> {
