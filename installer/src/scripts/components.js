@@ -32,19 +32,7 @@ async function show_install_dir() {
 
 // 定义一个异步函数来调用 select_folder 命令并存储结果到 localStorage 中
 async function select_folder() {
-  try {
-      const installPath = await invoke('select_folder');
-      if (installPath && installPath.trim() !== '') {
-          localStorage.setItem('installPath', installPath);
-          document.getElementById('default_home').value = `${installPath}`;
-          localStorage.setItem('installPath', installPath);
-      } else {
-          const currentPath = localStorage.getItem('installPath');
-          document.getElementById('default_home').value = `${currentPath}`;
-      }
-  } catch (e) {
-      e.preventDefault();
-  }
+  await invoke('select_folder');
 }
 
 async function loadComponents() {
@@ -125,4 +113,17 @@ window.addEventListener("DOMContentLoaded", () => {
     e.preventDefault();
     close();
   });
+});
+
+// 监听文件夹选择事件
+window.__TAURI__.event.listen('folder-selected', (event) => {
+  const installPath = event.payload;
+  if (installPath && installPath.trim() !== '') {
+    localStorage.setItem('installPath', installPath);
+    document.getElementById('default_home').value = `${installPath}`;
+    localStorage.setItem('installPath', installPath);
+  } else {
+      const currentPath = localStorage.getItem('installPath');
+      document.getElementById('default_home').value = `${currentPath}`;
+  }
 });
