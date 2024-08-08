@@ -1,6 +1,6 @@
 [package]
 name = "custom_rust_dist"
-version = "0.1.0-alpha.2"
+version = "0.1.0-alpha.3"
 edition = "2021"
 description = "Manage Rust toolchain and a set of extra tools with ease"
 rust-version = "1.73.0" # Minimal required version to use `zip`
