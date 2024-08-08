@@ -62,8 +62,8 @@ impl<T: Sized> DownloadOpt<T> {
         let status = resp.status();
         if !status.is_success() {
             bail!(
-                "failed to receive surver response when downloading '{}': {status}",
-                self.name
+                "failed to receive surver response when downloading from '{}': {status}",
+                url.as_str()
             );
         }
         let total_size = resp

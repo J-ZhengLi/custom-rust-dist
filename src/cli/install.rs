@@ -2,10 +2,11 @@
 
 use std::path::PathBuf;
 
-use crate::core::install::InstallConfiguration;
+use crate::core::install::{
+    default_rustup_dist_server, default_rustup_update_root, InstallConfiguration,
+};
 use crate::core::parser::manifest::ToolsetManifest;
 use crate::core::parser::TomlParser;
-use crate::core::rustup::Rustup;
 use crate::core::EnvConfig;
 use crate::utils;
 
@@ -34,10 +35,18 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
         .unwrap_or_else(utils::home_dir)
         .join(env!("CARGO_PKG_NAME"));
 
-    let config = InstallConfiguration::init(install_dir, false)?
+    let mut config = InstallConfiguration::init(install_dir, false)?
         .cargo_registry(cargo_registry)
-        .rustup_dist_server(rustup_dist_server.to_owned())
-        .rustup_update_root(rustup_update_root.to_owned());
+        .rustup_dist_server(
+            rustup_dist_server
+                .as_ref()
+                .unwrap_or_else(|| default_rustup_dist_server()),
+        )
+        .rustup_update_root(
+            rustup_update_root
+                .as_ref()
+                .unwrap_or_else(|| default_rustup_update_root()),
+        );
     config.config_rustup_env_vars()?;
     config.config_cargo()?;
 
@@ -52,12 +61,13 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
     // This step taking cares of requirements, such as `MSVC`.
     // Also third-party app such as `VS Code`.
     config.install_tools(&manifest)?;
+    config.install_rust(&manifest)?;
+    // install third-party tools via cargo that got installed by rustup
+    config.cargo_install(&manifest)?;
 
-    Rustup::init().download_toolchain(&config, &manifest)?;
+    println!("Rust is installed");
 
-    // TODO: install third-party tools via cargo that got installed by rustup
-
-    unimplemented!("`install` is not fully yet implemented.")
+    Ok(())
 }
 
 #[cfg(test)]

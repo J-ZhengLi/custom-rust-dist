@@ -10,7 +10,6 @@ pub(crate) mod rustup;
 pub(crate) mod uninstall;
 
 use anyhow::Result;
-use parser::manifest::ToolsetManifest;
 
 macro_rules! declare_env_vars {
     ($($key:ident),+) => {
@@ -37,9 +36,4 @@ pub(crate) trait EnvConfig {
     /// This will set persistent environment variables including
     /// `RUSTUP_DIST_SERVER`, `RUSTUP_UPDATE_ROOT`, `CARGO_HOME`, `RUSTUP_HOME`.
     fn config_rustup_env_vars(&self) -> Result<()>;
-    #[allow(unused)]
-    /// Steps to install `cargo` compatible softwares, should only be called after toolchain installation.
-    fn cargo_install(&self, manifest: &ToolsetManifest) -> Result<()> {
-        Ok(())
-    }
 }
