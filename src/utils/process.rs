@@ -4,7 +4,7 @@ use std::fmt::Debug;
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 
 macro_rules! exec_err {
     ($p:expr, $args:expr, $ext_msg:expr) => {
@@ -36,7 +36,15 @@ where
 {
     let output = output(program.as_ref(), args)?;
     if !output.status.success() {
-        return Err(exec_err!(program, args, "execution failed"));
+        bail!(
+            "executing `{} {}` returns error: {}",
+            program.as_ref().to_string_lossy().to_string(),
+            args.iter()
+                .map(|oss| oss.as_ref().to_string_lossy().to_string())
+                .collect::<Vec<_>>()
+                .join(" "),
+            String::from_utf8_lossy(&output.stderr),
+        );
     }
 
     Ok(String::from_utf8(output.stdout)?)
