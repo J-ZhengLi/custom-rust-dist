@@ -209,7 +209,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
         let input = include_str!("../../../tests/data/toolset_manifest.toml");
         let expected = ToolsetManifest {
             rust: RustToolchain {
-                version: "1.80.0".into(),
+                version: "stable".into(),
                 profile: Some("minimal".into()),
                 components: Some(vec!["clippy-preview".into(), "rustfmt".into()]),
             },
@@ -265,7 +265,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
             tools,
             BTreeMap::from([
                 (
-                    &"mingw".into(),
+                    &"mingw64".into(),
                     &ToolInfo::Path {
                         path: PathBuf::from(
                             "tests/cache/x86_64-13.2.0-release-posix-seh-msvcrt-rt_v11-rev1.7z"

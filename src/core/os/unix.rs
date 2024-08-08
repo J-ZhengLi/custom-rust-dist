@@ -7,7 +7,7 @@ use crate::core::EnvConfig;
 use crate::utils;
 use anyhow::{anyhow, Context, Result};
 
-impl EnvConfig for InstallConfiguration {
+impl EnvConfig for InstallConfiguration<'_> {
     // On linux, persistent env vars needs to be written in `.profile`, `.bash_profile`, etc.
     // Rustup already did all the dirty work by writting an entry in those files
     // to invoke `$CARGO_HOME/env.{sh|fish}`. Sadly we'll have to re-implement a similar procedure here,
