@@ -5,7 +5,7 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 use std::time::Duration;
 
-use tauri::api::dialog::blocking::FileDialogBuilder;
+use tauri::api::dialog::FileDialogBuilder;
 use xuanwu_installer::components::{get_component_list_from_manifest, Component};
 use xuanwu_installer::config::get_default_install_dir;
 
@@ -26,10 +26,21 @@ fn default_install_dir() -> String {
 }
 
 #[tauri::command]
-fn select_folder() -> Option<String> {
-    FileDialogBuilder::new()
-        .pick_folder()
-        .map(|path| path.to_string_lossy().to_string())
+fn select_folder(window: tauri::Window) {
+    FileDialogBuilder::new().pick_folder(move |path| {
+        // 处理用户选择的路径
+        let folder_path = match path {
+            Some(p) => Some(p.to_string_lossy().to_string()),
+            None => None,
+        };
+
+        // 通过窗口发送事件给前端
+        if let Some(folder) = folder_path {
+            window.emit("folder-selected", folder).unwrap();
+        } else {
+            window.emit("folder-selected", "").unwrap(); // 选择未成功
+        }
+    });
 }
 
 #[tauri::command]
