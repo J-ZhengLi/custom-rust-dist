@@ -3,7 +3,7 @@ target/
 Cargo.lock
 
 # Workspace configuration for VS-Code
-.vscode/
+./.vscode/
 
 # Tests artifacts
 tests/cache/

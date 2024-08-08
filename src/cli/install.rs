@@ -7,7 +7,7 @@ use crate::core::install::{
 };
 use crate::core::parser::manifest::ToolsetManifest;
 use crate::core::parser::TomlParser;
-use crate::core::EnvConfig;
+use crate::core::{try_it, EnvConfig};
 use crate::utils;
 
 use super::{GlobalOpt, Subcommands};
@@ -65,7 +65,11 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
     // install third-party tools via cargo that got installed by rustup
     config.cargo_install(&manifest)?;
 
-    println!("Rust is installed");
+    println!(
+        "Rust is installed, \
+        this setup will soon create an example project at current directory for you to try Rust!"
+    );
+    try_it::try_it(None)?;
 
     Ok(())
 }

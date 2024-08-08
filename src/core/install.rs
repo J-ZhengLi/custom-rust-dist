@@ -450,7 +450,7 @@ enum PluginType {
     Vsix,
 }
 
-static VSCODE_FAMILY: &[&str] = &[
+pub(crate) static VSCODE_FAMILY: &[&str] = &[
     "code",
     "code-oss",
     "code-exploration",
