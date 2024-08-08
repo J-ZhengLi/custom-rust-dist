@@ -1,6 +1,7 @@
 //! Contains all the definition of command line arguments.
 
 mod install;
+mod tryit;
 mod uninstall;
 
 use anyhow::Result;
@@ -54,12 +55,19 @@ pub(crate) enum Subcommands {
         #[command(subcommand)]
         commands: Option<UninstallCommand>,
     },
+    /// A subcommand to create a new Rust project template and let you start coding with it.
+    TryIt {
+        /// Specify another directory to create project template, defaulting to current directory.
+        #[arg(long, short, value_name = "PATH", value_hint = ValueHint::DirPath)]
+        path: Option<PathBuf>,
+    },
 }
 
 impl Subcommands {
     pub fn execute(&self, opt: GlobalOpt) -> Result<()> {
         install::execute(self, opt)?;
         uninstall::execute(self, opt)?;
+        tryit::execute(self, opt)?;
         Ok(())
     }
 }
