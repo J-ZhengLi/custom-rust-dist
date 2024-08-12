@@ -15,12 +15,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+    - name: install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+    - name: install rustup & toolchain
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        rustup -vV
+        rustc -vV
+    - name: cache
+      uses: swatinem/rust-cache@v2
+      with:
+        workspaces: './src-tauri -> target'
+    
+    # - uses: tauri-apps/tauri-action@v0 # Extremly slow, only used when releasing
+    
+    - name: Formatting check
+      run: cargo fmt --all --check
     - name: Build
       run: cargo build --workspace --verbose
     - name: Clippy check
       run: cargo clippy --all -- -D warnings
-    - name: Formatting check
-      run: cargo fmt --all --check
     - name: Run tests
-      run: cargo test --verbose
+      run: cargo test --workspace --verbose

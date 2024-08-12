@@ -29,17 +29,11 @@ fn default_install_dir() -> String {
 fn select_folder(window: tauri::Window) {
     FileDialogBuilder::new().pick_folder(move |path| {
         // 处理用户选择的路径
-        let folder_path = match path {
-            Some(p) => Some(p.to_string_lossy().to_string()),
-            None => None,
-        };
-
+        let folder = path
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
         // 通过窗口发送事件给前端
-        if let Some(folder) = folder_path {
-            window.emit("folder-selected", folder).unwrap();
-        } else {
-            window.emit("folder-selected", "").unwrap(); // 选择未成功
-        }
+        window.emit("folder-selected", folder).unwrap();
     });
 }
 
