@@ -11,7 +11,7 @@ pub fn get_default_install_dir() -> String {
 
         // 尝试获取相应的环境变量
         let home = env::var(home_env_var)
-            .expect(&format!("{} environment variable not set", home_env_var));
+            .unwrap_or_else(|_| panic!("{} environment variable not set", home_env_var));
 
         // 构建默认的 .xuanwu 路径
         let mut path = PathBuf::from(home);
