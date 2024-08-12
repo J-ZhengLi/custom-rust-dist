@@ -225,6 +225,9 @@ impl<'a> InstallConfiguration<'a> {
 // TODO: Write version info after installing each tool,
 // which is later used for updating.
 fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> Result<()> {
+    // If the tool with `name` has baked in packages, output it into temp directory then try
+    // to install it with the path
+
     match tool {
         ToolInfo::Version(ver) if config.cargo_is_installed => {
             let output = utils::output_with_env(

@@ -4,6 +4,7 @@
 
 mod custom_instructions;
 pub(crate) mod install;
+pub(crate) mod offline_packages;
 mod os;
 pub(crate) mod parser;
 pub(crate) mod rustup;
