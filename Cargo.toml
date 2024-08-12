@@ -5,16 +5,25 @@ edition = "2021"
 description = "Manage Rust toolchain and a set of extra tools with ease"
 rust-version = "1.73.0" # Minimal required version to use `zip`
 
-[dependencies]
+[workspace]
+members = ["installer/src-tauri"]
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
 anyhow = "1"
+url = { version = "2", features = ["serde"] }
+toml = "0.8.15"
+
+[dependencies]
+anyhow.workspace = true
 clap = { version = "4", features = ["derive"] }
 home = "0.5.9"
 indicatif = "0.17"
 reqwest = { version = "0.12", features = ["blocking"] }
-serde = { version = "1", features = ["derive"] }
-url = { version = "2", features = ["serde"] }
+serde.workspace = true
+url.workspace = true
 libc = "0.2"
-toml = "0.8.15"
+toml.workspace = true
 tempfile = "3"
 zip = "2"
 dirs = "5.0.1"
