@@ -1,7 +1,9 @@
 {
   "build": {
-    "devPath": "../src",
-    "distDir": "../src",
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build",
+    "devPath": "http://localhost:1420",
+    "distDir": "../dist",
     "withGlobalTauri": true
   },
   "package": {
@@ -22,10 +24,8 @@
     "windows": [
       {
         "title": "玄武 Rust 安装工具",
-        "minWidth": 800,
-        "minHeight": 500,
-        "maxWidth": 800,
-        "maxHeight": 500
+        "minWidth": 640,
+        "minHeight": 480
       }
     ],
     "security": {
