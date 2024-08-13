@@ -1,0 +1,157 @@
+:root {
+  font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  /* line-height: 40px; */
+  font-weight: 400;
+
+  color: #0f0f0f;
+  background-color: #f6f6f6;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+.container {
+  margin: 0;
+  padding-top: 0px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.components-box {
+  display: flex;
+  margin-top: 0px;
+  margin-bottom: 10px;
+  height: 280px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+#component-list {
+  width: 50%;
+  border-right: 1px solid #ccc;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+#component-info {
+  width: 50%;
+  padding: 10px;
+}
+
+.component {
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.component input {
+  margin-right: 10px;
+}
+
+.component-name {
+  font-weight: bold;
+}
+
+.component-desc {
+  margin-left: 20px;
+}
+
+.input-container {
+  display: flex;
+  align-items: center;
+  font-size: 11px;
+  margin-top: 30px;
+}
+
+.input-container input[type="text"] {
+  flex-grow: 1;
+  margin-top: 5px;
+  margin-bottom: 5px;
+  margin-right: 10px;
+  margin-left: 20px;
+}
+
+.fixed-length-text {
+  position: relative;
+  left: 3px;
+  display: inline-block;
+  width: 60px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: #535bf2;
+}
+
+h4 {
+  text-align: center;
+}
+
+input,
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  color: #0f0f0f;
+  background-color: #ffffff;
+  transition: border-color 0.25s;
+  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: #396cd8;
+}
+button:active {
+  border-color: #396cd8;
+  background-color: #e8e8e8;
+}
+
+input,
+button {
+  outline: none;
+}
+
+.previous-button {
+  position: fixed;
+  bottom: 20px;
+  right: 196px;
+  z-index: 1000;
+}
+
+.next-button {
+  position: fixed;
+  bottom: 20px;
+  right: 100px;
+  z-index: 1000;
+}
+
+.close-button {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 1000;
+}
