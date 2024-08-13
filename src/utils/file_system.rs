@@ -82,6 +82,19 @@ pub fn write_file<P: AsRef<Path>>(path: P, content: &str, append: bool) -> Resul
     Ok(())
 }
 
+pub fn write_bytes<P: AsRef<Path>>(path: P, content: &[u8], append: bool) -> Result<()> {
+    let mut options = fs::OpenOptions::new();
+    if append {
+        options.append(true);
+    } else {
+        options.truncate(true).write(true);
+    }
+    let mut file = options.create(true).open(path)?;
+    file.write_all(content)?;
+    file.sync_data()?;
+    Ok(())
+}
+
 /// Copy a file into an existing directory.
 ///
 /// Returns the path to pasted file.
