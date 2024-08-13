@@ -3,6 +3,7 @@
 use crate::core::install::{
     default_rustup_dist_server, default_rustup_update_root, InstallConfiguration,
 };
+use crate::core::offline_packages::OfflinePackages;
 use crate::core::parser::manifest::ToolsetManifest;
 use crate::core::parser::TomlParser;
 use crate::core::{try_it, EnvConfig};
@@ -50,7 +51,6 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
     config.config_cargo()?;
 
     // TODO: Download manifest form remote server for online build
-
     let (manifest, pkgs_root) = manifest_with_offline_packages(&config)?;
 
     // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
