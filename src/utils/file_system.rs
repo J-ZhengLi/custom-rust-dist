@@ -43,12 +43,12 @@ pub fn mkdirs<P: AsRef<Path>>(path: P) -> Result<()> {
     })
 }
 
-pub fn to_nomalized_abspath<P: AsRef<Path> + Into<PathBuf>>(path: P) -> Result<PathBuf> {
+pub fn to_nomalized_abspath<P: AsRef<Path>>(path: P, root: Option<&Path>) -> Result<PathBuf> {
     let abs_pathbuf = if path.as_ref().is_absolute() {
-        path.into()
+        path.as_ref().to_path_buf()
     } else {
-        env::current_dir()
-            .context("current directory cannot be determined")
+        root.map(|p| Ok(p.to_path_buf()))
+            .unwrap_or_else(|| env::current_dir().context("current directory cannot be determined"))
             .map(|mut cd| {
                 cd.push(path);
                 cd

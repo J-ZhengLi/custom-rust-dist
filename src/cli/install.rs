@@ -51,7 +51,8 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
 
     // TODO: Download manifest form remote server for online build
 
-    let (manifest, pkgs_root) = manifest_with_offline_packages(&config)?;
+    let (mut manifest, pkgs_root) = manifest_with_offline_packages(&config)?;
+    manifest.adjust_paths()?;
 
     // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
     config.install_tools(&manifest)?;

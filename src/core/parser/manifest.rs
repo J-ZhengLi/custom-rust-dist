@@ -5,6 +5,8 @@ use std::{collections::BTreeMap, path::PathBuf};
 use serde::Deserialize;
 use url::Url;
 
+use crate::utils;
+
 use super::TomlParser;
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -13,9 +15,19 @@ pub(crate) struct ToolsetManifest {
     pub(crate) rust: RustToolchain,
     #[serde(default)]
     pub(crate) tools: TargetedTools,
+    /// Path to the manifest file.
+    #[serde(skip)]
+    path: Option<PathBuf>,
 }
 
-impl TomlParser for ToolsetManifest {}
+impl TomlParser for ToolsetManifest {
+    fn load<P: AsRef<std::path::Path>>(path: P) -> anyhow::Result<Self> {
+        let raw = utils::read_to_string(&path)?;
+        let mut temp_manifest = Self::from_str(&raw)?;
+        temp_manifest.path = Some(path.as_ref().to_path_buf());
+        Ok(temp_manifest)
+    }
+}
 
 impl ToolsetManifest {
     /// Get a map of [`Tool`] that are available only in current target.
@@ -38,6 +50,38 @@ impl ToolsetManifest {
         // Clippy bug, the `map(|(k, v)| (k, v))` cannot be removed
         #[allow(clippy::map_identity)]
         self.tools.target.get_mut(cur_target)
+    }
+
+    /// Turn all the relative paths in the `tools` section to some absolute paths.
+    ///
+    /// There are some rules applied when converting, including:
+    /// 1. If the manifest was loaded from a path,
+    ///     all relative paths will be forced to combine with the path loading from.
+    /// 2. If the manifest was not loaded from path,
+    ///     all relative paths will be forced to combine with the parent directory of this executable.
+    ///     (Assuming the manifest was baked in the executable)
+    ///
+    /// # Errors
+    /// Return `Result::Err` if the manifest was not loaded from path, and the current executable path
+    /// cannot be determined as well.
+    pub(crate) fn adjust_paths(&mut self) -> anyhow::Result<()> {
+        let parent_dir = if let Some(p) = &self.path {
+            p.to_path_buf()
+        } else {
+            std::env::current_exe()?
+                .parent()
+                .unwrap_or_else(|| unreachable!("an executable always have a parent directory"))
+                .to_path_buf()
+        };
+
+        for tool in self.tools.target.values_mut() {
+            for tool_info in tool.values_mut() {
+                if let ToolInfo::Path { path, .. } = tool_info {
+                    *path = utils::to_nomalized_abspath(path.as_path(), Some(&parent_dir))?;
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -158,6 +202,7 @@ version = "1.0.0"
             ToolsetManifest {
                 rust: RustToolchain::new("1.0.0"),
                 tools: TargetedTools::default(),
+                path: None,
             }
         )
     }
@@ -234,6 +279,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
                     aarch64_linux_gnu_tools,
                 ),
             ]),
+            path: None,
         };
 
         assert_eq!(ToolsetManifest::from_str(input).unwrap(), expected);
@@ -285,6 +331,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
                     ]),
                 ),
             ]),
+            path: None,
         };
         assert_eq!(ToolsetManifest::from_str(input).unwrap(), expected);
     }
