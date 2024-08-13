@@ -498,8 +498,8 @@ alias autoremove='sudo pacman -Rcns $(pacman -Qdtq)'
         // Components take `..` accountable in case of symlink.
         assert_ne!(with_dots_comps, without_dots_comps);
 
-        let with_dots_normalized = utils::to_nomalized_abspath(&with_dots).unwrap();
-        let without_dots_normalized = utils::to_nomalized_abspath(&without_dots).unwrap();
+        let with_dots_normalized = utils::to_nomalized_abspath(&with_dots, None).unwrap();
+        let without_dots_normalized = utils::to_nomalized_abspath(&without_dots, None).unwrap();
         assert_eq!(with_dots_normalized, without_dots_normalized);
     }
 
