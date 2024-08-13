@@ -77,6 +77,7 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
 /// The returned `TempDir` is meant to keep the package path alive.
 ///
 /// Note that the bundled package sources will replace the one in the original manifest toml.
+#[cfg(feature = "offline")]
 pub(crate) fn manifest_with_offline_packages(
     config: &InstallConfiguration,
 ) -> Result<(ToolsetManifest, Option<TempDir>)> {
@@ -87,7 +88,7 @@ pub(crate) fn manifest_with_offline_packages(
     };
 
     let temp_dir = config.create_temp_dir("offline_packages")?;
-    let offline_pkgs = OfflinePackages::load();
+    let offline_pkgs = crate::core::offline_packages::OfflinePackages::load();
 
     for (key, val) in offline_pkgs.0 {
         // make sure no redundent packages in the source
@@ -105,6 +106,14 @@ pub(crate) fn manifest_with_offline_packages(
     }
 
     Ok((orig_manifest, Some(temp_dir)))
+}
+
+#[cfg(not(feature = "offline"))]
+pub(crate) fn manifest_with_offline_packages(
+    _config: &InstallConfiguration,
+) -> Result<(ToolsetManifest, Option<TempDir>)> {
+    ToolsetManifest::from_str(include_str!("../../resources/toolset_manifest.toml"))
+        .map(|m| (m, None))
 }
 
 #[cfg(test)]

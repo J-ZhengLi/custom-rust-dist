@@ -4,6 +4,7 @@
 
 mod custom_instructions;
 pub(crate) mod install;
+#[cfg(feature = "offline")]
 pub(crate) mod offline_packages;
 mod os;
 pub(crate) mod parser;
