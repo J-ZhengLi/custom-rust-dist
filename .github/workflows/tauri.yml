@@ -3,8 +3,12 @@ name: Tauri Tests
 on:
   push:
     branches: [ "master" ]
+    paths:
+      - 'installer/*'
   pull_request:
     branches: [ "master" ]
+    paths:
+      - 'installer/*'
 
 jobs:
   test-tauri:
@@ -33,7 +37,7 @@ jobs:
         if: matrix.platform == 'ubuntu-latest' # This must match the platform value defined above.
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: install frontend dependencies
         run: |
