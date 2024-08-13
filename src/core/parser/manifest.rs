@@ -29,6 +29,16 @@ impl ToolsetManifest {
             .map(|map| map.iter().map(|(k, v)| (k, v)).collect())
             .unwrap_or_default()
     }
+
+    /// Get a mut reference to the map of [`Tool`] that are available only in current target.
+    ///
+    /// Return `None` if there are no available tools in the current target.
+    pub(crate) fn current_target_tools_mut(&mut self) -> Option<&mut BTreeMap<String, ToolInfo>> {
+        let cur_target = env!("TARGET");
+        // Clippy bug, the `map(|(k, v)| (k, v))` cannot be removed
+        #[allow(clippy::map_identity)]
+        self.tools.target.get_mut(cur_target)
+    }
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -80,6 +90,31 @@ pub(crate) enum ToolInfo {
         url: Url,
         version: Option<String>,
     },
+}
+
+impl ToolInfo {
+    pub(crate) fn convert_to_path(&mut self, path: PathBuf) {
+        match self {
+            Self::Version(ver) => {
+                *self = Self::Path {
+                    path,
+                    version: Some(ver.to_owned()),
+                };
+            }
+            Self::Git { .. } => {
+                *self = Self::Path {
+                    path,
+                    version: None,
+                };
+            }
+            Self::Path { version, .. } | Self::Url { version, .. } => {
+                *self = Self::Path {
+                    path,
+                    version: version.to_owned(),
+                };
+            }
+        }
+    }
 }
 
 #[cfg(test)]

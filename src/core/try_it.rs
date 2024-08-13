@@ -55,9 +55,9 @@ struct ExampleTemplate<'a> {
 impl<'a> ExampleTemplate<'a> {
     fn load() -> Self {
         Self {
-            src_main: include_str!("../../templates/example/src/main.rs"),
-            cargo_toml: include_str!("../../templates/example/Cargo.toml"),
-            vscode_config: include_str!("../../templates/example/.vscode/launch.json"),
+            src_main: include_str!("../../resources/example/src/main.rs"),
+            cargo_toml: include_str!("../../resources/example/Cargo.toml"),
+            vscode_config: include_str!("../../resources/example/.vscode/launch.json"),
         }
     }
 
