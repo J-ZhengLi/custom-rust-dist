@@ -1,7 +1,18 @@
 [rust]
 version = "stable"
 profile = "minimal"
-components = ["clippy-preview", "rustfmt"]
+components = ["clippy", "rustfmt"]
+
+[tools.descriptions]
+clippy = "A collection of lints to catch common mistakes and improve your Rust code."
+rustfmt = "A tool for formatting Rust code according to style guidelines."
+cargo-llvm-cov = "Cargo subcommand to easily use LLVM source-based code coverage."
+vscode = "A free code editor with support for development operations like debugging, task running, and version control."
+vscode-rust-analyzer = "An implementation of Language Server Protocol for the Rust programming language. It provides features like completion and goto definition for VS-Code"
+flamegraph = "A Rust-powered flamegraph generator with additional support for Cargo projects."
+cargo-expand = "Prints out the result of macro expansion and #[derive] expansion applied to the current crate."
+buildtools = "(windows-msvc only) Requirement for Windows"
+mingw64 = "(windows-gnu only) Requirement for Windows"
 
 [tools.target.x86_64-pc-windows-msvc]
 buildtools = { path = "packages/x86_64-pc-windows-msvc/BuildTools-With-SDK.zip", version = "1" }

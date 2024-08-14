@@ -3,15 +3,13 @@
 use crate::core::install::{
     default_rustup_dist_server, default_rustup_update_root, InstallConfiguration,
 };
-use crate::core::parser::manifest::ToolsetManifest;
-use crate::core::parser::TomlParser;
 use crate::core::{try_it, EnvConfig};
+use crate::manifest::baked_in_manifest;
 use crate::utils;
 
 use super::{GlobalOpt, Subcommands};
 
 use anyhow::Result;
-use tempfile::TempDir;
 
 /// Execute `install` command.
 pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
@@ -38,20 +36,20 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
         .cargo_registry(cargo_registry)
         .rustup_dist_server(
             rustup_dist_server
-                .as_ref()
-                .unwrap_or_else(|| default_rustup_dist_server()),
+                .clone()
+                .unwrap_or_else(|| default_rustup_dist_server().clone()),
         )
         .rustup_update_root(
             rustup_update_root
-                .as_ref()
-                .unwrap_or_else(|| default_rustup_update_root()),
+                .clone()
+                .unwrap_or_else(|| default_rustup_update_root().clone()),
         );
     config.config_rustup_env_vars()?;
     config.config_cargo()?;
 
     // TODO: Download manifest form remote server for online build
 
-    let (mut manifest, pkgs_root) = manifest_with_offline_packages(&config)?;
+    let mut manifest = baked_in_manifest()?;
     manifest.adjust_paths()?;
 
     // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
@@ -59,9 +57,6 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
     config.install_rust(&manifest)?;
     // install third-party tools via cargo that got installed by rustup
     config.cargo_install(&manifest)?;
-
-    // Explicitly drop cache to remove the bundled packages.
-    drop(pkgs_root);
 
     println!(
         "Rust is installed, \
@@ -72,57 +67,12 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
     Ok(())
 }
 
-/// Try to include offline packages that were bundled in the source,
-/// and return the adjusted manifest along with a `TempDir`.
-///
-/// The returned `TempDir` is meant to keep the package path alive.
-///
-/// Note that the bundled package sources will replace the one in the original manifest toml.
-#[cfg(feature = "offline")]
-pub(crate) fn manifest_with_offline_packages(
-    config: &InstallConfiguration,
-) -> Result<(ToolsetManifest, Option<TempDir>)> {
-    let mut orig_manifest =
-        ToolsetManifest::from_str(include_str!("../../resources/toolset_manifest.toml"))?;
-    let Some(tools_map) = orig_manifest.current_target_tools_mut() else {
-        return Ok((orig_manifest, None));
-    };
-
-    let temp_dir = config.create_temp_dir("offline_packages")?;
-    let offline_pkgs = crate::core::offline_packages::OfflinePackages::load();
-
-    for (key, val) in offline_pkgs.0 {
-        // make sure no redundent packages in the source
-        let tool_info = tools_map.get_mut(key).unwrap_or_else(|| {
-            panic!(
-                "Internal Error: Redundent package '{}' in the resource directory.",
-                val.filename
-            )
-        });
-        // Then we need to write the pkg content to local file.
-        let dest = temp_dir.path().join(val.filename);
-        utils::write_bytes(&dest, val.value, false)?;
-        // Lastly, we overwrite the `ToolInfo` in the manifest
-        tool_info.convert_to_path(dest);
-    }
-
-    Ok((orig_manifest, Some(temp_dir)))
-}
-
-#[cfg(not(feature = "offline"))]
-pub(crate) fn manifest_with_offline_packages(
-    _config: &InstallConfiguration,
-) -> Result<(ToolsetManifest, Option<TempDir>)> {
-    ToolsetManifest::from_str(include_str!("../../resources/toolset_manifest.toml"))
-        .map(|m| (m, None))
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
-    use super::{InstallConfiguration, TomlParser, ToolsetManifest};
-    use crate::utils;
+    use super::InstallConfiguration;
+    use crate::{core::parser::TomlParser, manifest::ToolsetManifest, utils};
 
     #[test]
     fn dry_run() {
