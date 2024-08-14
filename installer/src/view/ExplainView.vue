@@ -1,7 +1,12 @@
 <script setup lang="ts">
+import { ref } from 'vue';
+import { message } from '@tauri-apps/api/dialog';
 import { useCustomRouter } from '../router';
 import ScrollBox from '../components/ScrollBox.vue';
+
 const { routerPush, routerBack } = useCustomRouter();
+
+const agree = ref();
 
 const explainText: string[] = `通过安装 Rustup，您同意以下条款：
 1. 软件许可：Rustup 由 Rust 社区开发，并遵循 MIT 和 Apache 2.0 许可协议。您可以自由使用、修改和分发 Rustup，但必须遵循相应的许可证条款。
@@ -13,18 +18,42 @@ const explainText: string[] = `通过安装 Rustup，您同意以下条款：
 );
 
 function handleNextClick() {
-  routerPush('/components');
+  if (agree.value) {
+    routerPush('/folder');
+  } else {
+    message('请先同意许可协议', { title: '提示' });
+  }
 }
 </script>
 
 <template>
   <div flex="~ col" w="full">
-    <h4 ml="12px">安装说明</h4>
+    <div ml="12px">
+      <h4 mb="4px">许可协议</h4>
+      <p mt="0">继续安装前请阅读以下重要信息。</p>
+      <p mb="4px">
+        请仔细阅读下列许可协议，您必须在继续安装前同意这些协议条款。
+      </p>
+    </div>
     <scroll-box flex="1" mx="12px" overflow="auto">
       <p v-for="txt in explainText" :key="txt">
         {{ txt }}
       </p>
     </scroll-box>
+    <div ml="12px">
+      <base-radio
+        v-model="agree"
+        :value="true"
+        name="agree"
+        label="我同意此协议"
+      />
+      <base-radio
+        v-model="agree"
+        :value="false"
+        name="agree"
+        label="我不同意此协议"
+      />
+    </div>
     <div basis="60px" flex="~ items-center justify-end">
       <base-button @click="routerBack" mr="12px">上一步</base-button>
       <base-button @click="handleNextClick" mr="12px">下一步</base-button>

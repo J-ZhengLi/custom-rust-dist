@@ -17,13 +17,7 @@ async function handleBackClick() {
   <div flex="~ col items-center" w="full">
     <div grow="2">
       <a href="https://xuanwu.beta.atomgit.com/" target="_blank">
-        <img
-          src="/logo.svg"
-          class="logo xuanwu"
-          alt="Xuanwu logo"
-          w="200px"
-          mt="50%"
-        />
+        <img src="/logo.svg" alt="Xuanwu logo" w="200px" mt="50%" />
       </a>
     </div>
     <div grow="2">

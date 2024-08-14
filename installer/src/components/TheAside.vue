@@ -30,28 +30,34 @@ function menuItemActive(order: number) {
 </script>
 
 <template>
-  <div text="end secondary">
-    <div
-      :style="beforeTop"
-      class="activeItem"
-      :class="{ ...menuItemActive(menuFirstItem?.meta?.order as number) }"
-      relative
-      h="24px"
-      mt="12px"
-      pr="1em"
-    >
-      {{ menuFirstItem?.meta?.title }}
+  <div flex="~ col items-center" h="full">
+    <h4 w="full" text="center" m="0" py="12px">安装步骤</h4>
+    <div flex="1" text="end secondary" w="full">
+      <div
+        :style="beforeTop"
+        class="activeItem"
+        :class="{ ...menuItemActive(menuFirstItem?.meta?.order as number) }"
+        relative
+        h="24px"
+        mt="12px"
+        pr="1em"
+      >
+        {{ menuFirstItem?.meta?.title }}
+      </div>
+      <div
+        v-for="item in menu"
+        :key="item.path"
+        :class="{ ...menuItemActive(item.meta?.order as number) }"
+        h="24px"
+        mt="12px"
+        pr="1em"
+        transition="all 0.3s"
+      >
+        {{ item.meta?.title }}
+      </div>
     </div>
-    <div
-      v-for="item in menu"
-      :key="item.path"
-      :class="{ ...menuItemActive(item.meta?.order as number) }"
-      h="24px"
-      mt="12px"
-      pr="1em"
-      transition="all 0.3s"
-    >
-      {{ item.meta?.title }}
+    <div mb="8px">
+      <img src="/logo.svg" alt="Xuanwu logo" w="90%" />
     </div>
   </div>
 </template>

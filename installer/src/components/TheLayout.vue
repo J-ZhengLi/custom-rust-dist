@@ -42,7 +42,9 @@ const transitionName = computed(() => {
       <div h-full relative>
         <router-view v-slot="{ Component }">
           <transition :name="transitionName">
-            <component :is="Component" absolute w="full" h="full" />
+            <keep-alive>
+              <component :is="Component" absolute w="full" h="full" />
+            </keep-alive>
           </transition>
         </router-view>
       </div>

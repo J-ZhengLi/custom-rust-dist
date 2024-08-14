@@ -20,8 +20,9 @@ import TheLayout from './components/TheLayout.vue';
     Apple Color Emoji,
     Segoe UI Emoji,
     Segoe UI Symbol;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 24px;
+  letter-spacing: 1px;
   font-weight: 400;
   --uno: bg-back c-header;
   font-synthesis: none;
