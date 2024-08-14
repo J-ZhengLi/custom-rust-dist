@@ -7,4 +7,5 @@ pub mod utils;
 // Exports
 pub use core::install::{default_install_dir, InstallConfiguration};
 pub use core::parser::manifest;
+pub use core::try_it::try_it;
 pub use core::EnvConfig;

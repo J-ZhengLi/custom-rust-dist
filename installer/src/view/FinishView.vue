@@ -3,12 +3,18 @@ import { ref } from 'vue';
 import { useCustomRouter } from '../router';
 import { invoke } from '@tauri-apps/api';
 
-const { routerBack } = useCustomRouter();
 const runApp = ref(true);
 
 function closeWindow() {
   if (runApp.value) {
     // run app
+    // TODO: Pass install_dir to the `run_app` function
+    invoke('run_app').catch((e) => {
+      console.error(e);
+    })
+    .catch((e) => {
+      console.error(e);
+    });
   }
   invoke('finish').catch((e) => {
     console.error(e);
@@ -24,12 +30,11 @@ function closeWindow() {
       <p>单击“完成”退出安装程序</p>
       <base-check-box
         v-model="runApp"
-        title="安装完成后自动运行"
+        title="安装完成后打开示例项目"
         mt="12px"
       ></base-check-box>
     </div>
     <div basis="60px" flex="~ items-center justify-end">
-      <base-button @click="routerBack" mr="12px">上一步-暂</base-button>
       <base-button mr="12px" @click="closeWindow">完成并关闭</base-button>
     </div>
   </div>

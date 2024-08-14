@@ -7,7 +7,7 @@ pub mod install;
 mod os;
 pub(crate) mod parser;
 pub(crate) mod rustup;
-pub(crate) mod try_it;
+pub mod try_it;
 pub(crate) mod uninstall;
 
 use anyhow::Result;

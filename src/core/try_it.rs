@@ -7,7 +7,7 @@ use std::{
 };
 
 /// Export an example `cargo` project, then open it with `VSCode` editor or `file explorer`.
-pub(crate) fn try_it(path: Option<&Path>) -> Result<()> {
+pub fn try_it(path: Option<&Path>) -> Result<()> {
     let path_to_init = if let Some(p) = path {
         p.to_path_buf()
     } else {

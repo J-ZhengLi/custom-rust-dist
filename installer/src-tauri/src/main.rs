@@ -7,7 +7,7 @@ use std::sync::{mpsc, Arc};
 use std::thread;
 
 use custom_rust_dist::manifest::{baked_in_manifest, ToolInfo};
-use custom_rust_dist::{EnvConfig, InstallConfiguration};
+use custom_rust_dist::{try_it, EnvConfig, InstallConfiguration};
 use tauri::api::dialog::FileDialogBuilder;
 use xuanwu_installer::components::{get_component_list_from_manifest, Component};
 use xuanwu_installer::Result;
@@ -183,6 +183,12 @@ fn install_toolchain(
     Ok(())
 }
 
+#[tauri::command]
+fn run_app() -> Result<()> {
+    try_it(None)?;
+    Ok(())
+}
+
 fn send<T>(sender: &Sender<T>, msg: T) {
     sender.send(msg).unwrap_or_else(|e| {
         // TODO: Change to error log
@@ -216,7 +222,8 @@ fn main() {
             default_install_dir,
             select_folder,
             get_component_list,
-            install_toolchain
+            install_toolchain,
+            run_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
