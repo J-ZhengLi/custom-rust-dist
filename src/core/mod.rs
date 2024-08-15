@@ -3,13 +3,11 @@
 //! Including configuration, toolchain, toolset management.
 
 mod custom_instructions;
-pub(crate) mod install;
-#[cfg(feature = "offline")]
-pub(crate) mod offline_packages;
+pub mod install;
 mod os;
 pub(crate) mod parser;
 pub(crate) mod rustup;
-pub(crate) mod try_it;
+pub mod try_it;
 pub(crate) mod uninstall;
 
 use anyhow::Result;
@@ -33,7 +31,7 @@ declare_env_vars!(
 ///
 /// Make sure to always call `init()` as it creates essential folders to
 /// hold the installation files.
-pub(crate) trait EnvConfig {
+pub trait EnvConfig {
     /// Configure environment variables for `rustup`.
     ///
     /// This will set persistent environment variables including

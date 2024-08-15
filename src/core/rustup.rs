@@ -75,12 +75,13 @@ impl Rustup {
         &self,
         config: &InstallConfiguration,
         manifest: &ToolsetManifest,
+        components_override: Option<Vec<&String>>,
     ) -> Result<()> {
         // We are putting the binary here so that it will be deleted automatically after done.
         let temp_dir = config.create_temp_dir("rustup-init")?;
         let rustup_init = temp_dir.path().join(RUSTUP_INIT);
         // Download rustup-init.
-        self.download_rustup_init(&rustup_init, config.rustup_update_root)?;
+        self.download_rustup_init(&rustup_init, &config.rustup_update_root)?;
         // File permission
         create_executable_file(&rustup_init)?;
         // Install rustup.
@@ -88,9 +89,15 @@ impl Rustup {
         // Install rust toolchain via rustup.
         let rustup = config.cargo_home().join("bin").join(RUSTUP);
         self.download_rust_toolchain(&rustup, manifest)?;
+
         // Install extral rust component via rustup.
-        if let Some(compoents) = &manifest.rust.components {
-            for cpt in compoents {
+        let maybe_components = components_override.or(manifest
+            .rust
+            .components
+            .as_ref()
+            .map(|v| v.iter().collect()));
+        if let Some(components) = maybe_components {
+            for cpt in components {
                 self.download_rust_component(&rustup, cpt)?;
             }
         }

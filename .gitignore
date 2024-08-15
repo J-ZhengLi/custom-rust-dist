@@ -7,3 +7,4 @@ Cargo.lock
 
 # Tests artifacts
 tests/cache/
+example_project/

@@ -12,7 +12,9 @@ use crate::{
     utils::{self, Extractable},
 };
 use anyhow::{anyhow, bail, Context, Result};
+use serde::{Deserialize, Serialize};
 use std::{
+    collections::BTreeMap,
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -39,9 +41,11 @@ declare_unfallible_url!(
     default_rustup_update_root(DEFAULT_RUSTUP_UPDATE_ROOT) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
 );
 
-#[derive(Debug)]
-pub(crate) struct InstallConfiguration<'a> {
-    pub(crate) cargo_registry: Option<(String, Url)>,
+// If you change any public fields in this struct,
+// make sure to change `installer/src/utils/types/InstallConfiguration.ts` as well.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct InstallConfiguration {
+    pub cargo_registry: Option<(String, Url)>,
     /// Path to install everything.
     ///
     /// Note that this folder will includes `.cargo` and `.rustup` folders as well.
@@ -49,27 +53,27 @@ pub(crate) struct InstallConfiguration<'a> {
     /// So, even if the user didn't specify any install path, a pair of env vars will still
     /// be written (CARGO_HOME and RUSTUP_HOME), as they will be located in a sub folder of `$HOME`,
     /// which is [`installer_home`](utils::installer_home).
-    pub(crate) install_dir: PathBuf,
-    pub(crate) rustup_dist_server: &'a Url,
-    pub(crate) rustup_update_root: &'a Url,
+    pub install_dir: PathBuf,
+    pub rustup_dist_server: Url,
+    pub rustup_update_root: Url,
     /// Indicates whether `cargo` was already installed, useful when installing third-party tools.
     cargo_is_installed: bool,
 }
 
-impl Default for InstallConfiguration<'_> {
+impl Default for InstallConfiguration {
     fn default() -> Self {
         Self {
-            install_dir: utils::home_dir().join(env!("CARGO_PKG_NAME")),
+            install_dir: default_install_dir(),
             cargo_registry: None,
-            rustup_dist_server: default_rustup_dist_server(),
-            rustup_update_root: default_rustup_update_root(),
+            rustup_dist_server: default_rustup_dist_server().clone(),
+            rustup_update_root: default_rustup_update_root().clone(),
             cargo_is_installed: false,
         }
     }
 }
 
-impl<'a> InstallConfiguration<'a> {
-    pub(crate) fn init(install_dir: PathBuf, dry_run: bool) -> Result<Self> {
+impl InstallConfiguration {
+    pub fn init(install_dir: PathBuf, dry_run: bool) -> Result<Self> {
         let this = Self {
             install_dir,
             ..Default::default()
@@ -97,17 +101,17 @@ impl<'a> InstallConfiguration<'a> {
         Ok(this)
     }
 
-    pub(crate) fn cargo_registry(mut self, registry: Option<(String, Url)>) -> Self {
+    pub fn cargo_registry(mut self, registry: Option<(String, Url)>) -> Self {
         self.cargo_registry = registry;
         self
     }
 
-    pub(crate) fn rustup_dist_server(mut self, url: &'a Url) -> Self {
+    pub fn rustup_dist_server(mut self, url: Url) -> Self {
         self.rustup_dist_server = url;
         self
     }
 
-    pub(crate) fn rustup_update_root(mut self, url: &'a Url) -> Self {
+    pub fn rustup_update_root(mut self, url: Url) -> Self {
         self.rustup_update_root = url;
         self
     }
@@ -153,8 +157,16 @@ impl<'a> InstallConfiguration<'a> {
 
     /// Install rust's toolchain manager `rustup` with a default toolchain
     pub(crate) fn install_rust(&mut self, manifest: &ToolsetManifest) -> Result<()> {
+        self.install_rust_with_optional_components(manifest, None)
+    }
+
+    pub fn install_rust_with_optional_components(
+        &mut self,
+        manifest: &ToolsetManifest,
+        components: Option<Vec<&String>>,
+    ) -> Result<()> {
         println!("installing rustup and rust toolchain");
-        Rustup::init().download_toolchain(self, manifest)?;
+        Rustup::init().download_toolchain(self, manifest, components)?;
         self.cargo_is_installed = true;
         Ok(())
     }
@@ -162,7 +174,11 @@ impl<'a> InstallConfiguration<'a> {
     /// Steps to install third-party softwares (excluding the ones that requires `cargo install`).
     pub(crate) fn install_tools(&self, manifest: &ToolsetManifest) -> Result<()> {
         let tools_to_install = manifest.current_target_tools();
-        for (name, tool) in tools_to_install {
+        self.install_set_of_tools(tools_to_install)
+    }
+
+    pub fn install_set_of_tools(&self, tools: BTreeMap<&String, &ToolInfo>) -> Result<()> {
+        for (name, tool) in tools {
             // Ignore tools that need to be installed using `cargo install`
             if matches!(tool, ToolInfo::Version(_) | ToolInfo::Git { .. }) {
                 continue;
@@ -177,7 +193,11 @@ impl<'a> InstallConfiguration<'a> {
     /// Steps to install `cargo` compatible softwares, should only be called after toolchain installation.
     pub(crate) fn cargo_install(&self, manifest: &ToolsetManifest) -> Result<()> {
         let tools_to_install = manifest.current_target_tools();
-        for (name, tool) in tools_to_install {
+        self.cargo_install_set_of_tools(tools_to_install)
+    }
+
+    pub fn cargo_install_set_of_tools(&self, tools: BTreeMap<&String, &ToolInfo>) -> Result<()> {
+        for (name, tool) in tools {
             if matches!(tool, ToolInfo::Version(_) | ToolInfo::Git { .. }) {
                 println!("installing '{name}'");
                 install_tool(self, name, tool)?;
@@ -190,7 +210,7 @@ impl<'a> InstallConfiguration<'a> {
     /// Configuration options for `cargo`.
     ///
     /// This will write a `config.toml` file to `CARGO_HOME`.
-    pub(crate) fn config_cargo(&self) -> Result<()> {
+    pub fn config_cargo(&self) -> Result<()> {
         let mut config = CargoConfig::new();
         if let Some((name, url)) = &self.cargo_registry {
             config.add_source(name, url.to_owned(), true);
@@ -220,6 +240,10 @@ impl<'a> InstallConfiguration<'a> {
             .tempdir_in(&root)
             .with_context(|| format!("unable to create temp directory under '{}'", root.display()))
     }
+}
+
+pub fn default_install_dir() -> PathBuf {
+    utils::home_dir().join(env!("CARGO_PKG_NAME"))
 }
 
 // TODO: Write version info after installing each tool,

@@ -3,7 +3,7 @@ import { computed, nextTick, onMounted, ref } from 'vue';
 import { useCustomRouter } from '../router';
 import { event } from '@tauri-apps/api';
 
-const { routerBack, routerPush } = useCustomRouter();
+const { routerPush } = useCustomRouter();
 const progress = ref(0);
 const output = ref(['']);
 const scrollBox = ref(null);
@@ -75,9 +75,8 @@ onMounted(() => {
       <p my="8px" v-for="item in output" :key="item">{{ item }}</p>
     </div>
     <div basis="60px" flex="~ justify-end items-center">
-      <base-button @click="routerBack" mr="12px">上一步-暂</base-button>
-      <base-button @click="() => routerPush('/finish')" mr="12px"
-        >下一步-暂</base-button
+      <base-button v-show="progress === 100" @click="() => routerPush('/finish')" mr="12px"
+        >下一步</base-button
       >
     </div>
   </div>

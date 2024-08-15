@@ -12,7 +12,7 @@ use winapi::um::winuser;
 
 pub(crate) use rustup::*;
 
-impl EnvConfig for InstallConfiguration<'_> {
+impl EnvConfig for InstallConfiguration {
     fn config_rustup_env_vars(&self) -> Result<()> {
         let vars_raw = self.env_vars()?;
         for (key, val) in vars_raw {

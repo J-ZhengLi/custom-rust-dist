@@ -1,13 +1,16 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::collections::BTreeMap;
+use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc};
 use std::thread;
-use std::time::Duration;
 
+use custom_rust_dist::manifest::{baked_in_manifest, ToolInfo};
+use custom_rust_dist::{try_it, EnvConfig, InstallConfiguration};
 use tauri::api::dialog::FileDialogBuilder;
 use xuanwu_installer::components::{get_component_list_from_manifest, Component};
-use xuanwu_installer::config::get_default_install_dir;
+use xuanwu_installer::Result;
 
 #[tauri::command]
 fn finish(window: tauri::Window) {
@@ -22,7 +25,10 @@ fn close_window(window: tauri::Window) {
 
 #[tauri::command]
 fn default_install_dir() -> String {
-    get_default_install_dir()
+    println!("using default install directory");
+    custom_rust_dist::default_install_dir()
+        .to_string_lossy()
+        .to_string()
 }
 
 #[tauri::command]
@@ -38,9 +44,17 @@ fn select_folder(window: tauri::Window) {
 }
 
 #[tauri::command]
-fn get_component_list() -> Vec<Component> {
+fn get_component_list() -> Result<Vec<Component>> {
     // 这里可以放置生成组件列表的逻辑
     get_component_list_from_manifest()
+}
+
+macro_rules! step {
+    ($info_sender:ident, $info:expr, $progress_sender:ident, $progress:expr, $($s:tt)+) => {
+        send(&$info_sender, $info);
+        $($s)*
+        send(&$progress_sender, $progress);
+    };
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -48,9 +62,33 @@ fn install_toolchain(
     window: tauri::Window,
     components_list: Vec<Component>,
     install_dir: String,
-) -> Result<(), String> {
-    println!("{:?}", components_list);
-    println!("{:?}", install_dir);
+) -> Result<()> {
+    // Split components list to `toolchain_components` and `toolset_components`,
+    // as we are running `rustup` to install toolchain components.
+    let toolset_components = component_list_to_map(
+        components_list
+            .iter()
+            .filter(|cm| !cm.is_toolchain_component)
+            .collect(),
+    );
+    let toolchain_components: Vec<String> = components_list
+        .into_iter()
+        .filter_map(|comp| {
+            if comp.is_toolchain_component && comp.name != "Rust" {
+                Some(comp.name)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    println!("toolsets: {toolset_components:#?}");
+    println!("toolchain: {toolchain_components:#?}");
+
+    // TODO: Download manifest form remote server for online build
+    let mut manifest = baked_in_manifest()?;
+    manifest.adjust_paths()?;
+
     // 使用 Arc 来共享 window
     let window = Arc::new(window);
     let (tx_progress, rx_progress) = mpsc::channel();
@@ -59,21 +97,69 @@ fn install_toolchain(
     // 在一个新线程中执行安装过程
     {
         let window_clone = Arc::clone(&window); // 克隆 Arc
-        thread::spawn(move || {
-            for i in 0..100 {
-                // 模拟进度
-                thread::sleep(Duration::from_millis(50));
+        thread::spawn(move || -> Result<()> {
+            // TODO: Use continuous progress
+            step!(
+                tx_details,
+                format!("Initalizing & Creating directory '{install_dir}'..."),
+                tx_progress,
+                10,
+                let mut config = InstallConfiguration::init(install_dir.into(), false)?;
+            );
 
-                // 发送进度
-                let _ = tx_progress.send(i);
+            step!(
+                tx_details,
+                "Configuring environment variables...".to_string(),
+                tx_progress,
+                20,
+                config.config_rustup_env_vars()?;
+            );
 
-                // 发送详细信息
-                let detail_message = format!("正在安装... {}%", i);
-                let _ = tx_details.send(detail_message);
-            }
+            step!(
+                tx_details,
+                "Writing cargo configuration...".to_string(),
+                tx_progress,
+                30,
+                config.config_cargo()?;
+            );
+
+            // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
+            step!(
+                tx_details,
+                "Installing dependencies & standalone tools...".to_string(),
+                tx_progress,
+                55,
+                config.install_set_of_tools(toolset_components.iter().collect())?;
+            );
+
+            step!(
+                tx_details,
+                "Installing rust toolchain components...".to_string(),
+                tx_progress,
+                80,
+                config.install_rust_with_optional_components(
+                    &manifest,
+                    Some(toolchain_components.iter().collect()),
+                )?;
+            );
+
+            // install third-party tools via cargo that got installed by rustup
+            step!(
+                tx_details,
+                "Installing cargo tools...".to_string(),
+                tx_progress,
+                100,
+                config.cargo_install_set_of_tools(toolset_components.iter().collect())?;
+            );
 
             // 安装完成后，发送安装完成事件
             let _ = window_clone.emit("install-complete", ());
+            println!(
+                "Rust is installed, \
+                this setup will soon create an example project at current directory for you to try Rust!"
+            );
+
+            Ok(())
         });
     }
 
@@ -97,6 +183,37 @@ fn install_toolchain(
     Ok(())
 }
 
+#[tauri::command]
+fn run_app() -> Result<()> {
+    try_it(None)?;
+    Ok(())
+}
+
+fn send<T>(sender: &Sender<T>, msg: T) {
+    sender.send(msg).unwrap_or_else(|e| {
+        // TODO: Change to error log
+        println!("[ERROR] unable to send tx details: {e}");
+    });
+}
+
+fn component_list_to_map(list: Vec<&Component>) -> BTreeMap<String, ToolInfo> {
+    let mut map = BTreeMap::new();
+
+    for comp in list {
+        println!("component: {comp:#?}");
+        let (name, tool_info) = (
+            comp.name.clone(),
+            comp.tool_installer.clone().expect(
+                "Internal Error: `component_list_to_map` should only be used on third-party tools",
+            ),
+        );
+
+        map.insert(name, tool_info);
+    }
+
+    map
+}
+
 fn main() {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -105,7 +222,8 @@ fn main() {
             default_install_dir,
             select_folder,
             get_component_list,
-            install_toolchain
+            install_toolchain,
+            run_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

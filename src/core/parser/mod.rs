@@ -1,5 +1,5 @@
 pub(crate) mod cargo_config;
-pub(crate) mod manifest;
+pub mod manifest;
 
 use anyhow::Result;
 use serde::{de::DeserializeOwned, Serialize};

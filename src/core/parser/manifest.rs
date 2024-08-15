@@ -1,20 +1,25 @@
 #![allow(unused)]
 
+use std::collections::HashMap;
+use std::ops::Deref;
 use std::{collections::BTreeMap, path::PathBuf};
 
-use serde::Deserialize;
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use tempfile::TempDir;
 use url::Url;
 
+use crate::core::install::InstallConfiguration;
 use crate::utils;
 
 use super::TomlParser;
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct ToolsetManifest {
+pub struct ToolsetManifest {
     pub(crate) rust: RustToolchain,
     #[serde(default)]
-    pub(crate) tools: TargetedTools,
+    pub(crate) tools: Tools,
     /// Path to the manifest file.
     #[serde(skip)]
     path: Option<PathBuf>,
@@ -30,8 +35,20 @@ impl TomlParser for ToolsetManifest {
 }
 
 impl ToolsetManifest {
+    pub fn toolchain_components(&self) -> Vec<&str> {
+        self.rust
+            .components
+            .as_ref()
+            .map(|seq| seq.iter().map(Deref::deref).collect())
+            .unwrap_or_default()
+    }
+
+    pub fn get_tool_description(&self, toolname: &str) -> Option<&str> {
+        self.tools.descriptions.get(toolname).map(|s| s.as_str())
+    }
+
     /// Get a map of [`Tool`] that are available only in current target.
-    pub(crate) fn current_target_tools(&self) -> BTreeMap<&String, &ToolInfo> {
+    pub fn current_target_tools(&self) -> BTreeMap<&String, &ToolInfo> {
         let cur_target = env!("TARGET");
         // Clippy bug, the `map(|(k, v)| (k, v))` cannot be removed
         #[allow(clippy::map_identity)]
@@ -45,7 +62,7 @@ impl ToolsetManifest {
     /// Get a mut reference to the map of [`Tool`] that are available only in current target.
     ///
     /// Return `None` if there are no available tools in the current target.
-    pub(crate) fn current_target_tools_mut(&mut self) -> Option<&mut BTreeMap<String, ToolInfo>> {
+    pub fn current_target_tools_mut(&mut self) -> Option<&mut BTreeMap<String, ToolInfo>> {
         let cur_target = env!("TARGET");
         // Clippy bug, the `map(|(k, v)| (k, v))` cannot be removed
         #[allow(clippy::map_identity)]
@@ -64,7 +81,7 @@ impl ToolsetManifest {
     /// # Errors
     /// Return `Result::Err` if the manifest was not loaded from path, and the current executable path
     /// cannot be determined as well.
-    pub(crate) fn adjust_paths(&mut self) -> anyhow::Result<()> {
+    pub fn adjust_paths(&mut self) -> anyhow::Result<()> {
         let parent_dir = if let Some(p) = &self.path {
             p.to_path_buf()
         } else {
@@ -103,22 +120,28 @@ impl RustToolchain {
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq, Default)]
-pub(crate) struct TargetedTools {
+pub(crate) struct Tools {
+    #[serde(default)]
+    descriptions: BTreeMap<String, String>,
     #[serde(default)]
     target: BTreeMap<String, BTreeMap<String, ToolInfo>>,
 }
 
-impl FromIterator<(String, BTreeMap<String, ToolInfo>)> for TargetedTools {
-    fn from_iter<T: IntoIterator<Item = (String, BTreeMap<String, ToolInfo>)>>(iter: T) -> Self {
+impl Tools {
+    pub(crate) fn new<I>(targeted_tools: I) -> Tools
+    where
+        I: IntoIterator<Item = (String, BTreeMap<String, ToolInfo>)>,
+    {
         Self {
-            target: BTreeMap::from_iter(iter),
+            descriptions: BTreeMap::default(),
+            target: BTreeMap::from_iter(targeted_tools),
         }
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
 #[serde(untagged)]
-pub(crate) enum ToolInfo {
+pub enum ToolInfo {
     Version(String),
     Git {
         git: Url,
@@ -137,7 +160,7 @@ pub(crate) enum ToolInfo {
 }
 
 impl ToolInfo {
-    pub(crate) fn convert_to_path(&mut self, path: PathBuf) {
+    pub fn convert_to_path(&mut self, path: PathBuf) {
         match self {
             Self::Version(ver) => {
                 *self = Self::Path {
@@ -159,6 +182,10 @@ impl ToolInfo {
             }
         }
     }
+}
+
+pub fn baked_in_manifest() -> Result<ToolsetManifest> {
+    ToolsetManifest::from_str(include_str!("../../../resources/toolset_manifest.toml"))
 }
 
 #[cfg(test)]
@@ -201,7 +228,7 @@ version = "1.0.0"
             ToolsetManifest::from_str(input).unwrap(),
             ToolsetManifest {
                 rust: RustToolchain::new("1.0.0"),
-                tools: TargetedTools::default(),
+                tools: Tools::default(),
                 path: None,
             }
         )
@@ -265,7 +292,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
                 profile: Some("minimal".into()),
                 components: Some(vec!["clippy-preview".into(), "llvm-tools-preview".into()]),
             },
-            tools: TargetedTools::from_iter([
+            tools: Tools::new([
                 (
                     "x86_64-pc-windows-msvc".to_string(),
                     x86_64_windows_msvc_tools,
@@ -294,7 +321,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
                 profile: Some("minimal".into()),
                 components: Some(vec!["clippy-preview".into(), "rustfmt".into()]),
             },
-            tools: TargetedTools::from_iter([
+            tools: Tools::new([
                 (
                     "x86_64-pc-windows-msvc".into(),
                     BTreeMap::from_iter([
@@ -425,5 +452,38 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
         ]));
 
         // TODO: Add test for macos.
+    }
+
+    #[test]
+    fn with_tools_descriptions() {
+        let input = r#"
+[rust]
+version = "1.0.0"
+
+[tools.descriptions]
+t1 = "desc for t1"
+# t2 does not have desc
+t3 = "desc for t3"
+t4 = "desc for t4 that might not exist"
+
+[tools.target.x86_64-pc-windows-msvc]
+t1 = "0.1.0" # use cargo install
+t2 = { path = "/path/to/local" }
+t3 = { url = "https://example.com/path/to/tool" }
+"#;
+
+        let expected = ToolsetManifest::from_str(input).unwrap();
+
+        assert_eq!(
+            expected.tools.descriptions,
+            BTreeMap::from_iter([
+                ("t1".to_string(), "desc for t1".to_string()),
+                ("t3".to_string(), "desc for t3".to_string()),
+                (
+                    "t4".to_string(),
+                    "desc for t4 that might not exist".to_string()
+                ),
+            ])
+        );
     }
 }
