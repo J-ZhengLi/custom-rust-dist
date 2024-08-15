@@ -1,4 +1,6 @@
+pub mod cli;
 pub mod components;
+
 pub type Result<T> = core::result::Result<T, InstallerError>;
 
 use std::fmt::Display;

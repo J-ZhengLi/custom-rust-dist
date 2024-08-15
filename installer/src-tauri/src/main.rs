@@ -3,14 +3,17 @@
 
 use std::collections::BTreeMap;
 use std::sync::mpsc::Sender;
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, OnceLock};
 use std::thread;
 
+use custom_rust_dist::cli::CliOpt;
 use custom_rust_dist::manifest::{baked_in_manifest, ToolInfo};
 use custom_rust_dist::{try_it, EnvConfig, InstallConfiguration};
 use tauri::api::dialog::FileDialogBuilder;
 use xuanwu_installer::components::{get_component_list_from_manifest, Component};
-use xuanwu_installer::Result;
+use xuanwu_installer::{cli, Result};
+
+static CLI_ARGS: OnceLock<CliOpt> = OnceLock::new();
 
 #[tauri::command]
 fn finish(window: tauri::Window) {
@@ -26,7 +29,10 @@ fn close_window(window: tauri::Window) {
 #[tauri::command]
 fn default_install_dir() -> String {
     println!("using default install directory");
-    custom_rust_dist::default_install_dir()
+    CLI_ARGS
+        .get()
+        .and_then(|opt| opt.install_dir().map(|p| p.to_path_buf()))
+        .unwrap_or_else(custom_rust_dist::default_install_dir)
         .to_string_lossy()
         .to_string()
 }
@@ -216,6 +222,16 @@ fn component_list_to_map(list: Vec<&Component>) -> BTreeMap<String, ToolInfo> {
 
 fn main() {
     tauri::Builder::default()
+        .setup(|app| {
+            let matches = app.get_cli_matches()?;
+            if let Some(cli_opt) = cli::tauri_cli_to_cli_opt(&matches) {
+                dbg!(&cli_opt);
+                CLI_ARGS
+                    .set(cli_opt)
+                    .expect("failed to cache commandline args");
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             close_window,
             finish,

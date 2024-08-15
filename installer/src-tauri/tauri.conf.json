@@ -42,6 +42,91 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ]
+    },
+    "cli": {
+      "description": "Manage Rust toolchain and a set of extra tools with ease",
+      "longDescription": "",
+      "beforeHelp": "",
+      "afterHelp": "",
+      "args": [
+        {
+          "name": "verbose",
+          "short": "v",
+          "conflictsWith": "quiet",
+          "description": "Enable verbose output"
+        },
+        {
+          "name": "quiet",
+          "short": "q",
+          "conflictsWith": "verbose",
+          "description": "Suppress non-critical messages"
+        },
+        {
+          "name": "yes_to_all",
+          "short": "y",
+          "description": "Disable interaction and answer 'yes' to all prompts"
+        }
+      ],
+      "subcommands": {
+        "install": {
+          "description": "Install rustup, rust toolchain, and various tools.",
+          "longDescription": "",
+          "beforeHelp": "",
+          "afterHelp": "",
+          "args": [
+            {
+              "name": "prefix",
+              "description": "Set the path to install Rust.",
+              "takesValue": true
+            },
+            {
+              "name": "registry_url",
+              "description": "Specify another cargo registry url to replace `crates.io`",
+              "takesValue": true
+            },
+            {
+              "name": "registry_name",
+              "description": "Specify another cargo registry name to replace `crates.io`, default: [mirror]",
+              "takesValue": true,
+              "requires": "registry_url"
+            },
+            {
+              "name": "rustup_dist_server",
+              "description": "Specify another server to download Rust toolchain.",
+              "takesValue": true
+            },
+            {
+              "name": "rustup_update_root",
+              "description": "Specify another server to download rustup.",
+              "takesValue": true
+            }
+          ]
+        },
+        "uninstall": {
+          "description": "Uninstall individual components or everything.",
+          "longDescription": "",
+          "beforeHelp": "",
+          "afterHelp": "",
+          "subcommands": {
+            "all": {
+              "description": "Uninstall everything."
+            },
+            "Tool": {
+              "description": "Uninstall a list of individual tools.",
+              "args": [
+                {
+                  "name": "names",
+                  "description": "Name of the tools to uninstall, separated by space.",
+                  "index": 1,
+                  "required": true,
+                  "takesValue": true,
+                  "multiple": true
+                }
+              ]
+            }
+          }
+        }
+      }
     }
   }
 }
