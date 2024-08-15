@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -45,6 +45,16 @@ impl ToolsetManifest {
 
     pub fn get_tool_description(&self, toolname: &str) -> Option<&str> {
         self.tools.descriptions.get(toolname).map(|s| s.as_str())
+    }
+
+    /// Get the group name of a certain tool, if exist.
+    pub fn group_name(&self, toolname: &str) -> Option<&str> {
+        for (group, tools) in &self.tools.group {
+            if tools.contains(toolname) {
+                return Some(group);
+            }
+        }
+        None
     }
 
     /// Get a map of [`Tool`] that are available only in current target.
@@ -123,6 +133,11 @@ impl RustToolchain {
 pub(crate) struct Tools {
     #[serde(default)]
     descriptions: BTreeMap<String, String>,
+    /// Containing groups of tools.
+    ///
+    /// Note that not all tools will have a group.
+    #[serde(default)]
+    group: BTreeMap<String, HashSet<String>>,
     #[serde(default)]
     target: BTreeMap<String, BTreeMap<String, ToolInfo>>,
 }
@@ -134,6 +149,7 @@ impl Tools {
     {
         Self {
             descriptions: BTreeMap::default(),
+            group: BTreeMap::default(),
             target: BTreeMap::from_iter(targeted_tools),
         }
     }
@@ -142,42 +158,66 @@ impl Tools {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
 #[serde(untagged)]
 pub enum ToolInfo {
-    Version(String),
+    // FIXME (?): Currently there's no way to specify a tool with plain version to be required.
+    PlainVersion(String),
     Git {
         git: Url,
         branch: Option<String>,
         tag: Option<String>,
         rev: Option<String>,
+        #[serde(default)]
+        required: bool,
     },
     Path {
         path: PathBuf,
         version: Option<String>,
+        #[serde(default)]
+        required: bool,
     },
     Url {
         url: Url,
         version: Option<String>,
+        #[serde(default)]
+        required: bool,
     },
 }
 
 impl ToolInfo {
+    pub fn is_required(&self) -> bool {
+        match self {
+            Self::PlainVersion(_) => false,
+            Self::Git { required, .. }
+            | Self::Path { required, .. }
+            | Self::Url { required, .. } => *required,
+        }
+    }
+
     pub fn convert_to_path(&mut self, path: PathBuf) {
         match self {
-            Self::Version(ver) => {
+            Self::PlainVersion(ver) => {
                 *self = Self::Path {
                     path,
                     version: Some(ver.to_owned()),
+                    required: false,
                 };
             }
-            Self::Git { .. } => {
+            Self::Git { required, .. } => {
                 *self = Self::Path {
                     path,
                     version: None,
+                    required: *required,
                 };
             }
-            Self::Path { version, .. } | Self::Url { version, .. } => {
+            Self::Path {
+                version, required, ..
+            }
+            | Self::Url {
+                version, required, ..
+            } => {
                 *self = Self::Path {
                     path,
                     version: version.to_owned(),
+                    required: *required,
                 };
             }
         }
@@ -192,14 +232,16 @@ pub fn baked_in_manifest() -> Result<ToolsetManifest> {
 mod tests {
     use super::*;
 
+    /// Convenient macro to initialize **Non-Required** `ToolInfo`
     macro_rules! tool_info {
         ($version:literal) => {
-            ToolInfo::Version($version.into())
+            ToolInfo::PlainVersion($version.into())
         };
         ($url_str:literal, $version:expr) => {
             ToolInfo::Url {
                 version: $version.map(ToString::to_string),
                 url: $url_str.parse().unwrap(),
+                required: false,
             }
         };
         ($git:literal, $branch:expr, $tag:expr, $rev:expr) => {
@@ -208,12 +250,14 @@ mod tests {
                 branch: $branch.map(ToString::to_string),
                 tag: $tag.map(ToString::to_string),
                 rev: $rev.map(ToString::to_string),
+                required: false,
             }
         };
         ($path:expr, $version:expr) => {
             ToolInfo::Path {
                 version: $version.map(ToString::to_string),
                 path: $path,
+                required: false,
             }
         };
     }
@@ -375,28 +419,30 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
             BTreeMap::from([
                 (
                     &"mingw64".into(),
-                    &ToolInfo::Path {
-                        path: PathBuf::from(
+                    &tool_info!(
+                        PathBuf::from(
                             "tests/cache/x86_64-13.2.0-release-posix-seh-msvcrt-rt_v11-rev1.7z"
                         ),
-                        version: Some("13.2.0".into()),
-                    }
+                        Some("13.2.0")
+                    )
                 ),
                 (
                     &"vscode".into(),
-                    &ToolInfo::Path {
-                        path: PathBuf::from("tests/cache/VSCode-win32-x64-1.91.1.zip"),
-                        version: Some("1.91.1".into()),
-                    }
+                    &tool_info!(
+                        PathBuf::from("tests/cache/VSCode-win32-x64-1.91.1.zip"),
+                        Some("1.91.1")
+                    )
                 ),
                 (
                     &"vscode-rust-analyzer".into(),
-                    &ToolInfo::Path {
-                        path: "tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix".into(),
-                        version: Some("0.4.2054".into()),
-                    }
+                    &tool_info!(
+                        PathBuf::from(
+                            "tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix"
+                        ),
+                        Some("0.4.2054")
+                    )
                 ),
-                (&"cargo-expand".into(), &ToolInfo::Version("1.0.88".into())),
+                (&"cargo-expand".into(), &tool_info!("1.0.88")),
             ])
         );
 
@@ -406,49 +452,44 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
             BTreeMap::from([
                 (
                     &"buildtools".into(),
-                    &ToolInfo::Path {
-                        path: PathBuf::from(
-                            "tests/cache/BuildTools-With-SDK.zip"
-                        ),
-                        version: Some("1".into()),
-                    }
+                    &tool_info!(
+                        "tests/cache/BuildTools-With-SDK.zip".into(),
+                        Some("1")
+                    )
                 ),
                 (
                     &"cargo-llvm-cov".into(),
-                    &ToolInfo::Url {
-                        url: "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-pc-windows-msvc.zip".parse().unwrap(),
-                        version: Some("0.6.11".into())
-                    }
+                    &tool_info!(
+                        "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-pc-windows-msvc.zip",
+                        Some("0.6.11")
+                    )
                 ),
                 (
                     &"vscode".into(),
-                    &ToolInfo::Path {
-                        path: PathBuf::from("tests/cache/VSCode-win32-x64-1.91.1.zip"),
-                        version: Some("1.91.1".into()),
-                    }
+                    &tool_info!(
+                        "tests/cache/VSCode-win32-x64-1.91.1.zip".into(),
+                        Some("1.91.1")
+                    )
                 ),
                 (
                     &"vscode-rust-analyzer".into(),
-                    &ToolInfo::Path {
-                        path: "tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix".into(),
-                        version: Some("0.4.2054".into()),
-                    }
+                    &tool_info!(
+                        "tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix".into(),
+                        Some("0.4.2054")
+                    )
                 ),
                 (
                     &"cargo-expand".into(),
-                    &ToolInfo::Version("1.0.88".into()),
+                    &tool_info!("1.0.88"),
                 ),
             ])
         );
 
         #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
         assert_eq!(tools, BTreeMap::from([
-            (&"cargo-llvm-cov".into(), &ToolInfo::Url {
-                url: "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz".parse().unwrap(),
-                version: Some("0.6.11".into())
-            }),
-            (&"flamegraph".into(), &ToolInfo::Git { git: "https://github.com/flamegraph-rs/flamegraph".parse().unwrap(), tag: Some("v0.6.5".into()), branch: None, rev: None }),
-            (&"cargo-expand".into(), &ToolInfo::Version("1.0.88".into())),
+            (&"cargo-llvm-cov".into(), &tool_info!("https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz", Some("0.6.11"))),
+            (&"flamegraph".into(), &tool_info!("https://github.com/flamegraph-rs/flamegraph", None::<&str>, Some("v0.6.5"), None::<&str>)),
+            (&"cargo-expand".into(), &tool_info!("1.0.88")),
         ]));
 
         // TODO: Add test for macos.
@@ -485,5 +526,56 @@ t3 = { url = "https://example.com/path/to/tool" }
                 ),
             ])
         );
+    }
+
+    #[test]
+    fn with_required_property() {
+        let input = r#"
+[rust]
+version = "1.0.0"
+
+[tools.target.x86_64-pc-windows-msvc]
+t1 = "0.1.0" # use cargo install
+t2 = { path = "/path/to/local", required = true }
+t3 = { url = "https://example.com/path/to/tool", required = true }
+t4 = { git = "https://git.example.com/org/tool", branch = "stable", required = true }
+"#;
+
+        let expected = ToolsetManifest::from_str(input).unwrap();
+        let tools = expected.tools.target.get("x86_64-pc-windows-msvc").unwrap();
+        assert!(!tools.get("t1").unwrap().is_required());
+        assert!(tools.get("t2").unwrap().is_required());
+        assert!(tools.get("t3").unwrap().is_required());
+        assert!(tools.get("t4").unwrap().is_required());
+    }
+
+    #[test]
+    fn with_tools_group() {
+        let input = r#"
+[rust]
+version = "1.0.0"
+
+[tools.group]
+"Some Group" = [ "t1", "t2" ]
+Others = [ "t3", "t4" ]
+"#;
+
+        let expected = ToolsetManifest::from_str(input).unwrap();
+        assert_eq!(
+            expected.tools.group,
+            BTreeMap::from_iter([
+                (
+                    "Some Group".to_string(),
+                    ["t1".to_string(), "t2".to_string()].into_iter().collect()
+                ),
+                (
+                    "Others".to_string(),
+                    ["t3".to_string(), "t4".to_string()].into_iter().collect()
+                )
+            ])
+        );
+        assert_eq!(expected.group_name("t3"), Some("Others"));
+        assert_eq!(expected.group_name("t1"), Some("Some Group"));
+        assert_eq!(expected.group_name("t100"), None);
     }
 }

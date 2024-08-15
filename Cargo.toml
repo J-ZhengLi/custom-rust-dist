@@ -5,6 +5,9 @@ edition = "2021"
 description = "Manage Rust toolchain and a set of extra tools with ease"
 rust-version = "1.73.0" # Minimal required version to use `zip`
 
+[features]
+gui = []
+
 [workspace]
 members = ["installer/src-tauri"]
 

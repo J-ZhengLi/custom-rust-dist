@@ -2,5 +2,6 @@ use anyhow::Result;
 use custom_rust_dist::cli;
 
 fn main() -> Result<()> {
-    cli::run()
+    let cli = cli::parse_cli();
+    cli.execute()
 }

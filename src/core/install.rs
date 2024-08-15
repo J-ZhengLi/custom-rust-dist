@@ -180,7 +180,7 @@ impl InstallConfiguration {
     pub fn install_set_of_tools(&self, tools: BTreeMap<&String, &ToolInfo>) -> Result<()> {
         for (name, tool) in tools {
             // Ignore tools that need to be installed using `cargo install`
-            if matches!(tool, ToolInfo::Version(_) | ToolInfo::Git { .. }) {
+            if need_cargo_install(tool) {
                 continue;
             }
             println!("installing '{name}'");
@@ -198,7 +198,7 @@ impl InstallConfiguration {
 
     pub fn cargo_install_set_of_tools(&self, tools: BTreeMap<&String, &ToolInfo>) -> Result<()> {
         for (name, tool) in tools {
-            if matches!(tool, ToolInfo::Version(_) | ToolInfo::Git { .. }) {
+            if need_cargo_install(tool) {
                 println!("installing '{name}'");
                 install_tool(self, name, tool)?;
             }
@@ -242,6 +242,10 @@ impl InstallConfiguration {
     }
 }
 
+fn need_cargo_install(tool: &ToolInfo) -> bool {
+    matches!(tool, ToolInfo::PlainVersion(_) | ToolInfo::Git { .. })
+}
+
 pub fn default_install_dir() -> PathBuf {
     utils::home_dir().join(env!("CARGO_PKG_NAME"))
 }
@@ -253,10 +257,10 @@ fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> R
     // to install it with the path
 
     match tool {
-        ToolInfo::Version(ver) if config.cargo_is_installed => {
+        ToolInfo::PlainVersion(version) if config.cargo_is_installed => {
             let output = utils::output_with_env(
                 "cargo",
-                &["install", name, "--version", ver],
+                &["install", name, "--version", version],
                 [
                     (CARGO_HOME, utils::path_to_str(&config.cargo_home())?),
                     (RUSTUP_HOME, utils::path_to_str(&config.rustup_home())?),
@@ -269,6 +273,7 @@ fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> R
             branch,
             tag,
             rev,
+            ..
         } if config.cargo_is_installed => {
             let mut args = vec!["install", "--git", git.as_str()];
 
