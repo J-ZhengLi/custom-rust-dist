@@ -32,11 +32,11 @@ const progressStyle = computed(() => {
     backgroundImage: props.striped
       ? `linear-gradient(
         45deg,
-        rgba(255, 255, 255, 0.1) 25%,
+        rgba(255, 255, 255, 0.2) 25%,
         transparent 25%,
         transparent 50%,
-        rgba(255, 255, 255, 0.1) 50%,
-        rgba(255, 255, 255, 0.1) 75%,
+        rgba(255, 255, 255, 0.2) 50%,
+        rgba(255, 255, 255, 0.2) 75%,
         transparent 75%,
         transparent
       )`
@@ -58,13 +58,13 @@ const progressStyle = computed(() => {
 .progress {
   width: 100%;
   height: 20px;
-  border-radius: 10px;
+  border-radius: 4px;
   overflow: hidden;
 }
 
 .progress-bar {
   height: 100%;
-  border-radius: 10px;
+  border-radius: 4px;
   transition: width 0.3s ease;
   background-size: 1.25em 1.25em;
   animation: striped 3s linear infinite;

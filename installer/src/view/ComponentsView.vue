@@ -2,12 +2,13 @@
 import { computed, onMounted, Ref, ref } from 'vue';
 import { useCustomRouter } from '../router';
 import { Component } from '../utils';
-import { invoke, event } from '@tauri-apps/api';
+import { invoke } from '@tauri-apps/api';
 import ScrollBox from '../components/ScrollBox.vue';
+import { useRoute } from 'vue-router';
+const route = useRoute();
 
 const { routerPush, routerBack } = useCustomRouter();
 
-const installDir = ref('');
 const focusIndex = ref();
 const components: Ref<Component[]> = ref([]);
 
@@ -22,41 +23,6 @@ const curDescriptions = computed(() => {
   return '';
 });
 
-// show_install_dir
-function showInstallDir() {
-  const installPath = localStorage.getItem('installPath');
-  if (installPath !== null) {
-    installDir.value = installPath;
-    return;
-  }
-
-  invoke('default_install_dir')
-    .then((path: unknown) => {
-      if (typeof path === 'string' && path.trim() !== '') {
-        localStorage.setItem('installPath', path);
-        installDir.value = path;
-      }
-    })
-    .catch((e) => {
-      console.error(e);
-    });
-}
-
-// select_folder
-function openFolder() {
-  invoke('select_folder')
-    // .then((path: unknown) => {
-    //   if (typeof path === 'string' && path.trim() !== '') {
-    //     localStorage.setItem('installPath', path);
-    //     installDir.value = path;
-    //   }
-    // })
-    .catch((e) => {
-      console.error(e);
-    });
-}
-
-// loadComponents
 function loadComponents() {
   invoke('get_component_list')
     .then((componentList: unknown) => {
@@ -85,40 +51,23 @@ function handleComponentsClick(component: Component) {
 }
 
 function handleInstallClick() {
-  invoke('install_toolchain', {
-    components_list: components.value
-      .filter((item: Component) => item.checked) // 选中的组件
-      .map((item: Component) => {
-        // 去掉checked属性
-        return { ...item, desc: item.desc.join(''), checked: undefined };
-      }),
-    install_dir: installDir.value,
-  })
-    .then((result: unknown) => {
-      console.log(result);
-      // 可以在添加一些回调
-      // if (result === 'success') {}
-      routerPush('/install');
-    })
-    .catch((e) => {
-      console.error(e);
+  const components_list = components.value
+    .filter((item: Component) => item.checked) // 选中的组件
+    .map((item: Component) => {
+      // 去掉checked属性
+      return { ...item, desc: item.desc.join(''), checked: undefined };
     });
+  routerPush({
+    path: '/confirm',
+    query: {
+      path: route.query.path,
+      components: JSON.stringify(components_list),
+    },
+  });
 }
 
 onMounted(() => {
-  showInstallDir();
   loadComponents();
-
-  // 监听文件夹选择事件
-  event.listen('folder-selected', (event) => {
-    const path = event.payload;
-    if (typeof path === 'string' && path.trim() !== '') {
-      installDir.value = path;
-      localStorage.setItem('installPath', path);
-    } else {
-      installDir.value = localStorage.getItem('installPath') || '';
-    }
-  });
 });
 </script>
 
@@ -133,8 +82,9 @@ onMounted(() => {
             v-model="item.checked"
             :title="`${item.name}${item.required ? '(必需)' : ''}`"
             :disabled="item.required"
-            :class="{ 'text-active': index === focusIndex }"
-            @click="() => handleComponentsClick(item)"
+            decoration="hover:underline"
+            :class="{ 'decoration-underline': index === focusIndex }"
+            @titleClick="() => handleComponentsClick(item)"
           />
         </div>
       </scroll-box>
@@ -144,24 +94,9 @@ onMounted(() => {
       </scroll-box>
     </div>
 
-    <div basis="120px" grow="0">
-      <div ml="12px">安装目录:</div>
-      <div flex="~ items-center" p="12px">
-        <base-input
-          v-bind:value="installDir"
-          flex="1"
-          type="text"
-          placeholder="选择一个文件夹"
-          readonly
-        />
-        <base-button ml="12px" @click="openFolder">选择文件夹</base-button>
-      </div>
-      <div h="60px" flex="~ justify-end items-center">
-        <base-button mr="12px" @click="routerBack">上一步</base-button>
-        <base-button mr="12px" @click="handleInstallClick"
-          >开始安装</base-button
-        >
-      </div>
+    <div basis="60px" flex="~ justify-end items-center">
+      <base-button mr="12px" @click="routerBack">上一步</base-button>
+      <base-button mr="12px" @click="handleInstallClick">下一步</base-button>
     </div>
   </div>
 </template>

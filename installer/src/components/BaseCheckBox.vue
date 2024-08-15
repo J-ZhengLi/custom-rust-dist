@@ -8,7 +8,7 @@ const { modelValue, title, disabled } = defineProps({
   disabled: Boolean,
 });
 
-const emit = defineEmits(['update:modelValue']);
+const emit = defineEmits(['update:modelValue', 'titleClick']);
 
 const isChecked = ref(modelValue);
 
@@ -18,6 +18,10 @@ const toggleCheck = () => {
     emit('update:modelValue', isChecked.value);
   }
 };
+
+function titleClick() {
+  emit('titleClick');
+}
 </script>
 
 <template>
@@ -29,10 +33,11 @@ const toggleCheck = () => {
   >
     <input type="checkbox" hidden :disabled="disabled" :checked="isChecked" />
     <span
+      flex="~ items-center justify-center"
       w="1rem"
       h="1rem"
       b="1px solid base"
-      shrink-0
+      shrink="0"
       rounded="2px"
       bg="white"
       :class="{
@@ -43,16 +48,10 @@ const toggleCheck = () => {
       @click="toggleCheck"
     >
       <slot name="checked">
-        <mdi-check
-          w="1rem"
-          h="1rem"
-          :class="{ hidden: !isChecked }"
-          c="active"
-          p="b-2px"
-        />
+        <mdi-check v-if="isChecked" w="1rem" h="1rem" c="active" />
       </slot>
     </span>
-    <span ml="4px" line-clamp="1">
+    <span ml="4px" line-clamp="1" @click="titleClick">
       <slot>{{ title }}</slot>
     </span>
   </label>
