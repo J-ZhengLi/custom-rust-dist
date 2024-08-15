@@ -18,11 +18,16 @@ pub use file_system::*;
 pub use process::*;
 pub use triple::HostTriple;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use url::Url;
 
-pub fn parse_url(url: &str) -> Result<Url> {
-    Url::parse(url).with_context(|| format!("failed to parse url: {url}"))
+/// Forcefully parsing a `&str` to [`Url`].
+///
+/// # Panic
+///
+/// Causes panic if the given string cannot be parsed as `Url`.
+pub fn force_parse_url(url: &str) -> Url {
+    Url::parse(url).unwrap_or_else(|e| panic!("failed to parse url '{url}': {e}"))
 }
 
 /// Basically [`Url::join`], but will insert a forward slash (`/`) to the root if necessary.

@@ -3,14 +3,18 @@
 
 use std::collections::BTreeMap;
 use std::sync::mpsc::Sender;
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, OnceLock};
 use std::thread;
 
+use anyhow::Context;
+use custom_rust_dist::cli::{parse_cli, CliOpt};
 use custom_rust_dist::manifest::{baked_in_manifest, ToolInfo};
 use custom_rust_dist::{try_it, EnvConfig, InstallConfiguration};
 use tauri::api::dialog::FileDialogBuilder;
 use xuanwu_installer::components::{get_component_list_from_manifest, Component};
 use xuanwu_installer::Result;
+
+static CLI_ARGS: OnceLock<CliOpt> = OnceLock::new();
 
 #[tauri::command]
 fn finish(window: tauri::Window) {
@@ -26,7 +30,10 @@ fn close_window(window: tauri::Window) {
 #[tauri::command]
 fn default_install_dir() -> String {
     println!("using default install directory");
-    custom_rust_dist::default_install_dir()
+    CLI_ARGS
+        .get()
+        .and_then(|opt| opt.install_dir().map(|p| p.to_path_buf()))
+        .unwrap_or_else(custom_rust_dist::default_install_dir)
         .to_string_lossy()
         .to_string()
 }
@@ -214,17 +221,25 @@ fn component_list_to_map(list: Vec<&Component>) -> BTreeMap<String, ToolInfo> {
     map
 }
 
-fn main() {
-    tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![
-            close_window,
-            finish,
-            default_install_dir,
-            select_folder,
-            get_component_list,
-            install_toolchain,
-            run_app
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+fn main() -> Result<()> {
+    let cli = parse_cli();
+
+    if !cli.no_gui {
+        tauri::Builder::default()
+            .invoke_handler(tauri::generate_handler![
+                close_window,
+                finish,
+                default_install_dir,
+                select_folder,
+                get_component_list,
+                install_toolchain,
+                run_app
+            ])
+            .run(tauri::generate_context!())
+            .context("error while running tauri application")?;
+    } else {
+        cli.execute()?;
+    }
+
+    Ok(())
 }

@@ -6,47 +6,80 @@ mod uninstall;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueHint};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use url::Url;
 
 /// Master struct for command line args.
 ///
-/// NOTE: If you changed anything in this struct, or any other child types that related to
-/// this struct, make sure the README doc is updated as well.
-#[derive(Parser)]
-#[command(version, about, arg_required_else_help = true)]
-struct CliOpt {
+// NOTE: If you changed anything in this struct, or any other child types that related to
+// this struct, make sure the README doc is updated as well,
+// also make sure to update the cli section of `installer/src-tauri/tauri.conf.json`.
+#[derive(Parser, Default, Debug)]
+#[command(version, about)]
+pub struct CliOpt {
     /// Enable verbose output
     #[arg(short, long, conflicts_with = "quiet")]
-    verbose: bool,
+    pub verbose: bool,
     /// Suppress non-critical messages
     #[arg(short, long, conflicts_with = "verbose")]
-    quiet: bool,
+    pub quiet: bool,
     /// Disable interaction and answer 'yes' to all prompts
     #[arg(short, long = "yes")]
-    yes_to_all: bool,
+    pub yes_to_all: bool,
+    #[cfg(feature = "gui")]
+    /// Don't show GUI when running the program.
+    #[arg(long)]
+    pub no_gui: bool,
     #[command(subcommand)]
-    command: Option<Subcommands>,
+    pub command: Option<Subcommands>,
+}
+
+impl CliOpt {
+    pub fn install_dir(&self) -> Option<&Path> {
+        self.command.as_ref().and_then(|cmd| {
+            if let Subcommands::Install { prefix, .. } = cmd {
+                prefix.as_deref()
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn execute(&self) -> Result<()> {
+        let global_opt = GlobalOpt {
+            verbose: self.verbose,
+            quiet: self.quiet,
+            yes: self.yes_to_all,
+        };
+
+        if let Some(subcommand) = &self.command {
+            subcommand.execute(global_opt)
+        } else {
+            // Do nothing if no subcommand provided.
+            // Note that options like `--version`, `--help` are already handled by `clap`.
+            Ok(())
+        }
+    }
 }
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Subcommand, Debug)]
-pub(crate) enum Subcommands {
+pub enum Subcommands {
     /// Install rustup, rust toolchain, and various tools.
     Install {
-        /// Set the path to install Rust.
+        /// Set another path to install Rust.
         #[arg(long, value_name = "PATH", value_hint = ValueHint::DirPath)]
         prefix: Option<PathBuf>,
-        /// Specify a cargo registry url to replace `crates.io`.
+        /// Specify another cargo registry url to replace `crates.io`.
         #[arg(hide = true, long, value_name = "URL", value_hint = ValueHint::Url)]
         registry_url: Option<Url>,
-        /// Specify a cargo registry name to replace `crates.io`.
+        /// Specify another cargo registry name to replace `crates.io`.
         #[arg(hide = true, long, default_value = "mirror", value_hint = ValueHint::Url)]
         registry_name: String,
-        /// Specify a server to download Rust toolchain.
+        /// Specify another server to download Rust toolchain.
         #[arg(hide = true, long, value_name = "URL", value_hint = ValueHint::Url)]
         rustup_dist_server: Option<Url>,
-        /// Specify a server to download rustup.
+        /// Specify another server to download rustup.
         #[arg(hide = true, long, value_name = "URL", value_hint = ValueHint::Url)]
         rustup_update_root: Option<Url>,
     },
@@ -64,7 +97,7 @@ pub(crate) enum Subcommands {
 }
 
 impl Subcommands {
-    pub fn execute(&self, opt: GlobalOpt) -> Result<()> {
+    pub(crate) fn execute(&self, opt: GlobalOpt) -> Result<()> {
         install::execute(self, opt)?;
         uninstall::execute(self, opt)?;
         tryit::execute(self, opt)?;
@@ -74,7 +107,7 @@ impl Subcommands {
 
 #[derive(Subcommand, Debug)]
 #[command(arg_required_else_help = true)]
-pub(crate) enum UninstallCommand {
+pub enum UninstallCommand {
     /// Uninstall everything.
     All,
     /// Uninstall a list of individual tools, separated by space.
@@ -94,20 +127,6 @@ pub struct GlobalOpt {
     pub yes: bool,
 }
 
-pub fn run() -> Result<()> {
-    let cli = CliOpt::parse();
-
-    let global_opt = GlobalOpt {
-        verbose: cli.verbose,
-        quiet: cli.quiet,
-        yes: cli.yes_to_all,
-    };
-
-    let Some(subcommand) = &cli.command else {
-        // Do nothing if no subcommand provided.
-        // Note that options like `--version`, `--help` are already handled by `clap`.
-        return Ok(());
-    };
-
-    subcommand.execute(global_opt)
+pub fn parse_cli() -> CliOpt {
+    CliOpt::parse()
 }
