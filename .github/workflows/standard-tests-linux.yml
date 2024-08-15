@@ -1,4 +1,4 @@
-name: Standard Tests
+name: Standard Tests (Linux)
 
 on:
   push:
@@ -10,8 +10,6 @@ env:
   CARGO_TERM_COLOR: always
 
 concurrency:
-  # For a given workflow, if we push to the same PR, cancel all previous builds on that PR.
-  # If the push is not attached to a PR, we will cancel all builds on the same branch.
   group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
   cancel-in-progress: true
 

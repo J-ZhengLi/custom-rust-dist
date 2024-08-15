@@ -1,4 +1,4 @@
-name: Standard Tests
+name: Standard Tests (Windows)
 
 on:
   push:
