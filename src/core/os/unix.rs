@@ -54,25 +54,30 @@ impl EnvConfig for InstallConfiguration {
 impl Uninstallation for UninstallConfiguration {
     // This is basically removing the section marked with `rustup config section` in shell profiles.
     fn remove_rustup_env_vars(&self) -> Result<()> {
-        for sh in shell::get_available_shells() {
-            for rc in sh.rcfiles().iter().filter(|rc| rc.is_file()) {
-                let content = utils::read_to_string(rc)?;
-                let new_content = remove_sub_string_between(
-                    content,
-                    shell::RC_FILE_SECTION_START,
-                    shell::RC_FILE_SECTION_END
-                ).ok_or_else(
-                    || anyhow!(
-                        "unable to remove rustup config section from shell profile: '{}'. \
-                        This could mean that the section was already removed, or the section label is broken, \
-                        please try manually removing any command wrapped within comments that saying \
-                        'rustup config section' if there are any.",
-                        rc.display()
-                    )
-                )?;
-                utils::write_file(rc, &new_content, false)?;
-            }
-        }
+        // Remove the shell profiles content from `RC_FILE_SECTION_START` to `RC_FILE_SECTION_END`
+        remove_shell_profile_content(shell::RC_FILE_SECTION_START, shell::RC_FILE_SECTION_END)?;
+
+        let current_exe_path = env::current_exe()?;
+        let cargo_home_dir = current_exe_path
+            .parent()
+            .expect("Cannot get the cargo bin directory")
+            .parent()
+            .expect("Cannot get the cargo home directory");
+
+        // Remove the `. "$CARGO_HOME/.cargo/env"` which is added by rustup
+        if cargo_home_dir.join("env").exists() {
+            let rustup_env_path = cargo_home_dir.join("env");
+            let rustup_env = format!(". \"{:?}\"", rustup_env_path.as_path());
+            remove_shell_profile_content(rustup_env.as_str(), rustup_env.as_str())?;
+        } else {
+            unimplemented!("Fish");
+        };
+        
+        // Remove the `"$CARGO_HOME/tools/vscode/bin"`
+        let vscode_bin_path = cargo_home_dir.join("tools").join("vscode").join("bin");
+        let vscode_env = format!("export PATH=\"$PATH:{:?}\"", vscode_bin_path.as_path());
+        remove_shell_profile_content(vscode_env.as_str(), vscode_env.as_str())?;
+
         Ok(())
     }
 
@@ -87,12 +92,36 @@ impl Uninstallation for UninstallConfiguration {
     }
 }
 
+fn remove_shell_profile_content(start: &str, end: &str) -> Result<()> {
+    for sh in shell::get_available_shells() {
+        for rc in sh.rcfiles().iter().filter(|rc| rc.is_file()) {
+            let content = utils::read_to_string(rc)?;
+            let new_content = remove_sub_string_between(
+                content,
+                start,
+                end
+            ).ok_or_else(
+                || anyhow!(
+                    "unable to remove rustup config section from shell profile: '{}'. \
+                    This could mean that the section was already removed, or the section label is broken, \
+                    please try manually removing any command wrapped within comments that saying \
+                    'rustup config section' if there are any.",
+                    rc.display()
+                )
+            )?;
+            utils::write_file(rc, &new_content, false)?;
+        }
+    }
+
+    Ok(())
+}
+
 fn remove_sub_string_between(input: String, start: &str, end: &str) -> Option<String> {
     // TODO: this might not be an optimized solution.
     let start_pos = input.lines().position(|line| line == start)?;
     let end_pos = input.lines().position(|line| line == end)?;
     assert!(
-        end_pos >= start_pos,
+        end_pos > start_pos,
         "Interal Error: Failed deleting sub string, the start pos is larger than end pos"
     );
     let result = input
