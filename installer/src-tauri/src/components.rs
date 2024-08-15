@@ -30,16 +30,16 @@ impl Component {
             is_toolchain_component: false,
         }
     }
-    fn required(mut self) -> Self {
-        self.required = true;
+    fn required(mut self, yes: bool) -> Self {
+        self.required = yes;
         self
     }
     fn toolchain_component(mut self) -> Self {
         self.is_toolchain_component = true;
         self
     }
-    fn with_group_name(mut self, group: &str) -> Self {
-        self.group_name = Some(group.into());
+    fn with_group_name(mut self, group: Option<&str>) -> Self {
+        self.group_name = group.map(ToOwned::to_owned);
         self
     }
     fn with_installer(mut self, installer: &manifest::ToolInfo) -> Self {
@@ -51,9 +51,9 @@ impl Component {
 pub fn get_component_list_from_manifest() -> Result<Vec<Component>> {
     let mut components = vec![
         Component::new("Rust", "Basic set of tools to run Rust compiler")
-            .with_group_name("Rust toolchain")
+            .with_group_name(Some("Rust toolchain"))
             .toolchain_component()
-            .required(),
+            .required(true),
     ];
     let manifest = manifest::baked_in_manifest()?;
 
@@ -65,19 +65,21 @@ pub fn get_component_list_from_manifest() -> Result<Vec<Component>> {
                     .get_tool_description(toolchain_components)
                     .unwrap_or_default(),
             )
-            .with_group_name("Rust toolchain")
+            .with_group_name(Some("Rust toolchain"))
             .toolchain_component(),
         );
     }
 
     for (tool_name, tool_info) in manifest.current_target_tools() {
-        let comp = Component::new(
-            tool_name,
-            manifest.get_tool_description(tool_name).unwrap_or_default(),
-        )
-        .with_group_name("Third-party tools")
-        .with_installer(tool_info);
-        components.push(comp);
+        components.push(
+            Component::new(
+                tool_name,
+                manifest.get_tool_description(tool_name).unwrap_or_default(),
+            )
+            .with_group_name(manifest.group_name(tool_name))
+            .with_installer(tool_info)
+            .required(tool_info.is_required()),
+        );
     }
 
     Ok(components)

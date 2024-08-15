@@ -14,21 +14,26 @@ cargo-expand = "Prints out the result of macro expansion and #[derive] expansion
 buildtools = "(windows-msvc only) Requirement for Windows"
 mingw64 = "(windows-gnu only) Requirement for Windows"
 
+[tools.group]
+Prerequisites = [ "buildtools", "mingw64" ]
+"IDE Related" = [ "vscode", "vscode-rust-analyzer" ]
+Misc = [ "flamegraph", "cargo-expand" ]
+
 [tools.target.x86_64-pc-windows-msvc]
-buildtools = { path = "packages/x86_64-pc-windows-msvc/BuildTools-With-SDK.zip", version = "1" }
+buildtools = { required = true, path = "packages/x86_64-pc-windows-msvc/BuildTools-With-SDK.zip", version = "1" }
 cargo-llvm-cov = { url = "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-pc-windows-msvc.zip", version = "0.6.11" }
 vscode = { path = "packages/x86_64-pc-windows-msvc/VSCode-win32-x64-1.91.1.zip", version = "1.91.1" }
 vscode-rust-analyzer = { path = "packages/x86_64-pc-windows-msvc/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix", version = "0.4.2054" }
 cargo-expand = "1.0.88"
 
 [tools.target.x86_64-pc-windows-gnu]
-mingw64 = { path = "packages/x86_64-pc-windows-gnu/x86_64-13.2.0-release-posix-seh-msvcrt-rt_v11-rev1.7z", version = "13.2.0" }
+mingw64 = { required = true, path = "packages/x86_64-pc-windows-gnu/x86_64-13.2.0-release-posix-seh-msvcrt-rt_v11-rev1.7z", version = "13.2.0" }
 vscode = { path = "packages/x86_64-pc-windows-gnu/VSCode-win32-x64-1.91.1.zip", version = "1.91.1" }
 vscode-rust-analyzer = { path = "packages/x86_64-pc-windows-gnu/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix", version = "0.4.2054" }
 cargo-expand = "1.0.88"
 
 [tools.target.x86_64-unknown-linux-gnu]
-cargo-llvm-cov = { url = "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz", version = "0.6.11" }
+cargo-llvm-cov = { required = true, url = "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz", version = "0.6.11" }
 flamegraph = { git = "https://github.com/flamegraph-rs/flamegraph", tag = "v0.6.5" }
 cargo-expand = "1.0.88"
 
