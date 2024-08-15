@@ -1,74 +1,50 @@
 <script setup lang="ts">
-import { computed, onMounted, Ref, ref } from 'vue';
-import { useCustomRouter } from '../router';
-import { Component } from '../utils';
-import { invoke } from '@tauri-apps/api';
+import { computed, onMounted, ref } from 'vue';
 import ScrollBox from '../components/ScrollBox.vue';
-import { useRoute } from 'vue-router';
-const route = useRoute();
+import { installConf, invokeCommand } from '../utils';
+import type { Component } from '../utils';
+import { useCustomRouter } from '../router';
 
 const { routerPush, routerBack } = useCustomRouter();
-
 const focusIndex = ref();
-const components: Ref<Component[]> = ref([]);
+const components = installConf.value.components;
 
 const curDescriptions = computed(() => {
   if (
     focusIndex.value !== null &&
     focusIndex.value >= 0 &&
-    focusIndex.value < components.value.length
+    focusIndex.value < components.length
   ) {
-    return components.value[focusIndex.value].desc;
+    return components[focusIndex.value].desc;
   }
   return '';
 });
 
-function loadComponents() {
-  invoke('get_component_list')
-    .then((componentList: unknown) => {
-      if (Array.isArray(componentList)) {
-        components.value = componentList.map((item) => {
-          return {
-            ...item,
-            desc: item.desc.split('\n'),
-            checked: item.required,
-          };
-        });
-        components.value.sort(
-          (a, b) => Number(b.required) - Number(a.required)
-        );
-      }
-    })
-    .catch((e) => {
-      console.error(e);
+async function loadComponents() {
+  const componentList = await invokeCommand('get_component_list');
+  if (Array.isArray(componentList)) {
+    const newComponents = componentList.map((item) => {
+      return {
+        ...item,
+        desc: item.desc.split('\n'),
+        checked: item.required,
+      };
     });
+    components.splice(0, components.length, ...newComponents);
+    components.sort((a, b) => Number(b.required) - Number(a.required));
+  }
+  if (components.length > 0) {
+    focusIndex.value = 0; // 默认选中第一个component
+  }
 }
 
 function handleComponentsClick(component: Component) {
-  focusIndex.value = components.value.findIndex(
+  focusIndex.value = components.findIndex(
     (item: Component) => item.name === component.name
   );
 }
 
-function handleInstallClick() {
-  const components_list = components.value
-    .filter((item: Component) => item.checked) // 选中的组件
-    .map((item: Component) => {
-      // 去掉checked属性
-      return { ...item, desc: item.desc.join(''), checked: undefined };
-    });
-  routerPush({
-    path: '/confirm',
-    query: {
-      path: route.query.path,
-      components: JSON.stringify(components_list),
-    },
-  });
-}
-
-onMounted(() => {
-  loadComponents();
-});
+onMounted(loadComponents);
 </script>
 
 <template>
@@ -77,10 +53,15 @@ onMounted(() => {
     <div flex="1 ~" p="12px" overflow="auto">
       <scroll-box grow="1" basis="100px">
         <div>组件</div>
-        <div v-for="(item, index) of components" :key="item.name" mt="12px">
+        <div
+          v-for="(item, index) of components"
+          :key="item.name"
+          mt="8px"
+          h="1.5rem"
+        >
           <base-check-box
             v-model="item.checked"
-            :title="`${item.name}${item.required ? '(必需)' : ''}`"
+            :title="`${item.name}${item.required ? ' (required)' : ''}`"
             :disabled="item.required"
             decoration="hover:underline"
             :class="{ 'decoration-underline': index === focusIndex }"
@@ -96,7 +77,9 @@ onMounted(() => {
 
     <div basis="60px" flex="~ justify-end items-center">
       <base-button mr="12px" @click="routerBack">上一步</base-button>
-      <base-button mr="12px" @click="handleInstallClick">下一步</base-button>
+      <base-button mr="12px" @click="() => routerPush('/confirm')"
+        >下一步</base-button
+      >
     </div>
   </div>
 </template>

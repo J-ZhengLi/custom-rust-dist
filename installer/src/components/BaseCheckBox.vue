@@ -26,7 +26,6 @@ function titleClick() {
 
 <template>
   <label
-    rounded="4px"
     flex="inline items-center"
     :class="{ 'opacity-80': disabled }"
     :title="title"

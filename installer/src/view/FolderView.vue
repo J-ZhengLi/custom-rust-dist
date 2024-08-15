@@ -1,45 +1,37 @@
 <script setup lang="ts">
-import { invoke, event } from '@tauri-apps/api';
-import { message } from '@tauri-apps/api/dialog';
+import { event } from '@tauri-apps/api';
 import { onMounted, ref } from 'vue';
 import { useCustomRouter } from '../router';
+import { installConf, invokeCommand } from '../utils';
 
 const { routerPush, routerBack } = useCustomRouter();
-const installDir = ref('');
 const diskRequire = ref(33);
 
 function handleNextClick() {
   routerPush({
     path: '/components',
-    query: { path: installDir.value },
+    query: { path: installConf.value.path },
   });
 }
 
-// show_install_dir
-function showInstallDir() {
+async function showInstallDir() {
   const installPath = localStorage.getItem('installPath');
   if (installPath !== null) {
-    installDir.value = installPath;
+    installConf.value.path = installPath;
     return;
   }
 
-  invoke('default_install_dir')
-    .then((path: unknown) => {
-      if (typeof path === 'string' && path.trim() !== '') {
-        localStorage.setItem('installPath', path);
-        installDir.value = path;
-      }
-    })
-    .catch((e) => {
-      message(e.message, { title: '错误', type: 'error' });
-    });
+  const path = await invokeCommand('default_install_dir');
+  if (typeof path === 'string' && path.trim() !== '') {
+    localStorage.setItem('installPath', path);
+    installConf.value.path = path;
+  }
 }
 
 function openFolder() {
-  invoke('select_folder').catch((e) => {
-    message(e.message, { title: '错误', type: 'error' });
-  });
+  invokeCommand('select_folder');
 }
+
 onMounted(() => {
   showInstallDir();
 
@@ -47,10 +39,10 @@ onMounted(() => {
   event.listen('folder-selected', (event) => {
     const path = event.payload;
     if (typeof path === 'string' && path.trim() !== '') {
-      installDir.value = path;
+      installConf.value.path = path;
       localStorage.setItem('installPath', path);
     } else {
-      installDir.value = localStorage.getItem('installPath') || '';
+      installConf.value.path = localStorage.getItem('installPath') || '';
     }
   });
 });
@@ -63,7 +55,7 @@ onMounted(() => {
       <p>Rust的本体和组件将会一起安装到该路径中。</p>
       <div flex="~ items-center">
         <base-input
-          v-bind:value="installDir"
+          v-bind:value="installConf.path"
           flex="1"
           type="text"
           placeholder="选择一个文件夹"

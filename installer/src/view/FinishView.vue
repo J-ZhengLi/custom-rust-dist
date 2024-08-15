@@ -1,23 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { invoke } from '@tauri-apps/api';
+import { installConf, invokeCommand } from '../utils';
 
 const runApp = ref(true);
 
 function closeWindow() {
   if (runApp.value) {
-    // run app
-    // TODO: Pass install_dir to the `run_app` function
-    invoke('run_app').catch((e) => {
-      console.error(e);
-    })
-    .catch((e) => {
-      console.error(e);
-    });
+    invokeCommand('run_app', { install_dir: installConf.value.path });
   }
-  invoke('finish').catch((e) => {
-    console.error(e);
-  });
+  invokeCommand('finish');
 }
 </script>
 

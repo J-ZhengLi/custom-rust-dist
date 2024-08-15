@@ -1,15 +1,11 @@
 <script lang="ts" setup>
 import { useCustomRouter } from '../router';
-import { invoke } from '@tauri-apps/api';
+import { invokeCommand } from '../utils';
 
 const { routerPush } = useCustomRouter();
 
-function handleNextClick() {
-  routerPush('/explain');
-}
-
-async function handleBackClick() {
-  await invoke('close_window');
+function handleBackClick() {
+  invokeCommand('close_window');
 }
 </script>
 
@@ -17,7 +13,13 @@ async function handleBackClick() {
   <div flex="~ col items-center" w="full">
     <div grow="2">
       <a href="https://xuanwu.beta.atomgit.com/" target="_blank">
-        <img src="/logo.svg" alt="Xuanwu logo" w="200px" mt="50%" />
+        <img
+          src="/logo.svg"
+          class="logo xuanwu"
+          alt="Xuanwu logo"
+          w="200px"
+          mt="50%"
+        />
       </a>
     </div>
     <div grow="2">
@@ -25,7 +27,9 @@ async function handleBackClick() {
     </div>
     <div basis="80px" w="full" flex="~ items-center justify-end">
       <base-button mr="12px" @click="handleBackClick"> 关闭</base-button>
-      <base-button mr="12px" @click="handleNextClick">开始安装</base-button>
+      <base-button mr="12px" @click="() => routerPush('/explain')"
+        >开始安装</base-button
+      >
     </div>
   </div>
 </template>
