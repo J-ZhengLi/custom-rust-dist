@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import type { Ref } from 'vue';
+import { event } from '@tauri-apps/api';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useCustomRouter } from '../router';
-import { event } from '@tauri-apps/api';
 
 const { routerPush } = useCustomRouter();
 const progress = ref(0);
-const output = ref(['']);
+const output: Ref<string[]> = ref([]);
 const scrollBox = ref(null);
 
 const title = computed(
@@ -23,7 +24,7 @@ function toBottom() {
 }
 
 function progressFormat(value: number) {
-  return value.toFixed(2).toString().padStart(5, '0') + '%';
+  return value.toFixed(2).padStart(5, '0') + '%';
 }
 
 onMounted(() => {
@@ -34,7 +35,6 @@ onMounted(() => {
   });
 
   event.listen('install-details', (event) => {
-    console.log(event.payload);
     if (typeof event.payload === 'string') {
       output.value.push(event.payload);
       toBottom();
@@ -75,7 +75,10 @@ onMounted(() => {
       <p my="8px" v-for="item in output" :key="item">{{ item }}</p>
     </div>
     <div basis="60px" flex="~ justify-end items-center">
-      <base-button v-show="progress === 100" @click="() => routerPush('/finish')" mr="12px"
+      <base-button
+        v-show="progress === 100"
+        @click="() => routerPush('/finish')"
+        mr="12px"
         >下一步</base-button
       >
     </div>

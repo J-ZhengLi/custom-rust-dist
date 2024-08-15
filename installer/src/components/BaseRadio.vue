@@ -50,6 +50,9 @@ const { modelValue, name, value, label } = defineProps({
   cursor: pointer;
   --uno: b-1 b-base b-solid;
 }
+.custom-radio:checked {
+  --uno: b-active;
+}
 input[type='radio'] {
   position: absolute;
   opacity: 0;

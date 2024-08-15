@@ -5,7 +5,6 @@ import { useCustomRouter } from '../router';
 import ScrollBox from '../components/ScrollBox.vue';
 
 const { routerPush, routerBack } = useCustomRouter();
-
 const agree = ref();
 
 const explainText: string[] = `通过安装 Rustup，您同意以下条款：

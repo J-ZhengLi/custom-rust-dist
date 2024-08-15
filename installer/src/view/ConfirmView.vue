@@ -1,51 +1,26 @@
 <script setup lang="ts">
-import { useRoute } from 'vue-router';
+import { computed } from 'vue';
+import { installConf, invokeCommand } from '../utils';
+import type { Component } from '../utils';
 import { useCustomRouter } from '../router';
-import { onMounted, Ref, ref, watch } from 'vue';
-import { Component } from '../utils';
 import ScrollBox from '../components/ScrollBox.vue';
-import { invoke } from '@tauri-apps/api';
-
-const route = useRoute();
-const path = ref(route.query.path as string);
-const components: Ref<Component[]> = ref(
-  JSON.parse(route.query.components as string)
-);
-
-watch(
-  () => route.query.path,
-  (newPath) => {
-    if (typeof newPath === 'string') {
-      path.value = newPath;
-    }
-  }
-);
-watch(
-  () => route.query.components,
-  (newComponents) => {
-    if (typeof newComponents === 'string') {
-      components.value = JSON.parse(newComponents);
-    }
-  }
-);
 
 const { routerPush, routerBack } = useCustomRouter();
+const path = computed(() => installConf.value.path);
+const components = computed(() =>
+  installConf.value.components
+    .filter((i) => i.checked) // 筛选选中组件
+    .map((item: Component) => {
+      return { ...item, desc: item.desc.join(''), checked: undefined };
+    })
+);
+
 function handleNextClick() {
-  invoke('install_toolchain', {
+  invokeCommand('install_toolchain', {
     components_list: components.value,
     install_dir: path.value,
-  })
-    .then(() => {
-      routerPush('/install');
-    })
-    .catch((e) => {
-      console.error(e);
-    });
+  }).then(() => routerPush('/install'));
 }
-
-onMounted(() => {
-  console.log(route.query);
-});
 </script>
 
 <template>
@@ -58,7 +33,7 @@ onMounted(() => {
     <scroll-box flex="1" mx="12px" overflow="auto">
       <p mt="0" mb="8px">安装位置：</p>
       <base-input
-        :value="path"
+        :value="installConf.path"
         border-color="focus:base"
         ml="12px"
         w="90%"
