@@ -3,7 +3,6 @@ import {
   createRouter,
   useRouter,
   RouteLocationRaw,
-  RouteLocationAsPath,
 } from 'vue-router';
 
 import HomeView from '../view/HomeView.vue';

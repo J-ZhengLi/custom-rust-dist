@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useCustomRouter } from '../router';
 import { invoke } from '@tauri-apps/api';
 
 const runApp = ref(true);
