@@ -57,26 +57,16 @@ impl Uninstallation for UninstallConfiguration {
         // Remove the shell profiles content from `RC_FILE_SECTION_START` to `RC_FILE_SECTION_END`
         remove_shell_profile_content(shell::RC_FILE_SECTION_START, shell::RC_FILE_SECTION_END)?;
 
-        let current_exe_path = env::current_exe()?;
-        let cargo_home_dir = current_exe_path
-            .parent()
-            .expect("Cannot get the cargo bin directory")
-            .parent()
-            .expect("Cannot get the cargo home directory");
+        let installed_dir = install_dir_from_exe_path()?;
 
         // Remove the `. "$CARGO_HOME/.cargo/env"` which is added by rustup
-        if cargo_home_dir.join("env").exists() {
-            let rustup_env_path = cargo_home_dir.join("env");
-            let rustup_env = format!(". \"{:?}\"", rustup_env_path.as_path());
-            remove_shell_profile_content(rustup_env.as_str(), rustup_env.as_str())?;
+        let env_file = installed_dir.join(".cargo").join("env");
+        if env_file.exists() {
+            let rustup_env_profile = format!(". {:?}", env_file.as_path());
+            remove_single_shell_profile_content(rustup_env_profile.as_str())?;
         } else {
             unimplemented!("Fish");
         };
-        
-        // Remove the `"$CARGO_HOME/tools/vscode/bin"`
-        let vscode_bin_path = cargo_home_dir.join("tools").join("vscode").join("bin");
-        let vscode_env = format!("export PATH=\"$PATH:{:?}\"", vscode_bin_path.as_path());
-        remove_shell_profile_content(vscode_env.as_str(), vscode_env.as_str())?;
 
         Ok(())
     }
@@ -90,6 +80,38 @@ impl Uninstallation for UninstallConfiguration {
         std::fs::remove_dir_all(installed_dir)?;
         Ok(())
     }
+}
+
+fn remove_single_shell_profile_content(value: &str) -> Result<()> {
+    for sh in shell::get_available_shells() {
+        for rc in sh.rcfiles().iter().filter(|rc| rc.is_file()) {
+            let content = utils::read_to_string(rc)?;
+            let new_content = remove_single_string(content, value).ok_or_else(|| {
+                anyhow!(
+                    "unable to remove single config '{}' from shell profile: '{}'. \
+                    This may mean that the value was not set or deleted.",
+                    value,
+                    rc.display()
+                )
+            })?;
+            utils::write_file(rc, &new_content, false)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn remove_single_string(input: String, value: &str) -> Option<String> {
+    // Remove the first match one.
+    let pos = input.lines().position(|line| line == value)?;
+    let result = input
+        .lines()
+        .take(pos)
+        .chain(input.lines().skip(pos + 1))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    Some(result)
 }
 
 fn remove_shell_profile_content(start: &str, end: &str) -> Result<()> {
@@ -121,7 +143,7 @@ fn remove_sub_string_between(input: String, start: &str, end: &str) -> Option<St
     let start_pos = input.lines().position(|line| line == start)?;
     let end_pos = input.lines().position(|line| line == end)?;
     assert!(
-        end_pos > start_pos,
+        end_pos >= start_pos,
         "Interal Error: Failed deleting sub string, the start pos is larger than end pos"
     );
     let result = input
