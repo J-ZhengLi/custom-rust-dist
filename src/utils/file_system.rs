@@ -43,6 +43,15 @@ pub fn mkdirs<P: AsRef<Path>>(path: P) -> Result<()> {
     })
 }
 
+pub fn ensure_parent_dir<P: AsRef<Path>>(path: P) -> Result<()> {
+    if let Some(p) = path.as_ref().parent() {
+        if !p.exists() {
+            mkdirs(p)?;
+        }
+    }
+    Ok(())
+}
+
 pub fn to_nomalized_abspath<P: AsRef<Path>>(path: P, root: Option<&Path>) -> Result<PathBuf> {
     let abs_pathbuf = if path.as_ref().is_absolute() {
         path.as_ref().to_path_buf()

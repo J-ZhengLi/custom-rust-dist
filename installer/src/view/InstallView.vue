@@ -36,7 +36,9 @@ onMounted(() => {
 
   event.listen('install-details', (event) => {
     if (typeof event.payload === 'string') {
-      output.value.push(event.payload);
+      event.payload.split("\n").forEach(line => {
+        output.value.push(line);
+      });
       toBottom();
     }
   });

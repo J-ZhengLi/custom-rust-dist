@@ -80,15 +80,6 @@ impl Extractable<'_> {
     }
 }
 
-fn ensure_parent_dir(path: &Path) -> Result<()> {
-    if let Some(p) = path.parent() {
-        if !p.exists() {
-            super::mkdirs(p)?;
-        }
-    }
-    Ok(())
-}
-
 fn extract_zip<T: Sized>(path: &Path, root: &Path, indicator: ProgressIndicator<T>) -> Result<()> {
     use zip::ZipArchive;
 
@@ -114,7 +105,7 @@ fn extract_zip<T: Sized>(path: &Path, root: &Path, indicator: ProgressIndicator<
         if zip_file.is_dir() {
             super::mkdirs(&out_path)?;
         } else {
-            ensure_parent_dir(&out_path)?;
+            super::ensure_parent_dir(&out_path)?;
             let mut out_file = std::fs::File::create(&out_path)?;
             std::io::copy(&mut zip_file, &mut out_file)?;
         }
@@ -170,7 +161,7 @@ fn extract_7z<T: Sized>(path: &Path, root: &Path, indicator: ProgressIndicator<T
             })?;
             Ok(true)
         } else {
-            ensure_parent_dir(&out_path).map_err(|_| {
+            super::ensure_parent_dir(&out_path).map_err(|_| {
                 sevenz_rust::Error::other(format!(
                     "unable to create parent directory for '{}'",
                     out_path.display()
@@ -240,7 +231,6 @@ fn extract_tar<T: Sized, R: Read>(
             entry.path()?.to_path_buf()
         };
         let out_path = root.join(&entry_path);
-        println!("out_path: {}", out_path.display());
 
         if entry.header().entry_type().is_dir() {
             super::mkdirs(&out_path).with_context(|| {
@@ -250,7 +240,7 @@ fn extract_tar<T: Sized, R: Read>(
                 )
             })?;
         } else {
-            ensure_parent_dir(&out_path).with_context(|| {
+            super::ensure_parent_dir(&out_path).with_context(|| {
                 format!(
                     "failed to create directory when extracting '{}'",
                     path.display()

@@ -253,12 +253,9 @@ pub fn default_install_dir() -> PathBuf {
 // TODO: Write version info after installing each tool,
 // which is later used for updating.
 fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> Result<()> {
-    // If the tool with `name` has baked in packages, output it into temp directory then try
-    // to install it with the path
-
     match tool {
         ToolInfo::PlainVersion(version) if config.cargo_is_installed => {
-            let output = utils::output_with_env(
+            utils::execute_with_env(
                 "cargo",
                 &["install", name, "--version", version],
                 [
@@ -266,7 +263,6 @@ fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> R
                     (RUSTUP_HOME, utils::path_to_str(&config.rustup_home())?),
                 ],
             )?;
-            utils::forward_output(output)?;
         }
         ToolInfo::Git {
             git,
@@ -287,7 +283,7 @@ fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> R
                 args.extend(["--rev", s]);
             }
 
-            let output = utils::output_with_env(
+            utils::execute_with_env(
                 "cargo",
                 &args,
                 [
@@ -295,7 +291,6 @@ fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> R
                     (RUSTUP_HOME, utils::path_to_str(&config.rustup_home())?),
                 ],
             )?;
-            utils::forward_output(output)?;
         }
         ToolInfo::Path { path, .. } => try_install_from_path(config, name, path)?,
         // FIXME: Have a dedicated download folder, do not use temp dir to store downloaded artifacts,

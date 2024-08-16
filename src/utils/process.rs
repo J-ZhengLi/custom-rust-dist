@@ -1,7 +1,6 @@
 use std::env;
 use std::ffi::OsStr;
 use std::fmt::Debug;
-use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
 use anyhow::{bail, Context, Result};
@@ -63,12 +62,6 @@ where
         .with_context(|| exec_err!(program, args, ""))
 }
 
-pub fn forward_output(output: Output) -> Result<()> {
-    std::io::stdout().write_all(&output.stdout)?;
-    std::io::stderr().write_all(&output.stderr)?;
-    Ok(())
-}
-
 /// Execute a command as child process, wait for it to finish, and return its [`Output`].
 ///
 /// # Errors
@@ -89,63 +82,35 @@ pub fn cmd_exist(cmd: &str) -> bool {
         .any(|p| p.exists())
 }
 
-/// Execute a command as child process, wait for it to finish then collect its std output.
-pub fn cmd_output<P, A>(program: P, args: &[A]) -> Result<()>
+/// Execute a command as child process, wait for it to finish.
+pub fn execute<P, A>(program: P, args: &[A]) -> Result<()>
 where
     P: AsRef<OsStr> + Debug,
     A: AsRef<OsStr>,
+{
+    execute_with_env(program, args, [])
+}
+
+pub fn execute_with_env<'a, P, A, I>(program: P, args: &[A], envs: I) -> Result<()>
+where
+    P: AsRef<OsStr> + Debug,
+    A: AsRef<OsStr>,
+    I: IntoIterator<Item = (&'a str, &'a str)>,
 {
     let child = Command::new(program.as_ref())
         .args(args)
+        .envs(envs)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .spawn()
-        .unwrap_or_else(|_| panic!("Failed to spawn {:?} process.", program));
+        .with_context(|| exec_err!(program, args, ""))?;
 
-    let output = child.wait_with_output().expect("Failed to read stdout");
+    let output = child.wait_with_output()?;
 
     // 检查子进程的退出状态
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!(
-            "{:?} failed with error: {}",
-            program,
-            stderr
-        ));
-    }
-
-    Ok(())
-}
-
-/// Execute a command as child process with input, wait for it to finish then collect its std output.
-pub fn cmd_output_with_input<P, A>(program: P, args: &[A], input: &[u8]) -> Result<()>
-where
-    P: AsRef<OsStr> + Debug,
-    A: AsRef<OsStr>,
-{
-    let mut child = Command::new(program.as_ref())
-        .args(args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
-        .unwrap_or_else(|_| panic!("Failed to spawn {:?} process.", program));
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin
-            .write_all(input)
-            .unwrap_or_else(|_| panic!("Failed to spawn {:?} process.", program))
-    }
-
-    let output = child.wait_with_output().expect("Failed to read stdout");
-
-    // 检查子进程的退出状态
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(anyhow::anyhow!(
-            "{:?} failed with error: {}",
-            program,
-            stderr
-        ));
+        bail!("{:?} failed with error: {}", program, stderr);
     }
 
     Ok(())
