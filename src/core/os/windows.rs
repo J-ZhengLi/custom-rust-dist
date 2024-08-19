@@ -1,5 +1,6 @@
 // FIXME: Too much repeating code, generalize some of the trait methods.
 
+use std::path::PathBuf;
 use std::{os::windows::ffi::OsStrExt, path::Path, process::Command};
 
 use super::install_dir_from_exe_path;
@@ -27,6 +28,21 @@ impl EnvConfig for InstallConfiguration {
 
 impl Uninstallation for UninstallConfiguration {
     fn remove_rustup_env_vars(&self) -> Result<()> {
+        // Remove the `$CARGO_HOME/.cargo/bin` which is added by rustup
+        let cargo_home = std::env::var(crate::core::CARGO_HOME).expect("Failed to read CARGO_HOME");
+        let cargo_bin_dir = PathBuf::from(cargo_home)
+            .join("bin")
+            .to_string_lossy()
+            .to_string();
+
+        if let Some(filtered_paths) = get_filtered_path(&cargo_bin_dir.as_str()) {
+            let new_path =
+                std::env::join_paths(filtered_paths).expect(&format!("Failed to update paths"));
+
+            // Use std::env::set_var and set new `PATH`
+            std::env::set_var("PATH", new_path);
+        }
+
         for var_to_remove in crate::core::ALL_VARS {
             set_env_var(var_to_remove, vec![])?;
         }
@@ -48,6 +64,19 @@ impl Uninstallation for UninstallConfiguration {
         remove_self_()?;
         Ok(())
     }
+}
+
+/// Get `PATH` environment variable
+fn get_filtered_path(exclude: &str) -> Option<Vec<PathBuf>> {
+    // 获取PATH环境变量
+    let path_var = std::env::var_os("PATH")?;
+
+    // 将PATH分割成不同路径
+    let paths = std::env::split_paths(&path_var)
+        .filter(|path| !path.to_string_lossy().contains(exclude))
+        .collect::<Vec<PathBuf>>();
+
+    Some(paths)
 }
 
 /// Broadcast environment changes to other processes,
