@@ -10,7 +10,6 @@ use crate::utils;
 use crate::utils::create_executable_file;
 use crate::utils::download_from_start;
 use crate::utils::execute;
-use crate::utils::HostTriple;
 
 #[cfg(windows)]
 pub(crate) const RUSTUP_INIT: &str = "rustup-init.exe";
@@ -22,37 +21,29 @@ const RUSTUP: &str = "rustup.exe";
 #[cfg(not(windows))]
 const RUSTUP: &str = "rustup";
 
-pub struct Rustup {
-    pub triple: HostTriple,
-}
-
-impl Default for Rustup {
-    fn default() -> Self {
-        let host_triple = match HostTriple::from_host() {
-            Some(host_triple) => host_triple,
-            None => panic!("Failed to get local host triple."),
-        };
-        Self {
-            triple: host_triple,
-        }
-    }
-}
+pub struct Rustup;
 
 impl Rustup {
     pub(crate) fn init() -> Self {
         std::env::remove_var("RUSTUP_TOOLCHAIN");
-        Self::default()
+        Self
     }
 
     pub(crate) fn download_rustup_init(&self, dest: &Path, server: &Url) -> Result<()> {
         let download_url =
-            utils::force_url_join(server, &format!("dist/{}/{RUSTUP_INIT}", self.triple))
+            utils::force_url_join(server, &format!("dist/{}/{RUSTUP_INIT}", env!("TARGET")))
                 .context("Failed to init rustup download url.")?;
         download_from_start(RUSTUP_INIT, &download_url, dest).context("Failed to download rustup.")
     }
 
     pub(crate) fn generate_rustup(&self, rustup_init: &PathBuf) -> Result<()> {
-        let args = ["--default-toolchain", "none", "-y"];
+        let args = [
+            "--default-toolchain",
+            "none",
+            "--default-host",
+            env!("TARGET"),
+            "-vy",
+        ];
         execute(rustup_init, &args)
     }
 
@@ -101,6 +92,14 @@ impl Rustup {
                 self.download_rust_component(&rustup, cpt)?;
             }
         }
+
+        // Remove the `rustup` uninstall entry on windows, because we don't want
+        // uses to accidently uninstall `rustup` thus removing the installed binary of this program.
+        #[cfg(windows)]
+        super::os::windows::do_remove_from_programs(
+            r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Rustup",
+        )?;
+
         Ok(())
     }
 }

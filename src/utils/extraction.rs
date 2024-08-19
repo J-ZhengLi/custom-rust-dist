@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use common_path::common_path_all;
 use std::io::{Read, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 use crate::utils::progress_bar::Style;
@@ -83,6 +83,8 @@ impl Extractable<'_> {
 fn extract_zip<T: Sized>(path: &Path, root: &Path, indicator: ProgressIndicator<T>) -> Result<()> {
     use zip::ZipArchive;
 
+    println!("loading '{}'", path.display());
+    // FIXME: this is too slow for large files, see if it can be optimized.
     let file = std::fs::File::open(path)?;
     let mut zip_archive = ZipArchive::new(file)?;
     let zip_len = zip_archive.len();
@@ -132,6 +134,21 @@ fn extract_7z<T: Sized>(path: &Path, root: &Path, indicator: ProgressIndicator<T
     // if there is, just let it fail for now.
     let mut sz_reader = SevenZReader::open(path, Password::empty())
         .with_context(|| format!("failed to read 7z archive '{}'", path.display()))?;
+
+    // Find common prefix so we can skip them and reserve the only "important" parts.
+    let entries = &sz_reader.archive().files;
+    let common_prefix = {
+        if entries.len() < 2 {
+            None
+        } else {
+            let all_files = entries
+                .iter()
+                .filter(|et| !et.is_directory())
+                .map(|et| Path::new(et.name()));
+            common_path_all(all_files)
+        }
+    };
+
     let sz_len: u64 = sz_reader
         .archive()
         .files
@@ -149,8 +166,16 @@ fn extract_7z<T: Sized>(path: &Path, root: &Path, indicator: ProgressIndicator<T
 
     sz_reader.for_each_entries(|entry, reader| {
         let mut buf = [0_u8; 1024];
+        let mut entry_path = PathBuf::from(entry.name());
+        if let Some(prefix) = &common_prefix {
+            let Ok(stripped) = entry_path.strip_prefix(prefix).map(|p| p.to_path_buf()) else {
+                // meaning this entry is an prefix directory that we don't need
+                return Ok(true);
+            };
+            entry_path = stripped;
+        }
 
-        let out_path = root.join(entry.name());
+        let out_path = root.join(&entry_path);
 
         if entry.is_directory() {
             super::mkdirs(&out_path).map_err(|_| {
@@ -209,6 +234,8 @@ fn extract_tar<T: Sized, R: Read>(
             let all_paths = entries
                 .iter()
                 .filter_map(|entry| entry.as_ref().ok())
+                // Only get the files entry
+                .filter(|entry| entry.header().entry_type().is_file())
                 .filter_map(|f| f.path().map(|p| p.to_path_buf()).ok())
                 .collect::<Vec<_>>();
             common_path_all(all_paths.iter().map(|pb| pb.as_path()))
@@ -226,7 +253,11 @@ fn extract_tar<T: Sized, R: Read>(
     for (idx, maybe_entry) in entries.into_iter().enumerate() {
         let mut entry = maybe_entry?;
         let entry_path = if let Some(prefix) = &common_prefix {
-            entry.path()?.strip_prefix(prefix)?.to_path_buf()
+            let Ok(stripped) = entry.path()?.strip_prefix(prefix).map(|p| p.to_path_buf()) else {
+                // meaning this entry is an prefix directory that we don't need
+                continue;
+            };
+            stripped
         } else {
             entry.path()?.to_path_buf()
         };

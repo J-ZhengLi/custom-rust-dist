@@ -4,6 +4,7 @@ use std::fmt::Debug;
 use std::process::{Command, Output, Stdio};
 
 use anyhow::{bail, Context, Result};
+use cfg_if::cfg_if;
 
 macro_rules! exec_err {
     ($p:expr, $args:expr, $ext_msg:expr) => {
@@ -97,20 +98,50 @@ where
     A: AsRef<OsStr>,
     I: IntoIterator<Item = (&'a str, &'a str)>,
 {
-    let child = Command::new(program.as_ref())
+    let status = Command::new(program.as_ref())
         .args(args)
         .envs(envs)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .spawn()
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
         .with_context(|| exec_err!(program, args, ""))?;
 
-    let output = child.wait_with_output()?;
+    // 检查子进程的退出状态
+    if !status.success() {
+        return Err(exec_err!(program, args, ""));
+    }
+
+    Ok(())
+}
+
+/// Execute by invoking shell program, such as `sh` on Unix, `cmd` on Windows.
+pub fn shell_execute<P, A>(program: P, args: &[A]) -> Result<()>
+where
+    P: AsRef<OsStr> + Debug,
+    A: AsRef<OsStr>,
+{
+    cfg_if! {
+        if #[cfg(windows)] {
+            let shell = "cmd.exe";
+            let start_arg = "/C";
+        } else {
+            let shell = "sh";
+            let start_arg = "-c";
+        }
+    }
+
+    let status = Command::new(shell)
+        .arg(start_arg)
+        .arg(&program)
+        .args(args)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .with_context(|| exec_err!(program, args, ""))?;
 
     // 检查子进程的退出状态
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("{:?} failed with error: {}", program, stderr);
+    if !status.success() {
+        return Err(exec_err!(program, args, ""));
     }
 
     Ok(())

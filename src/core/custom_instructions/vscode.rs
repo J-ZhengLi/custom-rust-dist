@@ -23,7 +23,7 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
 
     // Step 1: Move the root of the directory into `tools` directory
     let vscode_dir = config.tools_dir().join("vscode");
-    utils::move_to(path, &vscode_dir)?;
+    utils::move_to(path, &vscode_dir, true)?;
     // Step 2: Add the `bin/` folder to path
     let bin_dir = vscode_dir.join("bin");
     add_to_path(&bin_dir)?;
@@ -41,7 +41,7 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
         utils::path_to_str(&shortcut_path)?,
         utils::path_to_str(&target_path)?,
     );
-    let _ = utils::stdout_output("powershell.exe", &[weird_powershell_cmd])?;
+    utils::execute("powershell.exe", &[weird_powershell_cmd])?;
 
     Ok(())
 }
@@ -53,13 +53,27 @@ pub(super) fn install(_path: &Path, _config: &InstallConfiguration) -> Result<()
 }
 
 #[cfg(windows)]
-pub(super) fn _uninstall() -> Result<()> {
-    // TODO: Remove shortcut, remove from PATH
+pub(super) fn uninstall() -> Result<()> {
+    use crate::core::os::install_dir_from_exe_path;
+    use crate::core::os::windows::remove_from_path;
+
+    // We've added a path for VSCode at `<InstallDir>/tools/vscode/bin`, try removing it from `PATH`.
+    let mut vscode_path = install_dir_from_exe_path()?;
+    vscode_path.push("tools");
+    vscode_path.push("vscode");
+    vscode_path.push("bin");
+    remove_from_path(&vscode_path)?;
+
+    // TODO: Remove desktop shortcut and `%USERPROFILE%/.vscode`.
+    // We need to see if the shortcut has the correct target before removing it,
+    // and we also need to ask user if they want to remove the user profile
+    // before doing so, since that folder might be shared with other vscode varients.
+
     Ok(())
 }
 
 #[cfg(not(windows))]
-pub(super) fn _uninstall() -> Result<()> {
+pub(super) fn uninstall() -> Result<()> {
     // TODO: Remove shortcut, remove from PATH
     Ok(())
 }

@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 // the folder fits the characteristic.
 // FIXME: There might be risks involved, resulting unintended directory being removed
 // after uninstallation.
-fn install_dir_from_exe_path() -> Result<PathBuf> {
+pub(crate) fn install_dir_from_exe_path() -> Result<PathBuf> {
     let exe_path = std::env::current_exe().context("cannot locate current executable")?;
     let comp_count = exe_path.components().count();
     let maybe_install_dir: PathBuf = exe_path
@@ -47,6 +47,15 @@ pub(crate) fn add_to_path(path: &Path) -> Result<()> {
 
     #[cfg(unix)]
     unix::add_to_path(path)?;
+
+    Ok(())
+}
+
+pub(crate) fn remvoe_from_path(path: &Path) -> Result<()> {
+    #[cfg(windows)]
+    windows::remove_from_path(path)?;
+
+    // FIXME: Missing support for unix
 
     Ok(())
 }

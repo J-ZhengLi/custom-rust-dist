@@ -4,6 +4,7 @@ use std::env;
 use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
+use std::time::Duration;
 
 /// Get a path to user's "home" directory.
 ///
@@ -122,13 +123,36 @@ where
         from.as_ref().display()
     );
 
-    copy_to(from, to)
+    copy_into(from, to)
 }
 
 /// Copy file or directory into an existing directory.
 ///
 /// Similar to [`copy_file_to`], except this will recursively copy directory as well.
-pub fn copy_to<P, Q>(from: P, to: Q) -> Result<PathBuf>
+pub fn copy_into<P, Q>(from: P, to: Q) -> Result<PathBuf>
+where
+    P: AsRef<Path>,
+    Q: AsRef<Path>,
+{
+    if !to.as_ref().is_dir() {
+        bail!("'{}' is not a directory", to.as_ref().display());
+    }
+
+    let dest = to.as_ref().join(from.as_ref().file_name().ok_or_else(|| {
+        anyhow!(
+            "path '{}' does not have a file name",
+            from.as_ref().display()
+        )
+    })?);
+
+    copy_as(from, &dest)?;
+    Ok(dest)
+}
+
+/// Copy file or directory to a specified path.
+///
+/// Similar to [`copy_file_to`], except this will recursively copy directory as well.
+pub fn copy_as<P, Q>(from: P, to: Q) -> Result<()>
 where
     P: AsRef<Path>,
     Q: AsRef<Path>,
@@ -155,35 +179,24 @@ where
         );
     }
 
-    if !to.as_ref().is_dir() {
-        bail!("'{}' is not a directory", to.as_ref().display());
-    }
-
-    let dest = to.as_ref().join(from.as_ref().file_name().ok_or_else(|| {
-        anyhow!(
-            "path '{}' does not have a file name",
-            from.as_ref().display()
-        )
-    })?);
-
     if from.as_ref().is_file() {
-        fs::copy(&from, &dest).with_context(|| {
+        fs::copy(&from, &to).with_context(|| {
             format!(
-                "could not copy file '{}' to directory '{}'",
+                "could not copy file '{}' to '{}'",
                 from.as_ref().display(),
                 to.as_ref().display()
             )
         })?;
     } else {
-        copy_dir_(from.as_ref(), &dest).with_context(|| {
+        copy_dir_(from.as_ref(), to.as_ref()).with_context(|| {
             format!(
-                "could not copy directory '{}' as a subfolder in '{}'",
+                "could not copy directory '{}' to '{}'",
                 from.as_ref().display(),
                 to.as_ref().display()
             )
         })?;
     }
-    Ok(dest)
+    Ok(())
 }
 
 /// Set file permissions (executable)
@@ -205,19 +218,19 @@ pub fn create_executable_file(_path: &Path) -> Result<()> {
 }
 
 /// Attempts to read a directory path, then return a list of paths
-/// that are inside the given directory, including sub folders.
-pub fn walk_dir(dir: &Path) -> Result<Vec<PathBuf>> {
-    fn collect_paths_(dir: &Path, paths: &mut Vec<PathBuf>) -> Result<()> {
+/// that are inside the given directory, may or may not including sub folders.
+pub fn walk_dir(dir: &Path, recursive: bool) -> Result<Vec<PathBuf>> {
+    fn collect_paths_(dir: &Path, paths: &mut Vec<PathBuf>, recursive: bool) -> Result<()> {
         for dir_entry in dir.read_dir()?.flatten() {
             paths.push(dir_entry.path());
-            if matches!(dir_entry.file_type(), Ok(ty) if ty.is_dir()) {
-                collect_paths_(&dir_entry.path(), paths)?;
+            if recursive && matches!(dir_entry.file_type(), Ok(ty) if ty.is_dir()) {
+                collect_paths_(&dir_entry.path(), paths, true)?;
             }
         }
         Ok(())
     }
     let mut paths = vec![];
-    collect_paths_(dir, &mut paths)?;
+    collect_paths_(dir, &mut paths, recursive)?;
     Ok(paths)
 }
 
@@ -233,13 +246,43 @@ pub fn is_executable<P: AsRef<Path>>(path: P) -> bool {
     path.as_ref().is_file() && is_executable_ext
 }
 
+pub fn remove<P: AsRef<Path>>(src: P) -> Result<()> {
+    if src.as_ref().is_file() {
+        fs::remove_file(&src)
+            .with_context(|| format!("unable to remove file '{}'", src.as_ref().display()))?;
+    } else if src.as_ref().is_dir() {
+        fs::remove_dir_all(&src)
+            .with_context(|| format!("unable to remove directory '{}'", src.as_ref().display()))?;
+    }
+    Ok(())
+}
+
 /// Move `src` path to `dest`.
-pub fn move_to(src: &Path, dest: &Path) -> Result<()> {
-    fs::rename(src, dest).with_context(|| {
-        format!(
-            "failed when moving '{}' to '{}'",
-            src.display(),
-            dest.display()
+pub fn move_to(src: &Path, dest: &Path, force: bool) -> Result<()> {
+    if force && dest.exists() {
+        remove(dest)?;
+    }
+
+    const RETRY_TIMES: u8 = 20;
+    for _ in 0..RETRY_TIMES {
+        match fs::rename(src, dest) {
+            Ok(()) => return Ok(()),
+            Err(err) if err.kind() == std::io::ErrorKind::PermissionDenied => {
+                std::thread::sleep(Duration::from_secs(1));
+                continue;
+            }
+            Err(err) => return Err(err.into()),
+        }
+    }
+    // If removing doesn't work, because some stupid problem caused by anti-virus software,
+    // try copy and delete.
+    copy_as(src, dest)?;
+    if remove(src).is_err() {
+        println!(
+            "warning: unable to remove '{}', please try manually removing it",
+            src.display()
         )
-    })
+    }
+
+    Ok(())
 }
