@@ -7,9 +7,9 @@ use url::Url;
 use super::install::InstallConfiguration;
 use super::parser::manifest::ToolsetManifest;
 use crate::utils;
-use crate::utils::cmd_output;
 use crate::utils::create_executable_file;
 use crate::utils::download_from_start;
+use crate::utils::execute;
 use crate::utils::HostTriple;
 
 #[cfg(windows)]
@@ -53,7 +53,7 @@ impl Rustup {
 
     pub(crate) fn generate_rustup(&self, rustup_init: &PathBuf) -> Result<()> {
         let args = ["--default-toolchain", "none", "-y"];
-        cmd_output(rustup_init, &args)
+        execute(rustup_init, &args)
     }
 
     fn download_rust_toolchain(&self, rustup: &Path, manifest: &ToolsetManifest) -> Result<()> {
@@ -63,12 +63,12 @@ impl Rustup {
         if let Some(profile) = &manifest.rust.profile {
             args.extend(["--profile", profile]);
         }
-        cmd_output(rustup, &args)
+        execute(rustup, &args)
     }
 
     fn download_rust_component(&self, rustup: &Path, compoent: &String) -> Result<()> {
         let args = ["component", "add", compoent];
-        cmd_output(rustup, &args)
+        execute(rustup, &args)
     }
 
     pub(crate) fn download_toolchain(
