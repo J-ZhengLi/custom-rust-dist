@@ -223,7 +223,7 @@ fn capture_output_to_file(
 
 #[tauri::command]
 fn run_app(install_dir: Option<String>) -> Result<()> {
-    let dir: PathBuf = install_dir.unwrap_or_else(|| default_install_dir()).into();
+    let dir: PathBuf = install_dir.unwrap_or_else(default_install_dir).into();
     try_it(Some(&dir))?;
     Ok(())
 }

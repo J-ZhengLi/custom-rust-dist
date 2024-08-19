@@ -52,12 +52,7 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
 
     // Step 3: Invoke the install command.
     println!("running VS BuildTools installer...");
-    let output = utils::output(buildtools_exe, &cmd)?;
-    if output.status.success() {
-        utils::forward_output(output)?;
-    } else {
-        bail!("failed to execute build tools installer command: {}", String::from_utf8_lossy(&output.stderr));
-    }
+    utils::execute(buildtools_exe, &cmd)?;
 
     Ok(())
 }
