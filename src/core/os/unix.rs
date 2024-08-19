@@ -231,6 +231,13 @@ pub(super) fn add_to_path(path: &Path) -> Result<()> {
     Ok(())
 }
 
+pub(super) fn remove_from_path(_path: &Path) -> Result<()> {
+    // FIXME: Remove the given `path` from those rc files we added in `add_to_path`.
+    // This is currently not needed because we don't have the functionality to uninstall
+    // individual tool yet.
+    Ok(())
+}
+
 /// Unix shell module, contains methods that are dedicated in configuring rustup env vars.
 // TODO?: Most code in this module are modified from rustup's `shell.rs`, this is not ideal for long term,
 // as the file in rustup could change drasically in the future and somehow we'll need to update

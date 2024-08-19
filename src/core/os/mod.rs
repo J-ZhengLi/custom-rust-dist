@@ -51,11 +51,12 @@ pub(crate) fn add_to_path(path: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn remvoe_from_path(path: &Path) -> Result<()> {
+pub(crate) fn remove_from_path(path: &Path) -> Result<()> {
     #[cfg(windows)]
     windows::remove_from_path(path)?;
 
-    // FIXME: Missing support for unix
+    #[cfg(not(windows))]
+    unix::remove_from_path(path)?;
 
     Ok(())
 }

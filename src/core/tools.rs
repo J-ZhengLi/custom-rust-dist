@@ -150,7 +150,7 @@ fn install_dir_with_bin_(config: &InstallConfiguration, name: &str, bin_dir: &Pa
 fn uninstall_dir_with_bin_(tool_path: &Path) -> Result<()> {
     // Remove from `PATH` at first.
     let bin_dir = tool_path.join("bin");
-    super::os::remvoe_from_path(&bin_dir)?;
+    super::os::remove_from_path(&bin_dir)?;
 
     fs::remove_dir_all(tool_path)?;
 
