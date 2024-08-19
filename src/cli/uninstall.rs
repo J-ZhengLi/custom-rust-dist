@@ -19,16 +19,15 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
     match uninst_cmd {
         UninstallCommand::All => {
             let config = UninstallConfiguration;
-            // TODO: remove rust installation using `rustup self uninstall`
-            // TODO: remove configurations
             config.remove_rustup_env_vars()?;
-            // TODO: remove self
+            config.remove_tools()?;
             config.remove_self()?;
-            unimplemented!("`uninstall all` is not fully implemented yet.")
         }
         UninstallCommand::Tool { names } => {
             // TODO: remove a certain tool, or component
             unimplemented!("attempt to remove '{names:?}', but this is not yet implemented.")
         }
     }
+
+    Ok(())
 }

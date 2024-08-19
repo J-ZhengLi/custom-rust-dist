@@ -1,9 +1,8 @@
-use crate::{core::install::VSCODE_FAMILY, utils};
+use crate::{core::tools::VSCODE_FAMILY, utils};
 use anyhow::Result;
 use std::{
     env,
     path::{Path, PathBuf},
-    process::Command,
 };
 
 /// Export an example `cargo` project, then open it with `VSCode` editor or `file explorer`.
@@ -29,20 +28,24 @@ pub fn try_it(path: Option<&Path>) -> Result<()> {
     #[cfg(target_os = "macos")]
     let file_explorer = "open";
 
-    let mut programs_to_try = VSCODE_FAMILY.to_vec();
-    programs_to_try.push(file_explorer);
-    for program in programs_to_try {
-        let status = Command::new(program).arg(&example_dir).status();
-        if matches!(status, Ok(s) if s.success()) {
+    let program = VSCODE_FAMILY
+        .iter()
+        .find_map(|p| utils::cmd_exist(p).then_some(*p))
+        .unwrap_or(file_explorer);
+    if utils::shell_execute(program, &[&example_dir]).is_err() {
+        #[cfg(windows)]
+        if program == file_explorer {
+            // explorer.exe return 1 even on success for some weird reason.
             return Ok(());
         }
+
+        println!(
+            "unable to open example directory with `VSCode` or `file explorer`, \
+            try open it manually: {}",
+            example_dir.display()
+        );
     }
 
-    println!(
-        "unable to open example directory with `VSCode` or `file explorer`, \
-        try open it manually: {}",
-        example_dir.display()
-    );
     Ok(())
 }
 

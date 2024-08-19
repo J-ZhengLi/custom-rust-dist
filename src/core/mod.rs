@@ -7,6 +7,7 @@ pub mod install;
 mod os;
 pub(crate) mod parser;
 pub(crate) mod rustup;
+pub(crate) mod tools;
 pub mod try_it;
 pub(crate) mod uninstall;
 

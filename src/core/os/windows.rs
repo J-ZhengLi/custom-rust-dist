@@ -1,15 +1,10 @@
-// FIXME: Too much repeating code, generalize some of the trait methods.
-
-use std::path::PathBuf;
-use std::{os::windows::ffi::OsStrExt, path::Path, process::Command};
+use std::process::Command;
 
 use super::install_dir_from_exe_path;
 use crate::core::install::InstallConfiguration;
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
 use crate::core::EnvConfig;
 use anyhow::Result;
-use winapi::shared::minwindef;
-use winapi::um::winuser;
 
 pub(crate) use rustup::*;
 
@@ -28,20 +23,11 @@ impl EnvConfig for InstallConfiguration {
 
 impl Uninstallation for UninstallConfiguration {
     fn remove_rustup_env_vars(&self) -> Result<()> {
-        // Remove the `$CARGO_HOME/.cargo/bin` which is added by rustup
-        let cargo_home = std::env::var(crate::core::CARGO_HOME).expect("Failed to read CARGO_HOME");
-        let cargo_bin_dir = PathBuf::from(cargo_home)
-            .join("bin")
-            .to_string_lossy()
-            .to_string();
-
-        if let Some(filtered_paths) = get_filtered_path(&cargo_bin_dir.as_str()) {
-            let new_path =
-                std::env::join_paths(filtered_paths).expect(&format!("Failed to update paths"));
-
-            // Use std::env::set_var and set new `PATH`
-            std::env::set_var("PATH", new_path);
-        }
+        // Remove the `<InstallDir>/.cargo/bin` which is added by rustup
+        let mut cargo_bin_dir = install_dir_from_exe_path()?;
+        cargo_bin_dir.push(".cargo");
+        cargo_bin_dir.push("bin");
+        remove_from_path(&cargo_bin_dir)?;
 
         for var_to_remove in crate::core::ALL_VARS {
             set_env_var(var_to_remove, vec![])?;
@@ -53,9 +39,6 @@ impl Uninstallation for UninstallConfiguration {
     }
 
     fn remove_self(&self) -> Result<()> {
-        // TODO: Run `rustup self uninstall` first
-        // TODO: Remove possibly installed extensions for other software, such as `vs-code` plugins.
-
         // On windows, we cannot delete an executable that is currently running.
         // Therefore, we are spawning a child process that runs `rmdir` and hope for the best.
         // `rustup` did something like this, it creates a "self-destructable" clone called `rustup-gc`,
@@ -63,35 +46,6 @@ impl Uninstallation for UninstallConfiguration {
         // use the rustup way.
         remove_self_()?;
         Ok(())
-    }
-}
-
-/// Get `PATH` environment variable
-fn get_filtered_path(exclude: &str) -> Option<Vec<PathBuf>> {
-    // 获取PATH环境变量
-    let path_var = std::env::var_os("PATH")?;
-
-    // 将PATH分割成不同路径
-    let paths = std::env::split_paths(&path_var)
-        .filter(|path| !path.to_string_lossy().contains(exclude))
-        .collect::<Vec<PathBuf>>();
-
-    Some(paths)
-}
-
-/// Broadcast environment changes to other processes,
-/// required after making env changes.
-fn update_env() {
-    unsafe {
-        winuser::SendMessageTimeoutA(
-            winuser::HWND_BROADCAST,
-            winuser::WM_SETTINGCHANGE,
-            0 as minwindef::WPARAM,
-            "Environment\0".as_ptr() as minwindef::LPARAM,
-            winuser::SMTO_ABORTIFHUNG,
-            5000,
-            std::ptr::null_mut(),
-        );
     }
 }
 
@@ -111,42 +65,28 @@ fn remove_self_() -> Result<()> {
         .args(["/C", "rmdir", "/s", "/q"])
         .arg(&installed_dir);
 
-    do_remove_from_programs()?;
+    do_remove_from_programs(uninstall_entry())?;
 
     yolo(cmd);
 }
 
-pub(super) fn add_to_path(path: &Path) -> Result<()> {
-    let Some(old_path) = get_windows_path_var()? else {
-        return Ok(());
-    };
-    let path_bytes = path.as_os_str().encode_wide().collect::<Vec<_>>();
-    let mut new_path = path_bytes;
-    new_path.push(b';' as u16);
-    new_path.extend_from_slice(&old_path);
-
-    // Apply the new path
-    set_env_var("PATH", new_path)?;
-
-    // Sync changes
-    update_env();
-
-    Ok(())
-}
-
+/// Module containing functions that are modified from `rustup`.
 pub(crate) mod rustup {
     use std::env;
     use std::ffi::OsString;
     use std::os::windows::ffi::{OsStrExt, OsStringExt};
+    use std::path::Path;
     use std::sync::OnceLock;
 
     use anyhow::{anyhow, Context, Result};
+    use winapi::shared::minwindef;
+    use winapi::um::winuser;
     use winreg::enums::{RegType, HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
     use winreg::{RegKey, RegValue};
 
     static UNINSTALL_ENTRY: OnceLock<String> = OnceLock::new();
 
-    fn uninstall_entry() -> &'static str {
+    pub(super) fn uninstall_entry() -> &'static str {
         UNINSTALL_ENTRY.get_or_init(|| {
             format!(
                 "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\{}",
@@ -155,7 +95,7 @@ pub(crate) mod rustup {
         })
     }
 
-    pub(crate) fn do_add_to_programs() -> Result<()> {
+    pub(crate) fn do_add_to_programs(bin_dir: &Path) -> Result<()> {
         use std::path::PathBuf;
 
         let key = RegKey::predef(HKEY_CURRENT_USER)
@@ -175,10 +115,21 @@ pub(crate) mod rustup {
             }
         }
 
-        let path = env::current_exe()?;
+        let cur_exe_path = env::current_exe()?;
+        let exe_name = cur_exe_path
+            .file_name()
+            .unwrap_or_else(|| unreachable!("executable should always have a filename"));
+        let path = bin_dir.join(exe_name);
+
         let mut uninstall_cmd = OsString::from("\"");
         uninstall_cmd.push(path);
-        uninstall_cmd.push("\" uninstall all");
+        uninstall_cmd.push("\"");
+
+        // FIXME: Remove this if the GUI app supports uninstallation with ui.
+        #[cfg(feature = "gui")]
+        uninstall_cmd.push(" --no-gui");
+
+        uninstall_cmd.push(" uninstall all");
 
         let reg_value = RegValue {
             bytes: to_winreg_bytes(uninstall_cmd.encode_wide().collect()),
@@ -187,7 +138,7 @@ pub(crate) mod rustup {
 
         key.set_raw_value("UninstallString", &reg_value)
             .context("Failed to set `UninstallString`")?;
-        key.set_value("DisplayName", &"Rust installation manager")
+        key.set_value("DisplayName", &"XuanWu Rust Installation Manager")
             .context("Failed to set `DisplayName`")?;
 
         Ok(())
@@ -221,8 +172,8 @@ pub(crate) mod rustup {
         unsafe { std::slice::from_raw_parts(v.as_ptr().cast::<u8>(), v.len() * 2).to_vec() }
     }
 
-    pub(super) fn do_remove_from_programs() -> Result<()> {
-        match RegKey::predef(HKEY_CURRENT_USER).delete_subkey_all(uninstall_entry()) {
+    pub(crate) fn do_remove_from_programs(entry: &str) -> Result<()> {
+        match RegKey::predef(HKEY_CURRENT_USER).delete_subkey_all(entry) {
             Ok(()) => Ok(()),
             Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(e) => Err(anyhow!(e)),
@@ -269,12 +220,88 @@ pub(crate) mod rustup {
             }
             env.delete_value(key)?;
         } else {
+            // Set for current process
+            env::set_var(key, OsString::from_wide(&val));
+
             let reg_value = RegValue {
                 bytes: to_winreg_bytes(val),
                 vtype: RegType::REG_EXPAND_SZ,
             };
+            // Set for persist user environment
             env.set_raw_value(key, &reg_value)?;
         }
+
+        Ok(())
+    }
+
+    /// Broadcast environment changes to other processes,
+    /// required after making env changes.
+    pub(super) fn update_env() {
+        unsafe {
+            winuser::SendMessageTimeoutA(
+                winuser::HWND_BROADCAST,
+                winuser::WM_SETTINGCHANGE,
+                0 as minwindef::WPARAM,
+                "Environment\0".as_ptr() as minwindef::LPARAM,
+                winuser::SMTO_ABORTIFHUNG,
+                5000,
+                std::ptr::null_mut(),
+            );
+        }
+    }
+
+    pub(crate) fn add_to_path(path: &Path) -> Result<()> {
+        let Some(old_path) = get_windows_path_var()? else {
+            return Ok(());
+        };
+        let path_bytes = path.as_os_str().encode_wide().collect::<Vec<_>>();
+
+        let mut new_path = path_bytes;
+        new_path.push(b';' as u16);
+        new_path.extend_from_slice(&old_path);
+
+        // Apply the new path
+        set_env_var("PATH", new_path)?;
+        // Sync changes
+        update_env();
+
+        Ok(())
+    }
+
+    pub(crate) fn remove_from_path(path: &Path) -> Result<()> {
+        let Some(old_path) = get_windows_path_var()? else {
+            return Ok(());
+        };
+        let path_bytes = path.as_os_str().encode_wide().collect::<Vec<_>>();
+
+        let Some(idx) = old_path
+            .windows(path_bytes.len())
+            .position(|path| path == path_bytes)
+        else {
+            // The path is not added, return without doing anything.
+            return Ok(());
+        };
+        // If there's a trailing semicolon (likely, since we probably added one
+        // during install), include that in the substring to remove. We don't search
+        // for that to find the string, because if it's the last string in the path,
+        // there may not be.
+        let mut len = path_bytes.len();
+        if old_path.get(idx + path_bytes.len()) == Some(&(b';' as u16)) {
+            len += 1;
+        }
+
+        let mut new_path = old_path[..idx].to_owned();
+        new_path.extend_from_slice(&old_path[idx + len..]);
+        // Don't leave a trailing ; though, we don't want an empty string in the
+        // path.
+        if new_path.last() == Some(&(b';' as u16)) {
+            new_path.pop();
+        }
+
+        // Apply the new path
+        set_env_var("PATH", new_path)?;
+        // Sync changes
+        update_env();
 
         Ok(())
     }

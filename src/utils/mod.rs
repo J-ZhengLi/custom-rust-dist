@@ -8,7 +8,6 @@ mod extraction;
 mod file_system;
 mod process;
 mod progress_bar;
-mod triple;
 
 use std::path::Path;
 
@@ -16,7 +15,6 @@ pub use download::download_from_start;
 pub use extraction::{Extractable, ExtractableKind};
 pub use file_system::*;
 pub use process::*;
-pub use triple::HostTriple;
 
 use anyhow::Result;
 use url::Url;

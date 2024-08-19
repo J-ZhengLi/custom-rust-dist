@@ -1,7 +1,7 @@
 [rust]
 version = "stable"
-profile = "minimal"
-components = ["clippy", "rustfmt"]
+profile = "default"
+components = []
 
 [tools.descriptions]
 clippy = "A collection of lints to catch common mistakes and improve your Rust code."

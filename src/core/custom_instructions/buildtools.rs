@@ -6,7 +6,7 @@ use crate::core::install::InstallConfiguration;
 pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> {
     use std::path::PathBuf;
     use crate::utils;
-    use anyhow::{anyhow, bail};
+    use anyhow::anyhow;
 
     fn any_existing_child_path(root: &Path, childs: &[&str]) -> Option<PathBuf> {
         for child in childs {
@@ -21,6 +21,7 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
     // Step 1: Check if user has already installed any of the two MSVC component.
     // FIXME: This should be checked before extraction instead.
     let missing_components = windows_related::get_missing_build_tools_components();
+    dbg!(&missing_components);
 
     // Step 2: Make an install command, or no command if everything are already installed.
     // TODO: Check version to make sure the newest version are installed.
@@ -64,22 +65,22 @@ pub(super) fn install(_path: &Path, _config: &InstallConfiguration) -> Result<()
 }
 
 #[cfg(windows)]
-pub(super) fn _uninstall() -> Result<()> {
+pub(super) fn uninstall() -> Result<()> {
     // TODO: Navigate to the vs_buildtools exe that we copied when installing, then execute it with:
     // .\vs_BuildTools.exe uninstall --productId Microsoft.VisualStudio.Product.BuildTools --channelId VisualStudio.17.Release --wait
+    // But we need to ask the user if they want to uninstall this or not.
     Ok(())
 }
 
 #[allow(unused)]
 #[cfg(not(windows))]
-pub(super) fn _uninstall() -> Result<()> {
+pub(super) fn uninstall() -> Result<()> {
     Ok(())
 }
 
 #[cfg(windows)]
 // TODO: move these code that are copied... *ahem* inspired from `rustup` into `utils`
 mod windows_related {
-    use crate::utils::HostTriple;
     use cc::windows_registry;
 
     #[derive(Debug, Clone, Copy)]
@@ -100,16 +101,13 @@ mod windows_related {
     }
 
     pub(crate) fn get_missing_build_tools_components() -> Vec<BuildToolsComponents> {
-        let host_triple = HostTriple::from_host().map_or_else(String::new, |t| t.to_string());
-        let installing_msvc = host_triple.contains("msvc");
-
-        if !installing_msvc {
+        if !env!("TARGET").contains("msvc") {
             return vec![];
         }
 
         let mut missing_comps = vec![];
 
-        let have_msvc = windows_registry::find_tool(&host_triple, "cl.exe").is_some();
+        let have_msvc = windows_registry::find_tool(env!("TARGET"), "cl.exe").is_some();
         if !have_msvc  {
             missing_comps.push(BuildToolsComponents::Msvc);
         }

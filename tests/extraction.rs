@@ -137,3 +137,43 @@ fn extracting_normal_xz() {
     assert!(temp_dir.path().join("f3").join("bbb.md").is_file());
     assert!(temp_dir.path().join("f3").join("ccc").is_file());
 }
+
+#[test]
+fn extracting_xz_with_prefix() {
+    let temp_dir = extract_to_temp("xz_with_prefixes.tar.xz");
+
+    let dir_contents = utils::walk_dir(temp_dir.path(), true).unwrap();
+    println!("contents: {:#?}", dir_contents);
+
+    assert!(temp_dir.path().join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("bbb.txt").is_file());
+    assert!(temp_dir.path().join("f1").is_dir());
+    assert!(temp_dir.path().join("f1").join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("f1").join("bbb.txt").is_file());
+    assert!(temp_dir.path().join("f2").is_dir());
+    assert!(temp_dir.path().join("f2").join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("f3").is_dir());
+    assert!(temp_dir.path().join("f3").join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("f3").join("bbb.md").is_file());
+    assert!(temp_dir.path().join("f3").join("ccc").is_file());
+}
+
+#[test]
+fn extracting_7z_with_prefix() {
+    let temp_dir = extract_to_temp("7z_with_prefixes.7z");
+
+    let dir_contents = utils::walk_dir(temp_dir.path(), true).unwrap();
+    println!("contents: {:#?}", dir_contents);
+
+    assert!(temp_dir.path().join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("bbb.txt").is_file());
+    assert!(temp_dir.path().join("f1").is_dir());
+    assert!(temp_dir.path().join("f1").join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("f1").join("bbb.txt").is_file());
+    assert!(temp_dir.path().join("f2").is_dir());
+    assert!(temp_dir.path().join("f2").join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("f3").is_dir());
+    assert!(temp_dir.path().join("f3").join("aaa.txt").is_file());
+    assert!(temp_dir.path().join("f3").join("bbb.md").is_file());
+    assert!(temp_dir.path().join("f3").join("ccc").is_file());
+}

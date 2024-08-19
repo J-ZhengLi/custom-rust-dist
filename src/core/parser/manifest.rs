@@ -94,6 +94,8 @@ impl ToolsetManifest {
     pub fn adjust_paths(&mut self) -> anyhow::Result<()> {
         let parent_dir = if let Some(p) = &self.path {
             p.to_path_buf()
+        } else if env!("PROFILE") == "debug" {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources")
         } else {
             std::env::current_exe()?
                 .parent()
