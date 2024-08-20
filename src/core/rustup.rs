@@ -66,7 +66,7 @@ impl Rustup {
         &self,
         config: &InstallConfiguration,
         manifest: &ToolsetManifest,
-        components_override: Option<Vec<&String>>,
+        components_override: Option<&[String]>,
     ) -> Result<()> {
         // We are putting the binary here so that it will be deleted automatically after done.
         let temp_dir = config.create_temp_dir("rustup-init")?;
@@ -86,7 +86,7 @@ impl Rustup {
             .rust
             .components
             .as_ref()
-            .map(|v| v.iter().collect()));
+            .map(|v| v.iter().as_slice()));
         if let Some(components) = maybe_components {
             for cpt in components {
                 self.download_rust_component(&rustup, cpt)?;

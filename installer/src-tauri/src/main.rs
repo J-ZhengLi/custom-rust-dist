@@ -154,10 +154,10 @@ fn install_toolchain(
                 (config_info, config.config_rustup_env_vars()?;);
                 (cargo_config_info, config.config_cargo()?;);
                 // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
-                (req_install_info, config.install_set_of_tools(toolset_components.iter().collect())?;);
-                (tc_install_info, config.install_rust_with_optional_components(&manifest, Some(toolchain_components.iter().collect()))?;);
+                (req_install_info, config.install_set_of_tools(&toolset_components)?;);
+                (tc_install_info, config.install_rust_with_optional_components(&manifest, Some(toolchain_components.as_slice()))?;);
                 // install third-party tools via cargo that got installed by rustup
-                (cargo_install_info, config.cargo_install_set_of_tools(toolset_components.iter().collect())?;)
+                (cargo_install_info, config.cargo_install_set_of_tools(&toolset_components)?;)
             };
 
             // Manually drop this, to tell instruct the thread stop capturing output.
