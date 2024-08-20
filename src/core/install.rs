@@ -39,7 +39,7 @@ declare_unfallible_url!(
 // make sure to change `installer/src/utils/types/InstallConfiguration.ts` as well.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct InstallConfiguration {
-    pub cargo_registry: Option<(String, Url)>,
+    pub cargo_registry: Option<(String, String)>,
     /// Path to install everything.
     ///
     /// Note that this folder will includes `.cargo` and `.rustup` folders as well.
@@ -95,7 +95,7 @@ impl InstallConfiguration {
         Ok(this)
     }
 
-    pub fn cargo_registry(mut self, registry: Option<(String, Url)>) -> Self {
+    pub fn cargo_registry(mut self, registry: Option<(String, String)>) -> Self {
         self.cargo_registry = registry;
         self
     }
@@ -217,7 +217,7 @@ impl InstallConfiguration {
     pub fn config_cargo(&self) -> Result<()> {
         let mut config = CargoConfig::new();
         if let Some((name, url)) = &self.cargo_registry {
-            config.add_source(name, url.to_owned(), true);
+            config.add_source(name, url, true);
         }
 
         let config_toml = config.to_toml()?;

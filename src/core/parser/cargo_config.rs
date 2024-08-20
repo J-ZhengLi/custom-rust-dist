@@ -2,7 +2,6 @@
 
 use serde::{ser::SerializeMap, Serialize};
 use std::collections::BTreeMap;
-use url::Url;
 
 use super::TomlParser;
 
@@ -50,7 +49,7 @@ impl CargoConfig {
     /// - `url` is the registry url.
     /// - `as_default` specify whether this source is used as a replaced source of `crates-io`,
     ///     note the first `add_source` call will always be default.
-    pub(crate) fn add_source(&mut self, key: &str, url: Url, as_default: bool) -> &mut Self {
+    pub(crate) fn add_source(&mut self, key: &str, url: &str, as_default: bool) -> &mut Self {
         self.source
             .entry("crates-io".to_string())
             .and_modify(|s| {
@@ -66,7 +65,7 @@ impl CargoConfig {
         self.source.insert(
             key.to_string(),
             Source {
-                registry: Some(url),
+                registry: Some(url.into()),
                 ..Default::default()
             },
         );
@@ -91,7 +90,7 @@ pub(crate) struct CargoHttpConfig {
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct Source {
     pub(crate) replace_with: Option<String>,
-    pub(crate) registry: Option<Url>,
+    pub(crate) registry: Option<String>,
 }
 
 // Serialize empty map to an empty string.
