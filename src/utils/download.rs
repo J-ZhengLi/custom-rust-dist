@@ -6,14 +6,15 @@ use std::time::Duration;
 
 use anyhow::{anyhow, bail, Result};
 use reqwest::blocking::{Client, ClientBuilder};
-use reqwest::header::USER_AGENT;
 use reqwest::Proxy;
 use url::Url;
 
 use super::progress_bar::{ProgressIndicator, Style};
 
 fn client_builder() -> ClientBuilder {
+    let user_agent = format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
     Client::builder()
+        .user_agent(user_agent)
         .timeout(Duration::from_secs(30))
         .connection_verbose(false)
 }
@@ -31,11 +32,8 @@ impl<T: Sized> DownloadOpt<T> {
         proxy: Option<Proxy>,
         handler: Option<ProgressIndicator<T>>,
     ) -> Result<Self> {
-        let client = if let Some(proxy) = proxy {
-            client_builder().proxy(proxy).build()?
-        } else {
-            client_builder().build()?
-        };
+        let proxy = proxy.unwrap_or_else(|| Proxy::custom(|url| env_proxy::for_url(url).to_url()));
+        let client = client_builder().proxy(proxy).build()?;
         Ok(Self {
             name,
             client,
@@ -54,11 +52,7 @@ impl<T: Sized> DownloadOpt<T> {
             return Ok(());
         }
 
-        let mut resp = self
-            .client
-            .get(url.as_ref())
-            .header(USER_AGENT, env!("CARGO_PKG_NAME"))
-            .send()?;
+        let mut resp = self.client.get(url.as_ref()).send()?;
         let status = resp.status();
         if !status.is_success() {
             bail!(

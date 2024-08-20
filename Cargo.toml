@@ -37,6 +37,7 @@ xz2 = "0.1.7"
 flate2 = "1"
 common-path = "1.0.0"
 cfg-if = "1"
+env_proxy = "0.4.1"
 
 [target."cfg(windows)".dependencies]
 winreg = "0.52.0"
