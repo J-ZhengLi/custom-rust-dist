@@ -50,6 +50,14 @@ onMounted(() => {
       routerPush('/finish');
     }, 1000);
   });
+
+  event.listen('install-failed', (event) => {
+    if (typeof event.payload === 'string') {
+      output.value.push(event.payload);
+      toBottom();
+      // TODO: Handle installation failure here, showing the reason and let user exit the program.
+    }
+  });
 });
 </script>
 

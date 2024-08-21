@@ -9,7 +9,7 @@ mod file_system;
 mod process;
 mod progress_bar;
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub use download::download_from_start;
 pub use extraction::{Extractable, ExtractableKind};
@@ -18,6 +18,11 @@ pub use process::*;
 
 use anyhow::Result;
 use url::Url;
+
+#[cfg(not(windows))]
+pub const EXE_EXT: &str = "";
+#[cfg(windows)]
+pub const EXE_EXT: &str = ".exe";
 
 /// Forcefully parsing a `&str` to [`Url`].
 ///
@@ -54,4 +59,13 @@ pub fn path_to_str(path: &Path) -> Result<&str> {
             path.display()
         )
     })
+}
+
+/// Get the binary name of current executing binary, a.k.a `arg[0]`.
+pub fn lowercase_program_name() -> Option<String> {
+    let program_executable = std::env::args().next().map(PathBuf::from)?;
+    let program_name = program_executable
+        .file_name()
+        .and_then(|oss| oss.to_str())?;
+    Some(program_name.to_lowercase())
 }

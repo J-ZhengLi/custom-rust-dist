@@ -68,8 +68,8 @@ impl<'a> ExampleTemplate<'a> {
         let root = dest.join("example_project");
         let src_dir = root.join("src");
         let vscode_dir = root.join(".vscode");
-        utils::mkdirs(&src_dir)?;
-        utils::mkdirs(&vscode_dir)?;
+        utils::ensure_dir(&src_dir)?;
+        utils::ensure_dir(&vscode_dir)?;
 
         let main_fp = src_dir.join("main.rs");
         let cargo_toml_fp = root.join("Cargo.toml");

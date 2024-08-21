@@ -48,7 +48,7 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
     // Step 2.5: Make a copy of this installer to the `tools` directory,
     // which is later used for uninstallation.
     let installer_dir = config.tools_dir().join("buildtools");
-    utils::mkdirs(&installer_dir)?;
+    utils::ensure_dir(&installer_dir)?;
     utils::copy_file_to(&buildtools_exe, &installer_dir)?;
 
     // Step 3: Invoke the install command.

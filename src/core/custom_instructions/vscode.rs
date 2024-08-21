@@ -110,7 +110,7 @@ Keywords=vscode;
                 show_no_folder_warning();
                 return Ok(());
             };
-            let _ = utils::mkdirs(&path_to_write);
+            let _ = utils::ensure_dir(&path_to_write);
             path_to_write.push(format!("{}.desktop", self.cmd));
             if utils::write_file(&path_to_write, &desktop_sc, false).is_err() {
                 show_failure_warning();

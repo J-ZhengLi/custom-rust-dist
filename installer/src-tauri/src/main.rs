@@ -3,22 +3,22 @@
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};
-use std::io::Read;
-use std::path::PathBuf;
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc, OnceLock};
-use std::thread;
 use std::time::Duration;
+use std::{env, thread};
 
 use anyhow::Context;
-use custom_rust_dist::cli::{parse_cli, CliOpt};
+use custom_rust_dist::cli::{parse_installer_cli, parse_manager_cli, Installer};
 use custom_rust_dist::manifest::{baked_in_manifest, ToolInfo};
 use custom_rust_dist::{try_it, utils, EnvConfig, InstallConfiguration};
 use tauri::api::dialog::FileDialogBuilder;
 use xuanwu_installer::components::{get_component_list_from_manifest, Component};
 use xuanwu_installer::Result;
 
-static CLI_ARGS: OnceLock<CliOpt> = OnceLock::new();
+static CLI_ARGS: OnceLock<Installer> = OnceLock::new();
 static LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
 
 #[tauri::command]
@@ -114,99 +114,123 @@ fn install_toolchain(
         })
         .collect();
 
-    // TODO: Download manifest form remote server for online build
-    let mut manifest = baked_in_manifest()?;
-    manifest.adjust_paths()?;
+    // FIXME: Don't use manifest here, instead, load everything we need to `component`
+    let manifest = baked_in_manifest()?;
 
     // 使用 Arc 来共享 window
     let window = Arc::new(window);
+    // 克隆 Arc
+    let install_thread_window_clone = Arc::clone(&window);
+    let main_thread_window_clone = Arc::clone(&window);
+
     let (tx_progress, rx_progress) = mpsc::channel();
 
     // 在一个新线程中执行安装过程
-    {
-        let window_clone = Arc::clone(&window); // 克隆 Arc
-        thread::spawn(move || -> anyhow::Result<()> {
-            println!("in installation thread");
-            let log_file = LOG_FILE.get_or_init(|| PathBuf::from(&install_dir).join("install.log"));
-            utils::ensure_parent_dir(log_file)?;
-            let file = std::fs::OpenOptions::new()
-                .truncate(true)
-                .create(true)
-                .read(true)
-                .write(true)
-                .open(log_file)?;
-            // Here we redirect all console output during installation to a buffer
-            // Note that `rustup` collect `info:` strings in stderr.
-            let drop_with_care = capture_output_to_file(file)?;
+    let install_thread = thread::spawn(move || -> anyhow::Result<()> {
+        let log_file = LOG_FILE.get_or_init(|| PathBuf::from(&install_dir).join("install.log"));
+        utils::ensure_parent_dir(log_file)?;
+        let file = std::fs::OpenOptions::new()
+            .truncate(true)
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(log_file)?;
+        // Here we redirect all console output during installation to a buffer
+        // Note that `rustup` collect `info:` strings in stderr.
+        let drop_with_care = capture_output_to_file(file)?;
 
-            let init_info = format!("Initalizing & Creating directory '{install_dir}'...");
-            let config_info = "Configuring environment variables...".to_string();
-            let cargo_config_info = "Writing cargo configuration...".to_string();
-            let req_install_info = "Installing dependencies & standalone tools...".to_string();
-            let tc_install_info = "Installing rust toolchain components...".to_string();
-            let cargo_install_info = "Installing cargo tools...".to_string();
+        let init_info = format!("Initalizing & Creating directory '{install_dir}'...");
+        let config_info = "Configuring environment variables...".to_string();
+        let cargo_config_info = "Writing cargo configuration...".to_string();
+        let req_install_info = "Installing dependencies & standalone tools...".to_string();
+        let tc_install_info = "Installing rust toolchain components...".to_string();
+        let cargo_install_info = "Installing cargo tools...".to_string();
 
-            // TODO: Use continuous progress
-            steps! {
-                redirect,
-                tx_progress,
-                (init_info, let mut config = InstallConfiguration::init(install_dir.into(), false)?;);
-                (config_info, config.config_rustup_env_vars()?;);
-                (cargo_config_info, config.config_cargo()?;);
-                // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
-                (req_install_info, config.install_set_of_tools(&toolset_components)?;);
-                (tc_install_info, config.install_rust_with_optional_components(&manifest, Some(toolchain_components.as_slice()))?;);
-                // install third-party tools via cargo that got installed by rustup
-                (cargo_install_info, config.cargo_install_set_of_tools(&toolset_components)?;)
-            };
+        // TODO: Use continuous progress
+        steps! {
+            redirect,
+            tx_progress,
+            (init_info, let mut config = InstallConfiguration::init(Path::new(&install_dir), false)?;);
+            (config_info, config.config_rustup_env_vars()?;);
+            (cargo_config_info, config.config_cargo()?;);
+            // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
+            (req_install_info, config.install_set_of_tools(&toolset_components)?;);
+            (tc_install_info, config.install_rust_with_optional_components(&manifest, Some(toolchain_components.as_slice()))?;);
+            // install third-party tools via cargo that got installed by rustup
+            (cargo_install_info, config.cargo_install_set_of_tools(&toolset_components)?;)
+        };
 
-            // Manually drop this, to tell instruct the thread stop capturing output.
-            drop(drop_with_care);
+        // Manually drop this, to tell instruct the thread stop capturing output.
+        drop(drop_with_care);
 
-            // 安装完成后，发送安装完成事件
-            window_clone.emit("install-complete", ())?;
+        // 安装完成后，发送安装完成事件
+        install_thread_window_clone.emit("install-complete", ())?;
 
-            Ok(())
-        });
-    }
+        Ok(())
+    });
 
     // 在主线程中接收进度并发送事件
-    {
-        let window_clone = Arc::clone(&window); // 克隆 Arc
-        thread::spawn(move || -> anyhow::Result<()> {
-            let mut existing_detail = String::new();
+    let gui_update_thread = thread::spawn(move || -> anyhow::Result<()> {
+        let mut existing_detail = String::new();
 
-            loop {
-                // Install log should be created once the installation started,
-                // that's where we should start showing progress.
-                let Some(mut log_file) = LOG_FILE
-                    .get()
-                    .and_then(|path| fs::OpenOptions::new().read(true).open(path).ok())
-                else {
-                    continue;
-                };
+        loop {
+            // Install log should be created once the installation started,
+            // that's where we should start showing progress.
+            let Some(mut log_file) = LOG_FILE.get().and_then(|path| {
+                fs::OpenOptions::new()
+                    .read(true)
+                    .append(true)
+                    .open(path)
+                    .ok()
+            }) else {
+                continue;
+            };
 
-                // 接收进度
-                if let Ok(progress) = rx_progress.recv() {
-                    let _ = window_clone.emit("install-progress", progress);
-                }
-                // 接收详细信息
-                // Try reading log file and output it in the detail box
-                // FIXME: When running `rustup` or `cargo` to install toolchain or cargo tools,
-                // their output was printed in the desired log file, but this thread cannot read them continuously,
-                // it appears that this thread was blocked thus unable to update when
-                // installing toolchain and cargo tools.
-                let mut new_detail = String::new();
-                log_file.read_to_string(&mut new_detail)?;
-                if new_detail.len() > existing_detail.len() {
-                    let detail = &new_detail[existing_detail.len()..];
-                    let _ = window_clone.emit("install-details", detail.to_string());
-                    existing_detail = new_detail;
-                }
-
-                thread::sleep(Duration::from_millis(50));
+            // 接收进度
+            if let Ok(progress) = rx_progress.recv() {
+                let _ = main_thread_window_clone.emit("install-progress", progress);
             }
-        });
+            // 接收详细信息
+            // Try reading log file and output it in the detail box
+            // FIXME: When running `rustup` or `cargo` to install toolchain or cargo tools,
+            // their output was printed in the desired log file, but this thread cannot read them continuously,
+            // it appears that this thread was blocked thus unable to update when
+            // installing toolchain and cargo tools.
+            let mut new_detail = String::new();
+            log_file
+                .read_to_string(&mut new_detail)
+                .expect("install log file exists, but it cannot be read");
+            if new_detail.len() > existing_detail.len() {
+                let detail = &new_detail[existing_detail.len()..];
+                main_thread_window_clone.emit("install-details", detail.to_string())?;
+                existing_detail = new_detail;
+            }
+
+            if install_thread.is_finished() {
+                return if let Err(known_error) = install_thread
+                    .join()
+                    .expect("unexpected error occurs when running installation thread.")
+                {
+                    let error_str = known_error.to_string();
+
+                    // Write this error to log file
+                    log_file.write_all(error_str.as_bytes())?;
+
+                    main_thread_window_clone.emit("install-failed", error_str.clone())?;
+                    Err(known_error)
+                } else {
+                    Ok(())
+                };
+            }
+
+            thread::sleep(Duration::from_millis(50));
+        }
+    });
+
+    if gui_update_thread.is_finished() {
+        gui_update_thread
+            .join()
+            .expect("unexpected error occurs when handling installation progress")?;
     }
 
     Ok(())
@@ -253,24 +277,42 @@ fn component_list_to_map(list: Vec<&Component>) -> BTreeMap<String, ToolInfo> {
 }
 
 fn main() -> Result<()> {
-    let cli = parse_cli();
-
-    if !cli.no_gui {
-        tauri::Builder::default()
-            .invoke_handler(tauri::generate_handler![
-                close_window,
-                finish,
-                default_install_dir,
-                select_folder,
-                get_component_list,
-                install_toolchain,
-                run_app
-            ])
-            .run(tauri::generate_context!())
-            .context("error while running tauri application")?;
-    } else {
-        cli.execute()?;
+    match utils::lowercase_program_name() {
+        Some(s) if s.starts_with("xuanwu-manager") => {
+            let cli = parse_manager_cli();
+            if !cli.no_gui {
+                // TODO: Add manager UI to manage install toolchain/tools, including
+                // update, add, remove, etc...
+            } else {
+                cli.execute()?;
+            }
+        }
+        _ => {
+            // fallback to installer mode
+            let cli = parse_installer_cli();
+            if !cli.no_gui {
+                gui_main()?;
+            } else {
+                cli.execute()?;
+            }
+        }
     }
 
+    Ok(())
+}
+
+fn gui_main() -> Result<()> {
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            close_window,
+            finish,
+            default_install_dir,
+            select_folder,
+            get_component_list,
+            install_toolchain,
+            run_app
+        ])
+        .run(tauri::generate_context!())
+        .context("unknown error occurs while running tauri application")?;
     Ok(())
 }

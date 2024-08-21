@@ -11,7 +11,7 @@ fn extract_to_temp(filename: &str) -> TempDir {
     let cache_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("cache");
-    utils::mkdirs(&cache_dir).unwrap();
+    utils::ensure_dir(&cache_dir).unwrap();
 
     let temp_dir = tempfile::Builder::new()
         .prefix("extract_test_")

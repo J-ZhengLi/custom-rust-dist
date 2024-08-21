@@ -1,10 +1,10 @@
-use super::{GlobalOpt, Subcommands};
+use super::{GlobalOpt, ManagerSubcommands};
 use crate::core::try_it;
 use anyhow::Result;
 
 /// Execute `install` command.
-pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
-    let Subcommands::TryIt { path } = subcommand else {
+pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Result<()> {
+    let ManagerSubcommands::TryIt { path } = subcommand else {
         return Ok(());
     };
 

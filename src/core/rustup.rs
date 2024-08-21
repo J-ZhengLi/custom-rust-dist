@@ -78,7 +78,7 @@ impl Rustup {
         // Install rustup.
         self.generate_rustup(&rustup_init)?;
         // Install rust toolchain via rustup.
-        let rustup = config.cargo_home().join("bin").join(RUSTUP);
+        let rustup = config.cargo_bin().join(RUSTUP);
         self.download_rust_toolchain(&rustup, manifest)?;
 
         // Install extral rust component via rustup.

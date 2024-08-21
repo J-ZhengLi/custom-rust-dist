@@ -105,7 +105,7 @@ fn extract_zip<T: Sized>(path: &Path, root: &Path, indicator: ProgressIndicator<
         };
 
         if zip_file.is_dir() {
-            super::mkdirs(&out_path)?;
+            super::ensure_dir(&out_path)?;
         } else {
             super::ensure_parent_dir(&out_path)?;
             let mut out_file = std::fs::File::create(&out_path)?;
@@ -178,7 +178,7 @@ fn extract_7z<T: Sized>(path: &Path, root: &Path, indicator: ProgressIndicator<T
         let out_path = root.join(&entry_path);
 
         if entry.is_directory() {
-            super::mkdirs(&out_path).map_err(|_| {
+            super::ensure_dir(&out_path).map_err(|_| {
                 sevenz_rust::Error::other(format!(
                     "unable to create entry directory '{}'",
                     out_path.display()
@@ -264,7 +264,7 @@ fn extract_tar<T: Sized, R: Read>(
         let out_path = root.join(&entry_path);
 
         if entry.header().entry_type().is_dir() {
-            super::mkdirs(&out_path).with_context(|| {
+            super::ensure_dir(&out_path).with_context(|| {
                 format!(
                     "failed to create directory when extracting '{}'",
                     path.display()
