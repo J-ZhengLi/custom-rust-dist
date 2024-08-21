@@ -70,9 +70,9 @@ pub enum Subcommands {
         /// Set another path to install Rust.
         #[arg(long, value_name = "PATH", value_hint = ValueHint::DirPath)]
         prefix: Option<PathBuf>,
-        /// Specify another cargo registry url to replace `crates.io`.
-        #[arg(hide = true, long, value_name = "URL", value_hint = ValueHint::Url)]
-        registry_url: Option<Url>,
+        /// Specify another cargo registry url to replace `crates.io`, could be `sparse+URL`.
+        #[arg(hide = true, long)]
+        registry_url: Option<String>,
         /// Specify another cargo registry name to replace `crates.io`.
         #[arg(hide = true, long, default_value = "mirror", value_hint = ValueHint::Url)]
         registry_name: String,

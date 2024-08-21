@@ -70,16 +70,18 @@ pub fn get_component_list_from_manifest() -> Result<Vec<Component>> {
         );
     }
 
-    for (tool_name, tool_info) in manifest.current_target_tools() {
-        components.push(
-            Component::new(
-                tool_name,
-                manifest.get_tool_description(tool_name).unwrap_or_default(),
-            )
-            .with_group_name(manifest.group_name(tool_name))
-            .with_installer(tool_info)
-            .required(tool_info.is_required()),
-        );
+    if let Some(tools) = manifest.current_target_tools() {
+        for (tool_name, tool_info) in tools {
+            components.push(
+                Component::new(
+                    tool_name,
+                    manifest.get_tool_description(tool_name).unwrap_or_default(),
+                )
+                .with_group_name(manifest.group_name(tool_name))
+                .with_installer(tool_info)
+                .required(tool_info.is_required()),
+            );
+        }
     }
 
     Ok(components)

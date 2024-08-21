@@ -11,10 +11,7 @@ use super::{
 use crate::utils::{self, Extractable};
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 use url::Url;
 
@@ -42,7 +39,7 @@ declare_unfallible_url!(
 // make sure to change `installer/src/utils/types/InstallConfiguration.ts` as well.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct InstallConfiguration {
-    pub cargo_registry: Option<(String, Url)>,
+    pub cargo_registry: Option<(String, String)>,
     /// Path to install everything.
     ///
     /// Note that this folder will includes `.cargo` and `.rustup` folders as well.
@@ -98,7 +95,7 @@ impl InstallConfiguration {
         Ok(this)
     }
 
-    pub fn cargo_registry(mut self, registry: Option<(String, Url)>) -> Self {
+    pub fn cargo_registry(mut self, registry: Option<(String, String)>) -> Self {
         self.cargo_registry = registry;
         self
     }
@@ -160,21 +157,26 @@ impl InstallConfiguration {
     pub fn install_rust_with_optional_components(
         &mut self,
         manifest: &ToolsetManifest,
-        components: Option<Vec<&String>>,
+        override_components: Option<&[String]>,
     ) -> Result<()> {
         println!("installing rustup and rust toolchain");
-        Rustup::init().download_toolchain(self, manifest, components)?;
+        Rustup::init().download_toolchain(self, manifest, override_components)?;
         self.cargo_is_installed = true;
         Ok(())
     }
 
     /// Steps to install third-party softwares (excluding the ones that requires `cargo install`).
     pub(crate) fn install_tools(&self, manifest: &ToolsetManifest) -> Result<()> {
-        let tools_to_install = manifest.current_target_tools();
-        self.install_set_of_tools(tools_to_install)
+        let Some(tools_to_install) = manifest.current_target_tools() else {
+            return Ok(());
+        };
+        self.install_set_of_tools(tools_to_install.iter())
     }
 
-    pub fn install_set_of_tools(&self, tools: BTreeMap<&String, &ToolInfo>) -> Result<()> {
+    pub fn install_set_of_tools<'a, M: IntoIterator<Item = (&'a String, &'a ToolInfo)>>(
+        &self,
+        tools: M,
+    ) -> Result<()> {
         for (name, tool) in tools {
             // Ignore tools that need to be installed using `cargo install`
             if need_cargo_install(tool) {
@@ -189,11 +191,16 @@ impl InstallConfiguration {
 
     /// Steps to install `cargo` compatible softwares, should only be called after toolchain installation.
     pub(crate) fn cargo_install(&self, manifest: &ToolsetManifest) -> Result<()> {
-        let tools_to_install = manifest.current_target_tools();
-        self.cargo_install_set_of_tools(tools_to_install)
+        let Some(tools_to_install) = manifest.current_target_tools() else {
+            return Ok(());
+        };
+        self.cargo_install_set_of_tools(tools_to_install.iter())
     }
 
-    pub fn cargo_install_set_of_tools(&self, tools: BTreeMap<&String, &ToolInfo>) -> Result<()> {
+    pub fn cargo_install_set_of_tools<'a, M: IntoIterator<Item = (&'a String, &'a ToolInfo)>>(
+        &self,
+        tools: M,
+    ) -> Result<()> {
         for (name, tool) in tools {
             if need_cargo_install(tool) {
                 println!("installing '{name}'");
@@ -210,7 +217,7 @@ impl InstallConfiguration {
     pub fn config_cargo(&self) -> Result<()> {
         let mut config = CargoConfig::new();
         if let Some((name, url)) = &self.cargo_registry {
-            config.add_source(name, url.to_owned(), true);
+            config.add_source(name, url, true);
         }
 
         let config_toml = config.to_toml()?;

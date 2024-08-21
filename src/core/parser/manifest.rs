@@ -5,6 +5,7 @@ use std::ops::Deref;
 use std::{collections::BTreeMap, path::PathBuf};
 
 use anyhow::Result;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use tempfile::TempDir;
 use url::Url;
@@ -13,6 +14,9 @@ use crate::core::install::InstallConfiguration;
 use crate::utils;
 
 use super::TomlParser;
+
+/// A map of tools, contains the name and source package information.
+pub type ToolMap = IndexMap<String, ToolInfo>;
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
@@ -58,21 +62,17 @@ impl ToolsetManifest {
     }
 
     /// Get a map of [`Tool`] that are available only in current target.
-    pub fn current_target_tools(&self) -> BTreeMap<&String, &ToolInfo> {
+    pub fn current_target_tools(&self) -> Option<&ToolMap> {
         let cur_target = env!("TARGET");
         // Clippy bug, the `map(|(k, v)| (k, v))` cannot be removed
         #[allow(clippy::map_identity)]
-        self.tools
-            .target
-            .get(cur_target)
-            .map(|map| map.iter().map(|(k, v)| (k, v)).collect())
-            .unwrap_or_default()
+        self.tools.target.get(cur_target)
     }
 
     /// Get a mut reference to the map of [`Tool`] that are available only in current target.
     ///
     /// Return `None` if there are no available tools in the current target.
-    pub fn current_target_tools_mut(&mut self) -> Option<&mut BTreeMap<String, ToolInfo>> {
+    pub fn current_target_tools_mut(&mut self) -> Option<&mut ToolMap> {
         let cur_target = env!("TARGET");
         // Clippy bug, the `map(|(k, v)| (k, v))` cannot be removed
         #[allow(clippy::map_identity)]
@@ -141,13 +141,13 @@ pub(crate) struct Tools {
     #[serde(default)]
     group: BTreeMap<String, HashSet<String>>,
     #[serde(default)]
-    target: BTreeMap<String, BTreeMap<String, ToolInfo>>,
+    target: BTreeMap<String, ToolMap>,
 }
 
 impl Tools {
     pub(crate) fn new<I>(targeted_tools: I) -> Tools
     where
-        I: IntoIterator<Item = (String, BTreeMap<String, ToolInfo>)>,
+        I: IntoIterator<Item = (String, ToolMap)>,
     {
         Self {
             descriptions: BTreeMap::default(),
@@ -302,7 +302,7 @@ t1 = "0.1.0"
 t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
 "#;
 
-        let mut x86_64_windows_msvc_tools = BTreeMap::new();
+        let mut x86_64_windows_msvc_tools = ToolMap::new();
         x86_64_windows_msvc_tools.insert("t1".to_string(), tool_info!("0.1.0"));
         x86_64_windows_msvc_tools.insert(
             "t2".to_string(),
@@ -313,14 +313,14 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
             tool_info!("https://example.com/path/to/tool", None::<&str>),
         );
 
-        let mut x86_64_linux_gnu_tools = BTreeMap::new();
+        let mut x86_64_linux_gnu_tools = ToolMap::new();
         x86_64_linux_gnu_tools.insert("t1".to_string(), tool_info!("0.1.0"));
         x86_64_linux_gnu_tools.insert(
             "t2".to_string(),
             tool_info!(PathBuf::from("/path/to/local"), None::<&str>),
         );
 
-        let mut aarch64_linux_gnu_tools = BTreeMap::new();
+        let mut aarch64_linux_gnu_tools = ToolMap::new();
         aarch64_linux_gnu_tools.insert("t1".to_string(), tool_info!("0.1.0"));
         aarch64_linux_gnu_tools.insert(
             "t4".to_string(),
@@ -370,7 +370,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
             tools: Tools::new([
                 (
                     "x86_64-pc-windows-msvc".into(),
-                    BTreeMap::from_iter([
+                    ToolMap::from_iter([
                         ("buildtools".to_string(), tool_info!(PathBuf::from("tests/cache/BuildTools-With-SDK.zip"), Some("1"))),
                         ("cargo-llvm-cov".to_string(), tool_info!("https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-pc-windows-msvc.zip", Some("0.6.11"))),
                         ("vscode".to_string(), tool_info!(PathBuf::from("tests/cache/VSCode-win32-x64-1.91.1.zip"), Some("1.91.1"))),
@@ -380,7 +380,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
                 ),
                 (
                     "x86_64-pc-windows-gnu".into(),
-                    BTreeMap::from_iter([
+                    ToolMap::from_iter([
                         ("mingw64".to_string(), tool_info!(PathBuf::from("tests/cache/x86_64-13.2.0-release-posix-seh-msvcrt-rt_v11-rev1.7z"), Some("13.2.0"))),
                         ("vscode".to_string(), tool_info!(PathBuf::from("tests/cache/VSCode-win32-x64-1.91.1.zip"), Some("1.91.1"))),
                         ("vscode-rust-analyzer".to_string(), tool_info!(PathBuf::from("tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix"), Some("0.4.2054"))),
@@ -389,7 +389,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
                 ),
                 (
                     "x86_64-unknown-linux-gnu".into(),
-                    BTreeMap::from_iter([
+                    ToolMap::from_iter([
                         ("cargo-llvm-cov".to_string(), tool_info!("https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz", Some("0.6.11"))),
                         ("flamegraph".to_string(), tool_info!("https://github.com/flamegraph-rs/flamegraph", None::<&str>, Some("v0.6.5"), None::<&str>)),
                         ("cargo-expand".to_string(), tool_info!("1.0.88")),
@@ -397,7 +397,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
                 ),
                 (
                     "aarch64-apple-darwin".into(),
-                    BTreeMap::from_iter([
+                    ToolMap::from_iter([
                         ("cargo-llvm-cov".to_string(), tool_info!("https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-aarch64-apple-darwin.tar.gz", Some("0.6.11"))),
                         ("flamegraph".to_string(), tool_info!("https://github.com/flamegraph-rs/flamegraph", None::<&str>, Some("v0.6.5"), None::<&str>)),
                         ("cargo-expand".to_string(), tool_info!("1.0.88")),
@@ -417,11 +417,11 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
 
         #[cfg(all(windows, target_env = "gnu"))]
         assert_eq!(
-            tools,
-            BTreeMap::from([
+            tools.unwrap(),
+            &ToolMap::from([
                 (
-                    &"mingw64".into(),
-                    &tool_info!(
+                    "mingw64".into(),
+                    tool_info!(
                         PathBuf::from(
                             "tests/cache/x86_64-13.2.0-release-posix-seh-msvcrt-rt_v11-rev1.7z"
                         ),
@@ -429,69 +429,69 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
                     )
                 ),
                 (
-                    &"vscode".into(),
-                    &tool_info!(
+                    "vscode".into(),
+                    tool_info!(
                         PathBuf::from("tests/cache/VSCode-win32-x64-1.91.1.zip"),
                         Some("1.91.1")
                     )
                 ),
                 (
-                    &"vscode-rust-analyzer".into(),
-                    &tool_info!(
+                    "vscode-rust-analyzer".into(),
+                    tool_info!(
                         PathBuf::from(
                             "tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix"
                         ),
                         Some("0.4.2054")
                     )
                 ),
-                (&"cargo-expand".into(), &tool_info!("1.0.88")),
+                ("cargo-expand".into(), tool_info!("1.0.88")),
             ])
         );
 
         #[cfg(all(windows, target_env = "msvc"))]
         assert_eq!(
-            tools,
-            BTreeMap::from([
+            tools.unwrap(),
+            &ToolMap::from([
                 (
-                    &"buildtools".into(),
-                    &tool_info!(
+                    "buildtools".into(),
+                    tool_info!(
                         "tests/cache/BuildTools-With-SDK.zip".into(),
                         Some("1")
                     )
                 ),
                 (
-                    &"cargo-llvm-cov".into(),
-                    &tool_info!(
+                    "cargo-llvm-cov".into(),
+                    tool_info!(
                         "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-pc-windows-msvc.zip",
                         Some("0.6.11")
                     )
                 ),
                 (
-                    &"vscode".into(),
-                    &tool_info!(
+                    "vscode".into(),
+                    tool_info!(
                         "tests/cache/VSCode-win32-x64-1.91.1.zip".into(),
                         Some("1.91.1")
                     )
                 ),
                 (
-                    &"vscode-rust-analyzer".into(),
-                    &tool_info!(
+                    "vscode-rust-analyzer".into(),
+                    tool_info!(
                         "tests/cache/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix".into(),
                         Some("0.4.2054")
                     )
                 ),
                 (
-                    &"cargo-expand".into(),
-                    &tool_info!("1.0.88"),
+                    "cargo-expand".into(),
+                    tool_info!("1.0.88"),
                 ),
             ])
         );
 
         #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))]
-        assert_eq!(tools, BTreeMap::from([
-            (&"cargo-llvm-cov".into(), &tool_info!("https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz", Some("0.6.11"))),
-            (&"flamegraph".into(), &tool_info!("https://github.com/flamegraph-rs/flamegraph", None::<&str>, Some("v0.6.5"), None::<&str>)),
-            (&"cargo-expand".into(), &tool_info!("1.0.88")),
+        assert_eq!(tools.unwrap(), &ToolMap::from([
+            ("cargo-llvm-cov".into(), tool_info!("https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz", Some("0.6.11"))),
+            ("flamegraph".into(), tool_info!("https://github.com/flamegraph-rs/flamegraph", None::<&str>, Some("v0.6.5"), None::<&str>)),
+            ("cargo-expand".into(), tool_info!("1.0.88")),
         ]));
 
         // TODO: Add test for macos.

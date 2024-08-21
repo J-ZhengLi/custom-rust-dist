@@ -33,9 +33,10 @@ vscode-rust-analyzer = { path = "packages/x86_64-pc-windows-gnu/rust-lang.rust-a
 cargo-expand = "1.0.88"
 
 [tools.target.x86_64-unknown-linux-gnu]
-cargo-llvm-cov = { url = "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz", version = "0.6.11" }
-flamegraph = { git = "https://github.com/flamegraph-rs/flamegraph", tag = "v0.6.5" }
-cargo-expand = "1.0.88"
+vscode = { path = "packages/x86_64-unknown-linux-gnu/code-stable-x64-1723659430.tar.gz", version = "1.91.1" }
+# cargo-llvm-cov = { url = "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-unknown-linux-gnu.tar.gz", version = "0.6.11" }
+# flamegraph = { git = "https://github.com/flamegraph-rs/flamegraph", tag = "v0.6.5" }
+# cargo-expand = "1.0.88"
 
 [tools.target.aarch64-apple-darwin]
 cargo-llvm-cov = { url = "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-aarch64-apple-darwin.tar.gz", version = "0.6.11" }

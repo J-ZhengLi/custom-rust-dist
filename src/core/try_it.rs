@@ -32,7 +32,7 @@ pub fn try_it(path: Option<&Path>) -> Result<()> {
         .iter()
         .find_map(|p| utils::cmd_exist(p).then_some(*p))
         .unwrap_or(file_explorer);
-    if utils::shell_execute(program, &[&example_dir]).is_err() {
+    if utils::execute(program, &[&example_dir]).is_err() {
         #[cfg(windows)]
         if program == file_explorer {
             // explorer.exe return 1 even on success for some weird reason.

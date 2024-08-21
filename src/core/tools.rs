@@ -194,7 +194,7 @@ impl PluginType {
                             "{op}ing extension '{}' for program '{program}'",
                             plugin_path.display()
                         );
-                        utils::shell_execute(
+                        utils::execute(
                             program,
                             &[arg_opt.as_str(), utils::path_to_str(plugin_path)?],
                         )?;
