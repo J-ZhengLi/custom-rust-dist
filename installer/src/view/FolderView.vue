@@ -8,24 +8,7 @@ const { routerPush, routerBack } = useCustomRouter();
 const diskRequire = ref(33);
 
 function handleNextClick() {
-  routerPush({
-    path: '/components',
-    query: { path: installConf.value.path },
-  });
-}
-
-async function showInstallDir() {
-  const installPath = localStorage.getItem('installPath');
-  if (installPath !== null) {
-    installConf.value.path = installPath;
-    return;
-  }
-
-  const path = await invokeCommand('default_install_dir');
-  if (typeof path === 'string' && path.trim() !== '') {
-    localStorage.setItem('installPath', path);
-    installConf.value.path = path;
-  }
+  routerPush('/components');
 }
 
 function openFolder() {
@@ -33,16 +16,11 @@ function openFolder() {
 }
 
 onMounted(() => {
-  showInstallDir();
-
   // 监听文件夹选择事件
   event.listen('folder-selected', (event) => {
     const path = event.payload;
-    if (typeof path === 'string' && path.trim() !== '') {
-      installConf.value.path = path;
-      localStorage.setItem('installPath', path);
-    } else {
-      installConf.value.path = localStorage.getItem('installPath') || '';
+    if (typeof path === 'string') {
+      installConf.setPath(path.trim());
     }
   });
 });
@@ -55,10 +33,18 @@ onMounted(() => {
       <p>Rust的本体和组件将会一起安装到该路径中。</p>
       <div flex="~ items-center">
         <base-input
-          v-bind:value="installConf.path"
+          v-bind:value="installConf.path.value"
           flex="1"
           type="text"
           placeholder="选择一个文件夹"
+          @change="
+            (event: Event) =>
+              installConf.setPath((event.target as HTMLInputElement).value)
+          "
+          @keydown.enter="
+            (event: Event) =>
+              installConf.setPath((event.target as HTMLInputElement).value)
+          "
         />
         <base-button ml="12px" @click="openFolder">选择文件夹</base-button>
       </div>
