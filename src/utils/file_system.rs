@@ -35,20 +35,21 @@ pub fn stringify_path<P: AsRef<Path>>(path: P) -> Result<String> {
         })
 }
 
-pub fn mkdirs<P: AsRef<Path>>(path: P) -> Result<()> {
-    fs::create_dir_all(path.as_ref()).with_context(|| {
-        format!(
-            "unable to create specified directory '{}'",
-            path.as_ref().display()
-        )
-    })
+pub fn ensure_dir<P: AsRef<Path>>(path: P) -> Result<()> {
+    if !path.as_ref().is_dir() {
+        fs::create_dir_all(path.as_ref()).with_context(|| {
+            format!(
+                "unable to create specified directory '{}'",
+                path.as_ref().display()
+            )
+        })?;
+    }
+    Ok(())
 }
 
 pub fn ensure_parent_dir<P: AsRef<Path>>(path: P) -> Result<()> {
     if let Some(p) = path.as_ref().parent() {
-        if !p.exists() {
-            mkdirs(p)?;
-        }
+        ensure_dir(p)?;
     }
     Ok(())
 }
@@ -150,8 +151,6 @@ where
 }
 
 /// Copy file or directory to a specified path.
-///
-/// Similar to [`copy_file_to`], except this will recursively copy directory as well.
 pub fn copy_as<P, Q>(from: P, to: Q) -> Result<()>
 where
     P: AsRef<Path>,

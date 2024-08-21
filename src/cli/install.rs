@@ -7,22 +7,22 @@ use crate::core::{try_it, EnvConfig};
 use crate::manifest::baked_in_manifest;
 use crate::utils;
 
-use super::{GlobalOpt, Subcommands};
+use super::Installer;
 
 use anyhow::Result;
 
-/// Execute `install` command.
-pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
-    let Subcommands::Install {
+/// Perform installer actions.
+///
+/// This will setup the environment and install everything user selected components.
+pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
+    let Installer {
         prefix,
         registry_url,
         registry_name,
         rustup_dist_server,
         rustup_update_root,
-    } = subcommand
-    else {
-        return Ok(());
-    };
+        ..
+    } = installer;
 
     let cargo_registry = registry_url
         .as_ref()
@@ -32,7 +32,7 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
         .unwrap_or_else(utils::home_dir)
         .join(env!("CARGO_PKG_NAME"));
 
-    let mut config = InstallConfiguration::init(install_dir, false)?
+    let mut config = InstallConfiguration::init(&install_dir, false)?
         .cargo_registry(cargo_registry)
         .rustup_dist_server(
             rustup_dist_server
@@ -62,7 +62,7 @@ pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
         "Rust is installed, \
         this setup will soon create an example project at current directory for you to try Rust!"
     );
-    try_it::try_it(None)?;
+    try_it::try_it(Some(&install_dir))?;
 
     Ok(())
 }
@@ -83,7 +83,7 @@ mod tests {
         std::fs::create_dir_all(&cache_dir).unwrap();
 
         let install_root = tempfile::Builder::new().tempdir_in(&cache_dir).unwrap();
-        let _config = InstallConfiguration::init(install_root.path().to_path_buf(), true).unwrap();
+        let _config = InstallConfiguration::init(install_root.path(), true).unwrap();
         let _manifest = ToolsetManifest::from_str(
             &utils::read_to_string(
                 PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/toolset_manifest.toml"),

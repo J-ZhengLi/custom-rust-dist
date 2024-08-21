@@ -3,13 +3,13 @@
 use crate::cli::UninstallCommand;
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
 
-use super::{GlobalOpt, Subcommands};
+use super::{GlobalOpt, ManagerSubcommands};
 
 use anyhow::Result;
 
 /// Execute `uninstall` command.
-pub(super) fn execute(subcommand: &Subcommands, _opt: GlobalOpt) -> Result<()> {
-    let Subcommands::Uninstall {
+pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Result<()> {
+    let ManagerSubcommands::Uninstall {
         commands: Some(uninst_cmd),
     } = subcommand
     else {

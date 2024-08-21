@@ -30,9 +30,35 @@ macro_rules! declare_unfallible_url {
     };
 }
 
+macro_rules! declare_install_paths {
+    ($($path_ident:ident),+) => {
+        $(
+            static $path_ident: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+        )*
+    };
+}
+
+/// Get the once-locked path under install_dir, and create that directory if it does not exists.
+macro_rules! get_path_and_create {
+    ($path_ident:ident, $init:expr) => {{
+        let __path__ = $path_ident.get_or_init(|| $init);
+        $crate::utils::ensure_dir(__path__)
+            .expect("unable to create one of the directory under installation folder");
+        __path__
+    }};
+}
+
 declare_unfallible_url!(
     default_rustup_dist_server(DEFAULT_RUSTUP_DIST_SERVER) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup";
     default_rustup_update_root(DEFAULT_RUSTUP_UPDATE_ROOT) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
+);
+
+declare_install_paths!(
+    CARGO_HOME_DIR,
+    CARGO_BIN_DIR,
+    RUSTUP_HOME_DIR,
+    TEMP_DIR,
+    TOOLS_DIR
 );
 
 // If you change any public fields in this struct,
@@ -67,29 +93,35 @@ impl Default for InstallConfiguration {
 }
 
 impl InstallConfiguration {
-    pub fn init(install_dir: PathBuf, dry_run: bool) -> Result<Self> {
+    pub fn init(install_dir: &Path, dry_run: bool) -> Result<Self> {
         let this = Self {
-            install_dir,
+            install_dir: install_dir.to_path_buf(),
             ..Default::default()
         };
 
         if !dry_run {
             // Create a new folder to hold installation
             let folder = &this.install_dir;
-            utils::mkdirs(folder)?;
+            utils::ensure_dir(folder)?;
 
-            // Create a copy of this binary to install dir
-            let self_exe = std::env::current_exe()?;
-            let cargo_bin_dir = this.cargo_home().join("bin");
-            utils::mkdirs(&cargo_bin_dir)?;
-            utils::copy_file_to(self_exe, &cargo_bin_dir)?;
+            // TODO: remove this condition check after the uninstallation implementation is finished.
+            if env!("PROFILE") == "debug" {
+                // Create a copy of this binary to CARGO_HOME/bin
+                let self_exe = std::env::current_exe()?;
+                // promote this installer to manager
+                let manager_name = self_exe
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|name| name.replace("installer", "manager"))
+                    .unwrap_or(format!("manager{}", utils::EXE_EXT));
 
-            // Create tools directory to store third party tools
-            utils::mkdirs(this.tools_dir())?;
+                let manager_exe = this.cargo_bin().join(manager_name);
+                utils::copy_as(self_exe, &manager_exe)?;
 
-            #[cfg(windows)]
-            // Create registry entry to add this program into "installed programs".
-            super::os::windows::do_add_to_programs(&cargo_bin_dir)?;
+                #[cfg(windows)]
+                // Create registry entry to add this program into "installed programs".
+                super::os::windows::do_add_to_programs(&manager_exe)?;
+            }
         }
 
         Ok(this)
@@ -110,24 +142,24 @@ impl InstallConfiguration {
         self
     }
 
-    pub(crate) fn cargo_home(&self) -> PathBuf {
-        self.install_dir.join(".cargo")
+    pub(crate) fn cargo_home(&self) -> &Path {
+        get_path_and_create!(CARGO_HOME_DIR, self.install_dir.join(".cargo"))
     }
 
-    pub(crate) fn cargo_bin(&self) -> PathBuf {
-        self.cargo_home().join("bin")
+    pub(crate) fn cargo_bin(&self) -> &Path {
+        get_path_and_create!(CARGO_BIN_DIR, self.cargo_home().join("bin"))
     }
 
-    pub(crate) fn rustup_home(&self) -> PathBuf {
-        self.install_dir.join(".rustup")
+    pub(crate) fn rustup_home(&self) -> &Path {
+        get_path_and_create!(RUSTUP_HOME_DIR, self.install_dir.join(".rustup"))
     }
 
-    pub(crate) fn temp_root(&self) -> PathBuf {
-        self.install_dir.join("temp")
+    pub(crate) fn temp_root(&self) -> &Path {
+        get_path_and_create!(TEMP_DIR, self.install_dir.join("temp"))
     }
 
-    pub(crate) fn tools_dir(&self) -> PathBuf {
-        self.install_dir.join("tools")
+    pub(crate) fn tools_dir(&self) -> &Path {
+        get_path_and_create!(TOOLS_DIR, self.install_dir.join("tools"))
     }
 
     pub(crate) fn env_vars(&self) -> Result<Vec<(&'static str, String)>> {
@@ -222,11 +254,7 @@ impl InstallConfiguration {
 
         let config_toml = config.to_toml()?;
         if !config_toml.trim().is_empty() {
-            // make sure cargo_home dir exists
-            let cargo_home = self.cargo_home();
-            utils::mkdirs(&cargo_home)?;
-
-            let config_path = cargo_home.join("config.toml");
+            let config_path = self.cargo_home().join("config.toml");
             utils::write_file(config_path, &config_toml, false)?;
         }
 
@@ -236,12 +264,10 @@ impl InstallConfiguration {
     /// Creates a temporary directory under `install_dir/temp`, with a certain prefix.
     pub(crate) fn create_temp_dir(&self, prefix: &str) -> Result<TempDir> {
         let root = self.temp_root();
-        // Ensure temp directory
-        utils::mkdirs(&root)?;
 
         tempfile::Builder::new()
             .prefix(&format!("{prefix}_"))
-            .tempdir_in(&root)
+            .tempdir_in(root)
             .with_context(|| format!("unable to create temp directory under '{}'", root.display()))
     }
 }
@@ -263,8 +289,8 @@ fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> R
                 "cargo",
                 &["install", name, "--version", version],
                 [
-                    (CARGO_HOME, utils::path_to_str(&config.cargo_home())?),
-                    (RUSTUP_HOME, utils::path_to_str(&config.rustup_home())?),
+                    (CARGO_HOME, utils::path_to_str(config.cargo_home())?),
+                    (RUSTUP_HOME, utils::path_to_str(config.rustup_home())?),
                 ],
             )?;
         }
@@ -291,8 +317,8 @@ fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> R
                 "cargo",
                 &args,
                 [
-                    (CARGO_HOME, utils::path_to_str(&config.cargo_home())?),
-                    (RUSTUP_HOME, utils::path_to_str(&config.rustup_home())?),
+                    (CARGO_HOME, utils::path_to_str(config.cargo_home())?),
+                    (RUSTUP_HOME, utils::path_to_str(config.rustup_home())?),
                 ],
             )?;
         }

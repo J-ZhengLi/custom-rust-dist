@@ -55,7 +55,10 @@ pub fn get_component_list_from_manifest() -> Result<Vec<Component>> {
             .toolchain_component()
             .required(true),
     ];
-    let manifest = manifest::baked_in_manifest()?;
+
+    // TODO: Download manifest form remote server for online build
+    let mut manifest = manifest::baked_in_manifest()?;
+    manifest.adjust_paths()?;
 
     for toolchain_components in manifest.toolchain_components() {
         components.push(

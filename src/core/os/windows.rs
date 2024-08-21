@@ -95,7 +95,7 @@ pub(crate) mod rustup {
         })
     }
 
-    pub(crate) fn do_add_to_programs(bin_dir: &Path) -> Result<()> {
+    pub(crate) fn do_add_to_programs(program_bin: &Path) -> Result<()> {
         use std::path::PathBuf;
 
         let key = RegKey::predef(HKEY_CURRENT_USER)
@@ -115,14 +115,8 @@ pub(crate) mod rustup {
             }
         }
 
-        let cur_exe_path = env::current_exe()?;
-        let exe_name = cur_exe_path
-            .file_name()
-            .unwrap_or_else(|| unreachable!("executable should always have a filename"));
-        let path = bin_dir.join(exe_name);
-
         let mut uninstall_cmd = OsString::from("\"");
-        uninstall_cmd.push(path);
+        uninstall_cmd.push(program_bin);
         uninstall_cmd.push("\"");
 
         // FIXME: Remove this if the GUI app supports uninstallation with ui.
