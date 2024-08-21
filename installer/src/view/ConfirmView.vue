@@ -1,23 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { installConf, invokeCommand } from '../utils';
-import type { Component } from '../utils';
 import { useCustomRouter } from '../router';
 import ScrollBox from '../components/ScrollBox.vue';
+import { computed } from 'vue';
 
 const { routerPush, routerBack } = useCustomRouter();
-const path = computed(() => installConf.value.path);
-const components = computed(() =>
-  installConf.value.components
-    .filter((i) => i.checked) // 筛选选中组件
-    .map((item: Component) => {
-      return { ...item, desc: item.desc.join(''), checked: undefined };
-    })
-);
+const path = installConf.path;
+const components = computed(() => installConf.getCheckedComponents());
 
 function handleNextClick() {
   invokeCommand('install_toolchain', {
-    components_list: components.value,
+    components_list: components,
     install_dir: path.value,
   }).then(() => routerPush('/install'));
 }
@@ -33,7 +26,7 @@ function handleNextClick() {
     <scroll-box flex="1" mx="12px" overflow="auto">
       <p mt="0" mb="8px">安装位置：</p>
       <base-input
-        :value="installConf.path"
+        :value="path"
         border-color="focus:base"
         ml="12px"
         w="90%"
