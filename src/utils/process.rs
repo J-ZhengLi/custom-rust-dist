@@ -1,10 +1,19 @@
 use std::env;
 use std::ffi::OsStr;
 use std::fmt::Debug;
-use std::process::{Command, Output, Stdio};
+use std::process::{Command, Stdio};
 
-use anyhow::{bail, Context, Result};
-use cfg_if::cfg_if;
+use anyhow::{Context, Result};
+
+cfg_if::cfg_if! {
+    if #[cfg(windows)] {
+        const SHELL: &str = "cmd.exe";
+        const START_ARG: &str = "/C";
+    } else {
+        const SHELL: &str = "sh";
+        const START_ARG: &str = "-c";
+    }
+}
 
 macro_rules! exec_err {
     ($p:expr, $args:expr, $ext_msg:expr) => {
@@ -21,61 +30,7 @@ macro_rules! exec_err {
     };
 }
 
-/// Execute a command as child process, wait for it to finish then collect its std output.
-///
-/// # Errors
-///
-/// This will return errors if:
-/// 1. The specific command cannot be execute.
-/// 2. The command was executed but failed.
-/// 3. The standard output contains non-UTF8 characteres thus cannot be parsed from bytes.
-pub fn stdout_output<P, A>(program: P, args: &[A]) -> Result<String>
-where
-    P: AsRef<OsStr>,
-    A: AsRef<OsStr>,
-{
-    let output = output(program.as_ref(), args)?;
-    if !output.status.success() {
-        bail!(
-            "executing `{} {}` returns error: {}",
-            program.as_ref().to_string_lossy().to_string(),
-            args.iter()
-                .map(|oss| oss.as_ref().to_string_lossy().to_string())
-                .collect::<Vec<_>>()
-                .join(" "),
-            String::from_utf8_lossy(&output.stderr),
-        );
-    }
-
-    Ok(String::from_utf8(output.stdout)?)
-}
-
-pub fn output_with_env<'a, P, A, I>(program: P, args: &[A], env: I) -> Result<Output>
-where
-    P: AsRef<OsStr>,
-    A: AsRef<OsStr>,
-    I: IntoIterator<Item = (&'a str, &'a str)>,
-{
-    Command::new(program.as_ref())
-        .args(args)
-        .envs(env)
-        .output()
-        .with_context(|| exec_err!(program, args, ""))
-}
-
-/// Execute a command as child process, wait for it to finish, and return its [`Output`].
-///
-/// # Errors
-/// This will return errors if the specific command cannot be execute.
-pub fn output<P, A>(program: P, args: &[A]) -> Result<Output>
-where
-    P: AsRef<OsStr>,
-    A: AsRef<OsStr>,
-{
-    let output = output_with_env(program, args, [])?;
-    Ok(output)
-}
-
+/// Check if a command/program exist in the `PATH`.
 pub fn cmd_exist(cmd: &str) -> bool {
     let path = env::var_os("PATH").unwrap_or_default();
     env::split_paths(&path)
@@ -83,65 +38,145 @@ pub fn cmd_exist(cmd: &str) -> bool {
         .any(|p| p.exists())
 }
 
-/// Execute a command as child process, wait for it to finish.
+/// Execute a commands using [`Command`] api.
+///
+/// # Platform specific behaviors:
+/// - On Windows, this will launch a `cmd.exe` process and invoke the command there.
+/// - On Linux, this invoke the command directly.
+///
+/// # Errors
+///
+/// This will return errors if:
+/// 1. The specific command cannot be execute.
+/// 2. The command was executed but failed.
 pub fn execute<P, A>(program: P, args: &[A]) -> Result<()>
 where
     P: AsRef<OsStr> + Debug,
     A: AsRef<OsStr>,
 {
-    execute_with_env(program, args, [])
+    #[cfg(windows)]
+    shell_execute_with_env(program, args, [])?;
+    #[cfg(not(windows))]
+    execute_program_with_env(program, args, [])?;
+
+    Ok(())
 }
 
+/// Execute a commands using [`Command`] api, with environment variables.
+///
+/// # Platform specific behaviors:
+/// - On Windows, this will launch a `cmd.exe` process and invoke the command there.
+/// - On Linux, this invoke the command directly.
+///
+/// # Errors
+///
+/// This will return errors if:
+/// 1. The specific command cannot be execute.
+/// 2. The command was executed but failed.
 pub fn execute_with_env<'a, P, A, I>(program: P, args: &[A], envs: I) -> Result<()>
 where
     P: AsRef<OsStr> + Debug,
     A: AsRef<OsStr>,
     I: IntoIterator<Item = (&'a str, &'a str)>,
 {
-    let status = Command::new(program.as_ref())
+    #[cfg(windows)]
+    shell_execute_with_env(program, args, envs)?;
+    #[cfg(not(windows))]
+    execute_program_with_env(program, args, envs)?;
+
+    Ok(())
+}
+
+/// Execute commands by directly invoking program, with environment variables.
+///
+/// # Errors
+///
+/// This will return errors if:
+/// 1. The specific command cannot be execute.
+/// 2. The command was executed but failed.
+pub fn execute_program_with_env<'a, P, A, I>(program: P, args: &[A], envs: I) -> Result<()>
+where
+    P: AsRef<OsStr> + Debug,
+    A: AsRef<OsStr>,
+    I: IntoIterator<Item = (&'a str, &'a str)>,
+{
+    let mut command = Command::new(program.as_ref());
+    command
         .args(args)
         .envs(envs)
         .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()
-        .with_context(|| exec_err!(program, args, ""))?;
+        .stderr(Stdio::inherit());
 
+    // Prevent CMD window popup
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(winapi::um::winbase::CREATE_NO_WINDOW);
+    }
+
+    let output = command
+        .output()
+        .with_context(|| exec_err!(program, args, ""))?;
     // 检查子进程的退出状态
-    if !status.success() {
-        return Err(exec_err!(program, args, ""));
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(exec_err!(program, args, stderr));
     }
 
     Ok(())
 }
 
-/// Execute by invoking shell program, such as `sh` on Unix, `cmd` on Windows.
+/// Execute commands by invoking shell program, such as `sh` on Unix, `cmd` on Windows.
+///
+/// # Errors
+///
+/// This will return errors if:
+/// 1. The specific command cannot be execute.
+/// 2. The command was executed but failed.
 pub fn shell_execute<P, A>(program: P, args: &[A]) -> Result<()>
 where
     P: AsRef<OsStr> + Debug,
     A: AsRef<OsStr>,
 {
-    cfg_if! {
-        if #[cfg(windows)] {
-            let shell = "cmd.exe";
-            let start_arg = "/C";
-        } else {
-            let shell = "sh";
-            let start_arg = "-c";
-        }
-    }
+    shell_execute_with_env(program, args, [])
+}
 
-    let status = Command::new(shell)
-        .arg(start_arg)
+/// Execute commands by invoking shell program, such as `sh` on Unix, `cmd` on Windows.
+///
+/// # Errors
+///
+/// This will return errors if:
+/// 1. The specific command cannot be execute.
+/// 2. The command was executed but failed.
+pub fn shell_execute_with_env<'a, P, A, I>(program: P, args: &[A], vars: I) -> Result<()>
+where
+    P: AsRef<OsStr> + Debug,
+    A: AsRef<OsStr>,
+    I: IntoIterator<Item = (&'a str, &'a str)>,
+{
+    let mut command = Command::new(SHELL);
+    command
+        .arg(START_ARG)
         .arg(&program)
         .args(args)
+        .envs(vars)
         .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .status()
-        .with_context(|| exec_err!(program, args, ""))?;
+        .stderr(Stdio::inherit());
 
+    // Prevent CMD window popup
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(winapi::um::winbase::CREATE_NO_WINDOW);
+    }
+
+    let output = command
+        .output()
+        .with_context(|| exec_err!(program, args, ""))?;
     // 检查子进程的退出状态
-    if !status.success() {
-        return Err(exec_err!(program, args, ""));
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(exec_err!(program, args, stderr));
     }
 
     Ok(())

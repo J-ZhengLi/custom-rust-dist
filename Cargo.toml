@@ -42,7 +42,7 @@ indexmap = { version = "2", features = ["serde"] }
 
 [target."cfg(windows)".dependencies]
 winreg = "0.52.0"
-winapi = { version = "0.3", features = ["winuser"] }
+winapi = { version = "0.3", features = ["winuser", "winbase"] }
 cc = "1"
 
 [target."cfg(windows)".dependencies.windows-sys]
