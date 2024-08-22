@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc, OnceLock};
@@ -76,12 +76,13 @@ macro_rules! steps_counter {
 /// - `progress_sender` ident - similar to `info_sender`, but sends progress as integer.
 /// - (`info`, `step`); - This whole thing is a list of steps to perform.
 macro_rules! steps {
-    ($redir:expr, $progress_sender:ident, $(($info:expr, $($step:tt)+));+) => {
+    ($redir:expr, $detail_sender:ident, $progress_sender:ident, $(($info:expr, $($step:tt)+));+) => {
         let __steps_count__ = steps_counter!($($info);*);
         let __step__ =  100_f32 / __steps_count__ as f32;
         let mut __cur_progress__ = 0_f32;
         $(
-            println!("{}", $info);
+            println!("{}", &$info);
+            send(&$detail_sender, $info);
             $($step)*
             __cur_progress__ += __step__;
             send(&$progress_sender, __cur_progress__.ceil().min(100_f32));
@@ -124,6 +125,7 @@ fn install_toolchain(
     let main_thread_window_clone = Arc::clone(&window);
 
     let (tx_progress, rx_progress) = mpsc::channel();
+    let (tx_detail, rx_detail) = mpsc::channel();
 
     // 在一个新线程中执行安装过程
     let install_thread = thread::spawn(move || -> anyhow::Result<()> {
@@ -149,6 +151,7 @@ fn install_toolchain(
         // TODO: Use continuous progress
         steps! {
             redirect,
+            tx_detail,
             tx_progress,
             (init_info, let mut config = InstallConfiguration::init(Path::new(&install_dir), false)?;);
             (config_info, config.config_rustup_env_vars()?;);
@@ -171,8 +174,6 @@ fn install_toolchain(
 
     // 在主线程中接收进度并发送事件
     let gui_update_thread = thread::spawn(move || -> anyhow::Result<()> {
-        let mut existing_detail = String::new();
-
         loop {
             // Install log should be created once the installation started,
             // that's where we should start showing progress.
@@ -188,22 +189,10 @@ fn install_toolchain(
 
             // 接收进度
             if let Ok(progress) = rx_progress.recv() {
-                let _ = main_thread_window_clone.emit("install-progress", progress);
+                main_thread_window_clone.emit("install-progress", progress)?;
             }
-            // 接收详细信息
-            // Try reading log file and output it in the detail box
-            // FIXME: When running `rustup` or `cargo` to install toolchain or cargo tools,
-            // their output was printed in the desired log file, but this thread cannot read them continuously,
-            // it appears that this thread was blocked thus unable to update when
-            // installing toolchain and cargo tools.
-            let mut new_detail = String::new();
-            log_file
-                .read_to_string(&mut new_detail)
-                .expect("install log file exists, but it cannot be read");
-            if new_detail.len() > existing_detail.len() {
-                let detail = &new_detail[existing_detail.len()..];
-                main_thread_window_clone.emit("install-details", detail.to_string())?;
-                existing_detail = new_detail;
+            if let Ok(detail) = rx_detail.recv() {
+                main_thread_window_clone.emit("install-details", detail)?;
             }
 
             if install_thread.is_finished() {

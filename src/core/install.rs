@@ -285,14 +285,7 @@ pub fn default_install_dir() -> PathBuf {
 fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> Result<()> {
     match tool {
         ToolInfo::PlainVersion(version) if config.cargo_is_installed => {
-            utils::execute_with_env(
-                "cargo",
-                &["install", name, "--version", version],
-                [
-                    (CARGO_HOME, utils::path_to_str(config.cargo_home())?),
-                    (RUSTUP_HOME, utils::path_to_str(config.rustup_home())?),
-                ],
-            )?;
+            utils::execute("cargo", &["install", name, "--version", version])?;
         }
         ToolInfo::Git {
             git,
@@ -313,14 +306,7 @@ fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> R
                 args.extend(["--rev", s]);
             }
 
-            utils::execute_with_env(
-                "cargo",
-                &args,
-                [
-                    (CARGO_HOME, utils::path_to_str(config.cargo_home())?),
-                    (RUSTUP_HOME, utils::path_to_str(config.rustup_home())?),
-                ],
-            )?;
+            utils::execute("cargo", &args)?;
         }
         ToolInfo::Path { path, .. } => try_install_from_path(config, name, path)?,
         // FIXME: Have a dedicated download folder, do not use temp dir to store downloaded artifacts,
