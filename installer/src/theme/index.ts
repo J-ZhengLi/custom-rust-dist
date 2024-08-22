@@ -4,8 +4,6 @@ import BaseInput from '../components/BaseInput.vue';
 import BaseCheckBox from '../components/BaseCheckBox.vue';
 import BaseProgress from '../components/BaseProgress.vue';
 import BaseRadio from '../components/BaseRadio.vue';
-import BaseDialog from '../components/BaseDialog.vue';
-import ScrollBox from '../components/ScrollBox.vue';
 
 export default {
   install(app: App) {
@@ -14,7 +12,5 @@ export default {
     app.component('base-check-box', BaseCheckBox);
     app.component('base-progress', BaseProgress);
     app.component('base-radio', BaseRadio);
-    app.component('base-dialog', BaseDialog);
-    app.component('scroll-box', ScrollBox);
   },
 };

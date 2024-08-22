@@ -1,30 +1,50 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import ScrollBox from '../components/ScrollBox.vue';
-import { installConf } from '../utils';
+import { installConf, invokeCommand } from '../utils';
 import type { Component } from '../utils';
 import { useCustomRouter } from '../router';
 
 const { routerPush, routerBack } = useCustomRouter();
-const focusIndex = ref(0);
-const components = installConf.components;
+const focusIndex = ref();
+const components = installConf.value.components;
 
 const curDescriptions = computed(() => {
   if (
     focusIndex.value !== null &&
     focusIndex.value >= 0 &&
-    focusIndex.value < components.value.length
+    focusIndex.value < components.length
   ) {
-    return components.value[focusIndex.value].desc;
+    return components[focusIndex.value].desc;
   }
   return '';
 });
 
+async function loadComponents() {
+  const componentList = await invokeCommand('get_component_list');
+  if (Array.isArray(componentList)) {
+    const newComponents = componentList.map((item) => {
+      return {
+        ...item,
+        desc: item.desc.split('\n'),
+        checked: item.required,
+      };
+    });
+    components.splice(0, components.length, ...newComponents);
+    components.sort((a, b) => Number(b.required) - Number(a.required));
+  }
+  if (components.length > 0) {
+    focusIndex.value = 0; // 默认选中第一个component
+  }
+}
+
 function handleComponentsClick(component: Component) {
-  focusIndex.value = components.value.findIndex(
+  focusIndex.value = components.findIndex(
     (item: Component) => item.name === component.name
   );
 }
+
+onMounted(loadComponents);
 </script>
 
 <template>
