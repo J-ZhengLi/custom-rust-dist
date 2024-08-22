@@ -16,36 +16,50 @@ pub(crate) enum Tool<'a> {
     /// ├─── some_binary.exe
     /// ├─── cargo-some_binary.exe
     /// ```
-    Executables(Vec<PathBuf>),
+    Executables(String, Vec<PathBuf>),
     /// Plugin file, such as `.vsix` files for Visual Studio.
-    Plugin { kind: PluginType, path: &'a Path },
+    Plugin {
+        name: String,
+        kind: PluginType,
+        path: &'a Path,
+    },
     /// Directory containing `bin` subfolder:
     /// ```text
     /// tool/
     /// ├─── bin/
     /// ├─── ...
     /// ```
-    DirWithBin { name: &'a str, bin_dir: PathBuf },
+    DirWithBin { name: String, bin_dir: PathBuf },
     /// We have a custom "script" for how to deal with such directory.
-    Custom { name: &'a str, path: &'a Path },
+    Custom { name: String, path: &'a Path },
 }
 
 impl<'a> Tool<'a> {
-    pub(crate) fn from_path(name: &'a str, path: &'a Path) -> Result<Self> {
+    pub(crate) fn name(&self) -> &str {
+        match self {
+            Self::DirWithBin { name, .. }
+            | Self::Executables(name, _)
+            | Self::Plugin { name, .. }
+            | Self::Custom { name, .. } => name,
+        }
+    }
+    pub(crate) fn from_path(name: &str, path: &'a Path) -> Result<Self> {
         if !path.exists() {
             bail!(
                 "the path for '{name}' specified as '{}' does not exist.",
                 path.display()
             );
         }
+        let name = name.replace('-', "_");
+
         // Step 1: Looking for custom instruction
-        if custom_instructions::SUPPORTED_TOOLS.contains(&name) {
+        if custom_instructions::SUPPORTED_TOOLS.contains(&name.as_str()) {
             return Ok(Self::Custom { name, path });
         }
 
         // Step 2: Identify from file extension (if it's a file ofc).
         if utils::is_executable(path) {
-            return Ok(Self::Executables(vec![path.to_path_buf()]));
+            return Ok(Self::Executables(name, vec![path.to_path_buf()]));
         } else if path.is_file() {
             let maybe_extension = path.extension();
             if let Some(ext) = maybe_extension.and_then(|ext| ext.to_str()) {
@@ -57,6 +71,7 @@ impl<'a> Tool<'a> {
                         return Ok(Self::Plugin {
                             kind: ext.parse()?,
                             path,
+                            name,
                         });
                     }
                     _ => bail!("unable to process tool '{name}': unknown file format '{ext}'"),
@@ -86,7 +101,7 @@ impl<'a> Tool<'a> {
                 let assumed_binaries = entries
                     .iter()
                     .filter_map(|path| utils::is_executable(path).then_some(path.to_path_buf()));
-                return Ok(Self::Executables(assumed_binaries.collect()));
+                return Ok(Self::Executables(name, assumed_binaries.collect()));
             }
         }
 
@@ -95,7 +110,7 @@ impl<'a> Tool<'a> {
 
     pub(crate) fn install(&self, config: &InstallConfiguration) -> Result<()> {
         match self {
-            Self::Executables(exes) => {
+            Self::Executables(_, exes) => {
                 for exe in exes {
                     utils::copy_file_to(exe, config.cargo_bin())?;
                 }
@@ -106,7 +121,7 @@ impl<'a> Tool<'a> {
             Self::DirWithBin { name, bin_dir } => {
                 install_dir_with_bin_(config, name, bin_dir)?;
             }
-            Self::Plugin { kind, path } => {
+            Self::Plugin { kind, path, .. } => {
                 // First, we need to "cache" to installer, so that we could uninstall with it.
                 utils::copy_file_to(path, config.tools_dir())?;
                 // Then, run the installation command.
@@ -118,14 +133,14 @@ impl<'a> Tool<'a> {
 
     pub(crate) fn uninstall(&self) -> Result<()> {
         match self {
-            Self::Executables(binaries) => {
+            Self::Executables(_, binaries) => {
                 for binary in binaries {
                     fs::remove_file(binary)?;
                 }
             }
             Self::Custom { name, .. } => custom_instructions::uninstall(name)?,
             Self::DirWithBin { bin_dir, .. } => uninstall_dir_with_bin_(bin_dir)?,
-            Self::Plugin { kind, path } => kind.uninstall_plugin(path)?,
+            Self::Plugin { kind, path, .. } => kind.uninstall_plugin(path)?,
         }
         Ok(())
     }

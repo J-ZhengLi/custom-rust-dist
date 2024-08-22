@@ -61,8 +61,6 @@ impl ToolsetManifest {
     /// Get a map of [`Tool`] that are available only in current target.
     pub fn current_target_tools(&self) -> Option<&ToolMap> {
         let cur_target = env!("TARGET");
-        // Clippy bug, the `map(|(k, v)| (k, v))` cannot be removed
-        #[allow(clippy::map_identity)]
         self.tools.target.get(cur_target)
     }
 
@@ -71,8 +69,6 @@ impl ToolsetManifest {
     /// Return `None` if there are no available tools in the current target.
     pub fn current_target_tools_mut(&mut self) -> Option<&mut ToolMap> {
         let cur_target = env!("TARGET");
-        // Clippy bug, the `map(|(k, v)| (k, v))` cannot be removed
-        #[allow(clippy::map_identity)]
         self.tools.target.get_mut(cur_target)
     }
 

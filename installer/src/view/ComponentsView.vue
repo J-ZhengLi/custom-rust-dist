@@ -27,7 +27,7 @@ async function loadComponents() {
       return {
         ...item,
         desc: item.desc.split('\n'),
-        checked: item.required,
+        checked: item.required || !item.optional,
       };
     });
     components.splice(0, components.length, ...newComponents);

@@ -273,7 +273,10 @@ impl InstallConfiguration {
 }
 
 fn need_cargo_install(tool: &ToolInfo) -> bool {
-    matches!(tool, ToolInfo::PlainVersion(_) | ToolInfo::Git { .. })
+    matches!(
+        tool,
+        ToolInfo::PlainVersion(_) | ToolInfo::Git { .. } | ToolInfo::DetailedVersion { .. }
+    )
 }
 
 pub fn default_install_dir() -> PathBuf {
@@ -283,9 +286,18 @@ pub fn default_install_dir() -> PathBuf {
 // TODO: Write version info after installing each tool,
 // which is later used for updating.
 fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> Result<()> {
+    // TODO: Check for availability of the tool before install
+
     match tool {
-        ToolInfo::PlainVersion(version) if config.cargo_is_installed => {
-            utils::execute("cargo", &["install", name, "--version", version])?;
+        ToolInfo::PlainVersion(version) => {
+            if config.cargo_is_installed {
+                utils::execute("cargo", &["install", name, "--version", version])?;
+            }
+        }
+        ToolInfo::DetailedVersion { ver, .. } => {
+            if config.cargo_is_installed {
+                utils::execute("cargo", &["install", name, "--version", ver])?;
+            }
         }
         ToolInfo::Git {
             git,
@@ -293,9 +305,12 @@ fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> R
             tag,
             rev,
             ..
-        } if config.cargo_is_installed => {
-            let mut args = vec!["install", "--git", git.as_str()];
+        } => {
+            if !config.cargo_is_installed {
+                return Ok(());
+            }
 
+            let mut args = vec!["install", "--git", git.as_str()];
             if let Some(s) = &branch {
                 args.extend(["--branch", s]);
             }
@@ -329,8 +344,6 @@ fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> R
             // TODO: Then do the `extract or copy to` like `ToolInfo::Path`
             try_install_from_path(config, name, &dest)?;
         }
-        // Don't try to install tools that requires `cargo install` if `cargo` isn't even installed.
-        _ => (),
     }
     Ok(())
 }

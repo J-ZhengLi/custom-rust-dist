@@ -19,6 +19,7 @@ toml.workspace = true
 tempfile.workspace = true
 gag = "1"
 custom_rust_dist = { path = "../..", features = [ "gui" ] }
+indexmap.workspace = true
 
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
