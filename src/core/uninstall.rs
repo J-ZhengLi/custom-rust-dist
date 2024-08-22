@@ -37,7 +37,12 @@ impl UninstallConfiguration {
     pub(crate) fn remove_tools(&self) -> Result<()> {
         // TODO: Read a list of tools to remove, this require a manifest file to be written after installation.
         // But right now we only remove those in `tools` directory
-        let tools_to_remove = utils::walk_dir(&self.tools_dir()?, false)?;
+        // If there's nothing to remove, do nothing
+        let tools_dir = self.tools_dir()?;
+        if !tools_dir.exists() {
+            return Ok(());
+        }
+        let tools_to_remove = utils::walk_dir(&tools_dir, false)?;
 
         for tool in tools_to_remove {
             // TODO: This name should be read from manifest anyway, but right now we get the name
