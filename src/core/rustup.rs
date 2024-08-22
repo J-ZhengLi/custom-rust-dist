@@ -57,8 +57,12 @@ impl Rustup {
         execute(rustup, &args)
     }
 
-    fn download_rust_component(&self, rustup: &Path, compoent: &String) -> Result<()> {
-        let args = ["component", "add", compoent];
+    fn download_rust_components(&self, rustup: &Path, components: Vec<&str>) -> Result<()> {
+        if components.is_empty() {
+            return Ok(());
+        }
+        let mut args = vec!["component", "add"];
+        args.extend(components);
         execute(rustup, &args)
     }
 
@@ -66,7 +70,7 @@ impl Rustup {
         &self,
         config: &InstallConfiguration,
         manifest: &ToolsetManifest,
-        components_override: Option<&[String]>,
+        optional_components: Option<&[String]>,
     ) -> Result<()> {
         // We are putting the binary here so that it will be deleted automatically after done.
         let temp_dir = config.create_temp_dir("rustup-init")?;
@@ -81,17 +85,25 @@ impl Rustup {
         let rustup = config.cargo_bin().join(RUSTUP);
         self.download_rust_toolchain(&rustup, manifest)?;
 
-        // Install extral rust component via rustup.
-        let maybe_components = components_override.or(manifest
-            .rust
-            .components
-            .as_ref()
-            .map(|v| v.iter().as_slice()));
-        if let Some(components) = maybe_components {
-            for cpt in components {
-                self.download_rust_component(&rustup, cpt)?;
-            }
-        }
+        // Install extra rust components via rustup.
+        // NOTE: that the `component` field in manifest is essential
+        let components_to_install = if let Some(opt) = optional_components {
+            manifest
+                .rust
+                .components
+                .iter()
+                .map(|s| s.as_str())
+                .chain(opt.iter().map(|s| s.as_str()))
+                .collect()
+        } else {
+            manifest
+                .rust
+                .components
+                .iter()
+                .map(|s| s.as_str())
+                .collect()
+        };
+        self.download_rust_components(&rustup, components_to_install)?;
 
         // Remove the `rustup` uninstall entry on windows, because we don't want
         // uses to accidently uninstall `rustup` thus removing the installed binary of this program.

@@ -12,8 +12,25 @@ pub struct Component {
     pub name: String,
     pub desc: String,
     pub required: bool,
+    pub optional: bool,
     pub tool_installer: Option<manifest::ToolInfo>,
     pub is_toolchain_component: bool,
+}
+
+macro_rules! setter {
+    ($name:ident ($self_arg:ident, $t:ty)) => {
+        #[allow(clippy::wrong_self_convention)]
+        fn $name(mut $self_arg, val: $t) -> Self {
+            $self_arg.$name = val;
+            $self_arg
+        }
+    };
+    ($name:ident ($self_arg:ident, $val:ident : $t:ty) { $init_val:expr }) => {
+        fn $name(mut $self_arg, $val: $t) -> Self {
+            $self_arg.$name = $init_val;
+            $self_arg
+        }
+    };
 }
 
 impl Component {
@@ -26,33 +43,24 @@ impl Component {
             name: name.into(),
             desc: desc.into(),
             required: false,
+            optional: false,
             tool_installer: None,
             is_toolchain_component: false,
         }
     }
-    fn required(mut self, yes: bool) -> Self {
-        self.required = yes;
-        self
-    }
-    fn toolchain_component(mut self) -> Self {
-        self.is_toolchain_component = true;
-        self
-    }
-    fn with_group_name(mut self, group: Option<&str>) -> Self {
-        self.group_name = group.map(ToOwned::to_owned);
-        self
-    }
-    fn with_installer(mut self, installer: &manifest::ToolInfo) -> Self {
-        self.tool_installer = Some(installer.clone());
-        self
-    }
+
+    setter!(required(self, bool));
+    setter!(optional(self, bool));
+    setter!(is_toolchain_component(self, bool));
+    setter!(group_name(self, group: Option<&str>) { group.map(ToOwned::to_owned) });
+    setter!(tool_installer(self, installer: &manifest::ToolInfo) { Some(installer.clone()) });
 }
 
 pub fn get_component_list_from_manifest() -> Result<Vec<Component>> {
     let mut components = vec![
         Component::new("Rust", "Basic set of tools to run Rust compiler")
-            .with_group_name(Some("Rust toolchain"))
-            .toolchain_component()
+            .group_name(Some("Rust toolchain"))
+            .is_toolchain_component(true)
             .required(true),
     ];
 
@@ -60,16 +68,15 @@ pub fn get_component_list_from_manifest() -> Result<Vec<Component>> {
     let mut manifest = manifest::baked_in_manifest()?;
     manifest.adjust_paths()?;
 
-    for toolchain_components in manifest.toolchain_components() {
+    for component in manifest.optional_toolchain_components() {
         components.push(
             Component::new(
-                toolchain_components,
-                manifest
-                    .get_tool_description(toolchain_components)
-                    .unwrap_or_default(),
+                component,
+                manifest.get_tool_description(component).unwrap_or_default(),
             )
-            .with_group_name(Some("Rust toolchain"))
-            .toolchain_component(),
+            .group_name(Some("Rust toolchain"))
+            .optional(true)
+            .is_toolchain_component(true),
         );
     }
 
@@ -80,9 +87,10 @@ pub fn get_component_list_from_manifest() -> Result<Vec<Component>> {
                     tool_name,
                     manifest.get_tool_description(tool_name).unwrap_or_default(),
                 )
-                .with_group_name(manifest.group_name(tool_name))
-                .with_installer(tool_info)
-                .required(tool_info.is_required()),
+                .group_name(manifest.group_name(tool_name))
+                .tool_installer(tool_info)
+                .required(tool_info.is_required())
+                .optional(tool_info.is_optional()),
             );
         }
     }

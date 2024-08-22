@@ -39,12 +39,9 @@ impl TomlParser for ToolsetManifest {
 }
 
 impl ToolsetManifest {
-    pub fn toolchain_components(&self) -> Vec<&str> {
-        self.rust
-            .components
-            .as_ref()
-            .map(|seq| seq.iter().map(Deref::deref).collect())
-            .unwrap_or_default()
+    // Get a list of all optional componets.
+    pub fn optional_toolchain_components(&self) -> &[String] {
+        self.rust.optional_components.as_slice()
     }
 
     pub fn get_tool_description(&self, toolname: &str) -> Option<&str> {
@@ -115,10 +112,16 @@ impl ToolsetManifest {
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
 pub(crate) struct RustToolchain {
     pub(crate) version: String,
     pub(crate) profile: Option<String>,
-    pub(crate) components: Option<Vec<String>>,
+    /// Components are installed by default
+    #[serde(default)]
+    pub(crate) components: Vec<String>,
+    /// Optional components are only installed if user choose to.
+    #[serde(default)]
+    pub(crate) optional_components: Vec<String>,
 }
 
 impl RustToolchain {
@@ -126,7 +129,8 @@ impl RustToolchain {
         Self {
             version: ver.to_string(),
             profile: None,
-            components: None,
+            components: vec![],
+            optional_components: vec![],
         }
     }
 }
@@ -160,8 +164,15 @@ impl Tools {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
 #[serde(untagged)]
 pub enum ToolInfo {
-    // FIXME (?): Currently there's no way to specify a tool with plain version to be required.
     PlainVersion(String),
+    // FIXME (?): This is bad, we basically have to use a different name for `version` to avoid parsing ambiguity.
+    DetailedVersion {
+        ver: String,
+        #[serde(default)]
+        required: bool,
+        #[serde(default)]
+        optional: bool,
+    },
     Git {
         git: Url,
         branch: Option<String>,
@@ -169,18 +180,24 @@ pub enum ToolInfo {
         rev: Option<String>,
         #[serde(default)]
         required: bool,
+        #[serde(default)]
+        optional: bool,
     },
     Path {
         path: PathBuf,
         version: Option<String>,
         #[serde(default)]
         required: bool,
+        #[serde(default)]
+        optional: bool,
     },
     Url {
         url: Url,
         version: Option<String>,
         #[serde(default)]
         required: bool,
+        #[serde(default)]
+        optional: bool,
     },
 }
 
@@ -190,7 +207,18 @@ impl ToolInfo {
             Self::PlainVersion(_) => false,
             Self::Git { required, .. }
             | Self::Path { required, .. }
-            | Self::Url { required, .. } => *required,
+            | Self::Url { required, .. }
+            | Self::DetailedVersion { required, .. } => *required,
+        }
+    }
+
+    pub fn is_optional(&self) -> bool {
+        match self {
+            Self::PlainVersion(_) => false,
+            Self::Git { optional, .. }
+            | Self::Path { optional, .. }
+            | Self::Url { optional, .. }
+            | Self::DetailedVersion { optional, .. } => *optional,
         }
     }
 
@@ -201,26 +229,49 @@ impl ToolInfo {
                     path,
                     version: Some(ver.to_owned()),
                     required: false,
+                    optional: false,
                 };
             }
-            Self::Git { required, .. } => {
+            Self::Git {
+                required, optional, ..
+            } => {
                 *self = Self::Path {
                     path,
                     version: None,
                     required: *required,
+                    optional: *optional,
                 };
             }
             Self::Path {
-                version, required, ..
+                version,
+                required,
+                optional,
+                ..
             }
             | Self::Url {
-                version, required, ..
+                version,
+                required,
+                optional,
+                ..
             } => {
                 *self = Self::Path {
                     path,
                     version: version.to_owned(),
                     required: *required,
+                    optional: *optional,
                 };
+            }
+            Self::DetailedVersion {
+                ver,
+                required,
+                optional,
+            } => {
+                *self = Self::Path {
+                    path,
+                    version: Some(ver.to_owned()),
+                    required: *required,
+                    optional: *optional,
+                }
             }
         }
     }
@@ -244,6 +295,7 @@ mod tests {
                 version: $version.map(ToString::to_string),
                 url: $url_str.parse().unwrap(),
                 required: false,
+                optional: false,
             }
         };
         ($git:literal, $branch:expr, $tag:expr, $rev:expr) => {
@@ -253,6 +305,7 @@ mod tests {
                 tag: $tag.map(ToString::to_string),
                 rev: $rev.map(ToString::to_string),
                 required: false,
+                optional: false,
             }
         };
         ($path:expr, $version:expr) => {
@@ -260,6 +313,7 @@ mod tests {
                 version: $version.map(ToString::to_string),
                 path: $path,
                 required: false,
+                optional: false,
             }
         };
     }
@@ -336,7 +390,8 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
             rust: RustToolchain {
                 version: "1.0.0".into(),
                 profile: Some("minimal".into()),
-                components: Some(vec!["clippy-preview".into(), "llvm-tools-preview".into()]),
+                components: vec!["clippy-preview".into(), "llvm-tools-preview".into()],
+                optional_components: vec![],
             },
             tools: Tools::new([
                 (
@@ -365,7 +420,8 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
             rust: RustToolchain {
                 version: "stable".into(),
                 profile: Some("minimal".into()),
-                components: Some(vec!["clippy-preview".into(), "rustfmt".into()]),
+                components: vec!["clippy-preview".into(), "rustfmt".into()],
+                optional_components: vec![],
             },
             tools: Tools::new([
                 (
@@ -552,6 +608,27 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable", required = t
     }
 
     #[test]
+    fn with_optional_property() {
+        let input = r#"
+[rust]
+version = "1.0.0"
+
+[tools.target.x86_64-pc-windows-msvc]
+t1 = "0.1.0" # use cargo install
+t2 = { path = "/path/to/local", optional = true }
+t3 = { url = "https://example.com/path/to/tool", optional = true }
+t4 = { git = "https://git.example.com/org/tool", branch = "stable", optional = true }
+"#;
+
+        let expected = ToolsetManifest::from_str(input).unwrap();
+        let tools = expected.tools.target.get("x86_64-pc-windows-msvc").unwrap();
+        assert!(!tools.get("t1").unwrap().is_optional());
+        assert!(tools.get("t2").unwrap().is_optional());
+        assert!(tools.get("t3").unwrap().is_optional());
+        assert!(tools.get("t4").unwrap().is_optional());
+    }
+
+    #[test]
     fn with_tools_group() {
         let input = r#"
 [rust]
@@ -579,5 +656,70 @@ Others = [ "t3", "t4" ]
         assert_eq!(expected.group_name("t3"), Some("Others"));
         assert_eq!(expected.group_name("t1"), Some("Some Group"));
         assert_eq!(expected.group_name("t100"), None);
+    }
+
+    #[test]
+    fn with_optional_toolchain_components() {
+        let input = r#"
+[rust]
+version = "1.0.0"
+components = ["c1", "c2"]
+optional-components = ["opt_c1", "opt_c2"]
+"#;
+
+        let expected = ToolsetManifest::from_str(input).unwrap();
+        assert_eq!(&expected.rust.version, "1.0.0");
+        assert_eq!(expected.rust.components, vec!["c1", "c2"]);
+        assert_eq!(expected.rust.optional_components, vec!["opt_c1", "opt_c2"]);
+    }
+
+    #[test]
+    fn all_toolchain_components_with_flag() {
+        let input = r#"
+[rust]
+version = "1.0.0"
+components = ["c1", "c2"]
+optional-components = ["opt_c1", "opt_c2"]
+"#;
+
+        let expected = ToolsetManifest::from_str(input).unwrap();
+        let opt_components = expected.optional_toolchain_components();
+        assert_eq!(opt_components, &["opt_c1", "opt_c2"]);
+    }
+
+    #[test]
+    fn with_detailed_version_tool() {
+        let input = r#"
+[rust]
+version = "1.0.0"
+
+[tools.target.x86_64-pc-windows-msvc]
+t1 = "0.1.0" # use cargo install
+t2 = { ver = "0.2.0", required = true } # use cargo install
+t3 = { ver = "0.3.0", optional = true } # use cargo install
+"#;
+
+        let expected = ToolsetManifest::from_str(input).unwrap();
+        let tools = expected.tools.target.get("x86_64-pc-windows-msvc").unwrap();
+        assert_eq!(
+            tools.get("t1"),
+            Some(&ToolInfo::PlainVersion("0.1.0".into()))
+        );
+        assert_eq!(
+            tools.get("t2"),
+            Some(&ToolInfo::DetailedVersion {
+                ver: "0.2.0".into(),
+                required: true,
+                optional: false
+            })
+        );
+        assert_eq!(
+            tools.get("t3"),
+            Some(&ToolInfo::DetailedVersion {
+                ver: "0.3.0".into(),
+                required: false,
+                optional: true
+            })
+        );
     }
 }
