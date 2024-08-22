@@ -1,11 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
 import TheLayout from './components/TheLayout.vue';
-import { installConf } from './utils';
-
-onMounted(() => {
-  installConf.loadAll();
-});
 </script>
 
 <template>
