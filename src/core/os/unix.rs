@@ -5,7 +5,7 @@ use crate::core::install::InstallConfiguration;
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
 use crate::core::EnvConfig;
 use crate::utils;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 
 impl EnvConfig for InstallConfiguration {
     // On linux, persistent env vars needs to be written in `.profile`, `.bash_profile`, etc.
@@ -82,19 +82,30 @@ impl Uninstallation for UninstallConfiguration {
     }
 }
 
+fn remove_section_or_warn_<F>(path: &Path, to_remove_sum: &str, operation: F) -> Result<()>
+where
+    F: FnOnce(String) -> Option<String>,
+{
+    let content = utils::read_to_string(path)?;
+    if operation(content)
+        .and_then(|s| utils::write_file(path, &s, false).ok())
+        .is_none()
+    {
+        println!(
+            "warning: unable to remove the desired content from file: '{}'. \
+            This could mean it was already removed, \
+            please try manually removing the following content from that file if there's any: \n\n\
+            {to_remove_sum}\n",
+            path.display()
+        )
+    }
+    Ok(())
+}
+
 fn remove_single_shell_profile_content(value: &str) -> Result<()> {
     for sh in shell::get_available_shells() {
         for rc in sh.rcfiles().iter().filter(|rc| rc.is_file()) {
-            let content = utils::read_to_string(rc)?;
-            let new_content = remove_single_string(content, value).ok_or_else(|| {
-                anyhow!(
-                    "unable to remove single config '{}' from shell profile: '{}'. \
-                    This may mean that the value was not set or deleted.",
-                    value,
-                    rc.display()
-                )
-            })?;
-            utils::write_file(rc, &new_content, false)?;
+            remove_section_or_warn_(rc, value, |cont| remove_single_string(cont, value))?;
         }
     }
 
@@ -117,21 +128,10 @@ fn remove_single_string(input: String, value: &str) -> Option<String> {
 fn remove_shell_profile_content(start: &str, end: &str) -> Result<()> {
     for sh in shell::get_available_shells() {
         for rc in sh.rcfiles().iter().filter(|rc| rc.is_file()) {
-            let content = utils::read_to_string(rc)?;
-            let new_content = remove_sub_string_between(
-                content,
-                start,
-                end
-            ).ok_or_else(
-                || anyhow!(
-                    "unable to remove rustup config section from shell profile: '{}'. \
-                    This could mean that the section was already removed, or the section label is broken, \
-                    please try manually removing any command wrapped within comments that saying \
-                    'rustup config section' if there are any.",
-                    rc.display()
-                )
-            )?;
-            utils::write_file(rc, &new_content, false)?;
+            let to_remove_summary = format!("{start}\n...\n{end}");
+            remove_section_or_warn_(rc, &to_remove_summary, |cont| {
+                remove_sub_string_between(cont, start, end)
+            })?;
         }
     }
 
