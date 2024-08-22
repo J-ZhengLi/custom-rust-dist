@@ -1,19 +1,18 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::collections::BTreeMap;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc, OnceLock};
-use std::time::Duration;
 use std::{env, thread};
 
 use anyhow::Context;
 use custom_rust_dist::cli::{parse_installer_cli, parse_manager_cli, Installer};
 use custom_rust_dist::manifest::{baked_in_manifest, ToolInfo};
 use custom_rust_dist::{try_it, utils, EnvConfig, InstallConfiguration};
+use indexmap::IndexMap;
 use tauri::api::dialog::FileDialogBuilder;
 use xuanwu_installer::components::{get_component_list_from_manifest, Component};
 use xuanwu_installer::Result;
@@ -175,18 +174,6 @@ fn install_toolchain(
     // 在主线程中接收进度并发送事件
     let gui_update_thread = thread::spawn(move || -> anyhow::Result<()> {
         loop {
-            // Install log should be created once the installation started,
-            // that's where we should start showing progress.
-            let Some(mut log_file) = LOG_FILE.get().and_then(|path| {
-                fs::OpenOptions::new()
-                    .read(true)
-                    .append(true)
-                    .open(path)
-                    .ok()
-            }) else {
-                continue;
-            };
-
             // 接收进度
             if let Ok(progress) = rx_progress.recv() {
                 main_thread_window_clone.emit("install-progress", progress)?;
@@ -196,6 +183,21 @@ fn install_toolchain(
             }
 
             if install_thread.is_finished() {
+                // Install log should be created once the install thread starts running,
+                // unless it hasn't, which means something was wrong before it could be created,
+                // and we should give up writting logs and exit this thread.
+                let Some(mut log_file) = LOG_FILE.get().and_then(|path| {
+                    fs::OpenOptions::new()
+                        .read(true)
+                        .append(true)
+                        .open(path)
+                        .ok()
+                }) else {
+                    main_thread_window_clone
+                        .emit("install-details", "ERROR: unable to read install log.")?;
+                    return Ok(());
+                };
+
                 return if let Err(known_error) = install_thread
                     .join()
                     .expect("unexpected error occurs when running installation thread.")
@@ -205,14 +207,13 @@ fn install_toolchain(
                     // Write this error to log file
                     log_file.write_all(error_str.as_bytes())?;
 
-                    main_thread_window_clone.emit("install-failed", error_str.clone())?;
+                    main_thread_window_clone
+                        .emit("install-failed", format!("ERROR: {error_str}"))?;
                     Err(known_error)
                 } else {
                     Ok(())
                 };
             }
-
-            thread::sleep(Duration::from_millis(50));
         }
     });
 
@@ -248,8 +249,8 @@ fn send<T>(sender: &Sender<T>, msg: T) {
     });
 }
 
-fn component_list_to_map(list: Vec<&Component>) -> BTreeMap<String, ToolInfo> {
-    let mut map = BTreeMap::new();
+fn component_list_to_map(list: Vec<&Component>) -> IndexMap<String, ToolInfo> {
+    let mut map = IndexMap::new();
 
     for comp in list {
         let (name, tool_info) = (

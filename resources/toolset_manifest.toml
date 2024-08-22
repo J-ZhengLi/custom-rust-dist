@@ -2,7 +2,7 @@
 version = "stable"
 profile = "minimal"
 components = ["clippy", "rustfmt", "rust-src", "rust-docs"]
-optional-components = ["llvm-tools-preview", "rust-analysis", "miri"]
+optional-components = ["llvm-tools-preview", "rust-analysis"]
 
 [tools.descriptions]
 clippy = "A collection of lints to catch common mistakes and improve your Rust code."

@@ -36,7 +36,7 @@ impl Default for VSCodeInstaller<'_> {
 }
 
 impl VSCodeInstaller<'_> {
-    fn install(&self, path: &Path, config: &InstallConfiguration) -> Result<()> {
+    pub(crate) fn install(&self, path: &Path, config: &InstallConfiguration) -> Result<()> {
 
         // Stop 0: Check if vs-code already exist
         let already_exist = utils::cmd_exist(self.cmd);
@@ -122,7 +122,7 @@ Keywords=vscode;
         Ok(())
     }
 
-    fn uninstall(&self) -> Result<()> {
+    pub(crate) fn uninstall(&self) -> Result<()> {
         use crate::core::os::install_dir_from_exe_path;
         use crate::core::os::remove_from_path;
 
