@@ -28,6 +28,7 @@ function titleClick() {
     flex="inline items-center"
     :class="{ 'opacity-60': disabled }"
     :title="title"
+    cursor-pointer
   >
     <span
       flex="~ items-center justify-center"

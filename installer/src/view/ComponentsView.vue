@@ -18,7 +18,6 @@ const checkedAll = computed(() => {
 });
 
 watch(checkedAll, (val) => {
-
   checkedAllBundle.value = val;
 });
 
@@ -110,7 +109,7 @@ onMounted(() => {
           expand
           @itemClick="handleComponentsClick"
           @change="handleComponentsChange"
-        ></check-box-group>
+        />
       </scroll-box>
       <scroll-box basis="200px" grow="4" ml="12px">
         <div>组件详细信息</div>
