@@ -1,83 +1,126 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, Ref, ref, watch } from 'vue';
 import ScrollBox from '../components/ScrollBox.vue';
-import { installConf, invokeCommand } from '../utils';
+import { installConf } from '../utils';
 import type { Component } from '../utils';
 import { useCustomRouter } from '../router';
+import CheckBoxGroup from '../components/CheckBoxGroup.vue';
 
 const { routerPush, routerBack } = useCustomRouter();
-const focusIndex = ref();
-const components = installConf.value.components;
+const selectComponentId = ref(0);
 
-const curDescriptions = computed(() => {
-  if (
-    focusIndex.value !== null &&
-    focusIndex.value >= 0 &&
-    focusIndex.value < components.length
-  ) {
-    return components[focusIndex.value].desc;
-  }
-  return '';
+const groupComponents: Ref<CheckGroup<Component>[]> = ref([]);
+const checkedAllBundle = ref(false);
+const checkedAll = computed(() => {
+  return groupComponents.value.every((item) =>
+    item.items.every((i) => i.checked)
+  );
 });
 
-async function loadComponents() {
-  const componentList = await invokeCommand('get_component_list');
-  if (Array.isArray(componentList)) {
-    const newComponents = componentList.map((item) => {
-      return {
-        ...item,
-        desc: item.desc.split('\n'),
-        checked: item.required || !item.optional,
-      };
-    });
-    components.splice(0, components.length, ...newComponents);
-    components.sort((a, b) => Number(b.required) - Number(a.required));
-  }
-  if (components.length > 0) {
-    focusIndex.value = 0; // 默认选中第一个component
-  }
-}
+watch(checkedAll, (val) => {
+  checkedAllBundle.value = val;
+});
 
-function handleComponentsClick(component: Component) {
-  focusIndex.value = components.findIndex(
-    (item: Component) => item.name === component.name
+const curCheckComponent = computed(() => {
+  for (const group of groupComponents.value) {
+    for (const item of group.items) {
+      if (item.selected) {
+        return item;
+      }
+    }
+  }
+  return null;
+});
+
+function updateInstallConf() {
+  installConf.setComponents(
+    groupComponents.value.reduce((components, group) => {
+      components.push(
+        ...group.items.map((item) => {
+          return {
+            label: item.label,
+            checked: item.checked,
+            value: { ...item.value },
+          };
+        })
+      );
+      return components;
+    }, [] as CheckItem<Component>[])
   );
 }
 
-onMounted(loadComponents);
+function handleComponentsClick(checkItem: CheckGroupItem<Component>) {
+  selectComponentId.value = checkItem.value.id;
+  groupComponents.value.forEach((group) => {
+    group.items.forEach((item) => {
+      if (item.value.id === checkItem.value.id) {
+        item.selected = true;
+      } else {
+        item.selected = false;
+      }
+    });
+  });
+}
+function handleComponentsChange(items: CheckGroupItem<Component>[]) {
+  groupComponents.value.forEach((group) => {
+    group.items.forEach((item) => {
+      const findItem = items.find((i) => i.value.id === item.value.id);
+      if (findItem) {
+        item.checked = findItem.checked;
+      }
+    });
+  });
+  updateInstallConf();
+}
+
+function handleSelectAll() {
+  const target = !checkedAll.value;
+  groupComponents.value.forEach((group) => {
+    group.items.forEach((item) => {
+      item.checked = item.value.required ? true : target;
+    });
+  });
+}
+
+onMounted(() => {
+  groupComponents.value = installConf.getGroups();
+});
 </script>
 
 <template>
   <div flex="~ col" w="full" h="full">
     <h4 ml="12px">安装选项</h4>
     <div flex="1 ~" p="12px" overflow="auto">
-      <scroll-box grow="1" basis="100px">
+      <scroll-box grow="1" basis="150px">
         <div>组件</div>
-        <div
-          v-for="(item, index) of components"
-          :key="item.name"
-          mt="8px"
-          h="1.5rem"
-        >
+        <div ml="1.5rem">
           <base-check-box
-            v-model="item.checked"
-            :title="`${item.name}${item.required ? ' (required)' : ''}`"
-            :disabled="item.required"
-            decoration="hover:underline"
-            :class="{ 'decoration-underline': index === focusIndex }"
-            @titleClick="() => handleComponentsClick(item)"
+            v-model="checkedAllBundle"
+            h="1.5rem"
+            title="全选"
+            @click="handleSelectAll"
           />
         </div>
+
+        <check-box-group
+          v-for="group of groupComponents"
+          :key="group.label"
+          :group="group"
+          expand
+          @itemClick="handleComponentsClick"
+          @change="handleComponentsChange"
+        />
       </scroll-box>
       <scroll-box basis="200px" grow="4" ml="12px">
         <div>组件详细信息</div>
-        <p v-for="item in curDescriptions">{{ item }}</p>
+        <p font="b">{{ curCheckComponent?.value.name }}</p>
+        <p v-for="item in curCheckComponent?.value.desc">{{ item }}</p>
       </scroll-box>
     </div>
 
     <div basis="60px" flex="~ justify-end items-center">
       <base-button mr="12px" @click="routerBack">上一步</base-button>
-      <base-button mr="12px" @click="() => routerPush('/confirm')"
+      <base-button mr="12px" @click="routerPush('/confirm')"
         >下一步</base-button
       >
     </div>

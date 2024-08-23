@@ -1,22 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import MdiCheck from './icons/MdiCheck.vue';
 
-const { modelValue, title, disabled } = defineProps({
-  modelValue: Boolean,
+const { title, disabled } = defineProps({
   title: String,
   disabled: Boolean,
 });
 
-const emit = defineEmits(['update:modelValue', 'titleClick']);
+const emit = defineEmits(['titleClick']);
 
-const isChecked = ref(modelValue);
+const isChecked = defineModel<boolean>();
 
 const toggleCheck = () => {
-  if (!disabled) {
-    isChecked.value = !isChecked.value;
-    emit('update:modelValue', isChecked.value);
+  if (disabled) {
+    return;
   }
+
+  isChecked.value = !isChecked.value;
 };
 
 function titleClick() {
@@ -27,10 +26,10 @@ function titleClick() {
 <template>
   <label
     flex="inline items-center"
-    :class="{ 'opacity-80': disabled }"
+    :class="{ 'opacity-60': disabled }"
     :title="title"
+    cursor-pointer
   >
-    <input type="checkbox" hidden :disabled="disabled" :checked="isChecked" />
     <span
       flex="~ items-center justify-center"
       w="1rem"
@@ -46,8 +45,8 @@ function titleClick() {
       }"
       @click="toggleCheck"
     >
-      <slot name="checked">
-        <mdi-check v-if="isChecked" w="1rem" h="1rem" c="active" />
+      <slot name="icon">
+        <mdi-check v-if="isChecked" c="active" />
       </slot>
     </span>
     <span ml="4px" line-clamp="1" @click="titleClick">

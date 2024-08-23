@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { installConf } from '../utils';
 
 const router = useRouter();
 
@@ -9,13 +10,21 @@ const menuFirstItem = computed(() => {
     (item) => (item.meta?.order as number) === 0
   );
 });
-const menu = ref(
-  router.options.routes.filter((item) => (item.meta?.order as number) > 0)
+const menu = computed(() =>
+  router.options.routes.filter((item) => {
+    const hasValidOrder = (item.meta?.order as number) > 0;
+
+    if (installConf.isCustomInstall) {
+      return hasValidOrder;
+    }
+
+    return hasValidOrder && item.meta?.required;
+  })
 );
 
 const beforeTop = computed(() => {
   return {
-    '--beforeTop': `${(router.currentRoute.value.meta.order as number) * 150}%`,
+    '--beforeTop': `${(menu.value.findIndex((i) => i.path === router.currentRoute.value.path) + 1) * 150}%`,
   };
 });
 
