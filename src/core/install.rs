@@ -290,8 +290,6 @@ pub fn default_install_dir() -> PathBuf {
 // TODO: Write version info after installing each tool,
 // which is later used for updating.
 fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> Result<()> {
-    // TODO: Check for availability of the tool before install
-
     match tool {
         ToolInfo::PlainVersion(version) => {
             if config.cargo_is_installed {

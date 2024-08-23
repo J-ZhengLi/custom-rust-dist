@@ -35,7 +35,7 @@ function handleNextClick() {
       <p mb="8px">组件：</p>
       <div ml="12px">
         <p my="4px" v-for="component in components" :key="component.name">
-          {{ `${component.name} ${component.required ? '(required)' : ''} ` }}
+          {{ `${component.name} ${component.required ? '(required)' : component.installed ? '(installed, re-installing)' : ''} ` }}
         </p>
       </div>
     </scroll-box>

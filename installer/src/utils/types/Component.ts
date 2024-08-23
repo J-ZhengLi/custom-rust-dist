@@ -3,6 +3,7 @@ interface OriginComponent {
   name: string;
   required: boolean;
   optional: boolean;
+  installed: boolean;
 }
 export interface Component extends OriginComponent {
   desc: string[];

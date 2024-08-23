@@ -37,14 +37,6 @@ impl Default for VSCodeInstaller<'_> {
 
 impl VSCodeInstaller<'_> {
     pub(crate) fn install(&self, path: &Path, config: &InstallConfiguration) -> Result<()> {
-
-        // Stop 0: Check if vs-code already exist
-        let already_exist = utils::cmd_exist(self.cmd);
-        if already_exist {
-            println!("skipping '{}' installation, no need to re-install", self.tool_name);
-            return Ok(());
-        }
-
         // Step 1: Move the root of the directory into `tools` directory
         let vscode_dir = config.tools_dir().join(self.tool_name);
         utils::move_to(path, &vscode_dir, true)?;
@@ -155,6 +147,10 @@ Keywords=vscode;
 
         Ok(())
     }
+
+    pub(crate) fn already_installed(&self) -> bool {
+        utils::cmd_exist(self.cmd)
+    }
 }
 
 pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> {
@@ -163,4 +159,8 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
 
 pub(super) fn uninstall() -> Result<()> {
     VSCodeInstaller::default().uninstall()
+}
+
+pub(super) fn already_installed() -> bool {
+    VSCodeInstaller::default().already_installed()
 }

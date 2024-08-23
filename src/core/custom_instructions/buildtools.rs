@@ -18,13 +18,8 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
         None
     }
 
-    // Step 1: Check if user has already installed any of the two MSVC component.
-    // FIXME: This should be checked before extraction instead.
+    // Step 1: Make an install command, or no command if everything are already installed.
     let missing_components = windows_related::get_missing_build_tools_components();
-    dbg!(&missing_components);
-
-    // Step 2: Make an install command, or no command if everything are already installed.
-    // TODO: Check version to make sure the newest version are installed.
     if missing_components.is_empty() {
         println!("skipping build tools installation, no need to re-install");
         return Ok(());
@@ -45,7 +40,7 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
         cmd.push(component.component_id());
     }
 
-    // Step 2.5: Make a copy of this installer to the `tools` directory,
+    // Step 2: Make a copy of this installer to the `tools` directory,
     // which is later used for uninstallation.
     let installer_dir = config.tools_dir().join("buildtools");
     utils::ensure_dir(&installer_dir)?;
@@ -58,7 +53,6 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
     Ok(())
 }
 
-#[allow(unused)]
 #[cfg(not(windows))]
 pub(super) fn install(_path: &Path, _config: &InstallConfiguration) -> Result<()> {
     Ok(())
@@ -72,10 +66,19 @@ pub(super) fn uninstall() -> Result<()> {
     Ok(())
 }
 
-#[allow(unused)]
 #[cfg(not(windows))]
 pub(super) fn uninstall() -> Result<()> {
     Ok(())
+}
+
+#[cfg(windows)]
+pub(super) fn already_installed() -> bool {
+    windows_related::get_missing_build_tools_components().is_empty()
+}
+
+#[cfg(not(windows))]
+pub(super) fn already_installed() -> bool {
+    true
 }
 
 #[cfg(windows)]

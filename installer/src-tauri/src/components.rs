@@ -15,6 +15,8 @@ pub struct Component {
     pub optional: bool,
     pub tool_installer: Option<manifest::ToolInfo>,
     pub is_toolchain_component: bool,
+    /// Indicates whether this component was already installed or not.
+    pub installed: bool,
 }
 
 macro_rules! setter {
@@ -46,11 +48,13 @@ impl Component {
             optional: false,
             tool_installer: None,
             is_toolchain_component: false,
+            installed: false,
         }
     }
 
     setter!(required(self, bool));
     setter!(optional(self, bool));
+    setter!(installed(self, bool));
     setter!(is_toolchain_component(self, bool));
     setter!(group_name(self, group: Option<&str>) { group.map(ToOwned::to_owned) });
     setter!(tool_installer(self, installer: &manifest::ToolInfo) { Some(installer.clone()) });
@@ -80,6 +84,7 @@ pub fn get_component_list_from_manifest() -> Result<Vec<Component>> {
         );
     }
 
+    let already_installed_tools = manifest.already_installed_tools();
     if let Some(tools) = manifest.current_target_tools() {
         for (tool_name, tool_info) in tools {
             components.push(
@@ -90,7 +95,8 @@ pub fn get_component_list_from_manifest() -> Result<Vec<Component>> {
                 .group_name(manifest.group_name(tool_name))
                 .tool_installer(tool_info)
                 .required(tool_info.is_required())
-                .optional(tool_info.is_optional()),
+                .optional(tool_info.is_optional())
+                .installed(already_installed_tools.contains(&tool_name)),
             );
         }
     }

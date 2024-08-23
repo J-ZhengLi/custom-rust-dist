@@ -50,10 +50,10 @@ impl<'a> Tool<'a> {
                 path.display()
             );
         }
-        let name = name.replace('-', "_");
+        let name = name.to_string();
 
         // Step 1: Looking for custom instruction
-        if custom_instructions::SUPPORTED_TOOLS.contains(&name.as_str()) {
+        if custom_instructions::is_supported(&name) {
             return Ok(Self::Custom { name, path });
         }
 

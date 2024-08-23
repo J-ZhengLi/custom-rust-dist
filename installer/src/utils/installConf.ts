@@ -101,7 +101,7 @@ class InstallConf {
           const { group_name, is_toolchain_component, desc, ...rest } = item;
           return {
             label: item.name,
-            checked: item.required || !item.optional,
+            checked: !item.installed && (item.required || !item.optional),
             value: {
               ...rest,
               desc: item.desc.split('\n'),

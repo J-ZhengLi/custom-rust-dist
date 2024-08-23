@@ -10,7 +10,7 @@ pub enum InstallerError {
 impl Display for InstallerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Anyhow(e) => write!(f, "{}", e.to_string()),
+            Self::Anyhow(e) => write!(f, "{e}"),
         }
     }
 }
@@ -18,7 +18,7 @@ impl Display for InstallerError {
 impl Debug for InstallerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Anyhow(e) => write!(f, "{}", e.to_string()),
+            Self::Anyhow(e) => write!(f, "{e}"),
         }
     }
 }
