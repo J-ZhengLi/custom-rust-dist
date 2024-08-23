@@ -2,6 +2,7 @@ interface OriginComponent {
   id: number;
   name: string;
   required: boolean;
+  optional: boolean;
 }
 export interface Component extends OriginComponent {
   desc: string[];

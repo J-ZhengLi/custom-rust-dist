@@ -38,11 +38,11 @@ pub(crate) fn install_dir_from_exe_path() -> Result<PathBuf> {
     // This is still unsafe, we're desparetely in need of an install manifest.
     let install_dir_contents = utils::walk_dir(&maybe_install_dir, false)
         .context("unable to uninstall as the installation directory cannot be determined.")?;
-    if !install_dir_contents.contains(&".cargo".into())
-        || !install_dir_contents.contains(&".rustup".into())
+    if !install_dir_contents.contains(&maybe_install_dir.join(".cargo"))
+        || !install_dir_contents.contains(&maybe_install_dir.join(".rustup"))
     {
         bail!(
-            "unable to uninstall as it appears that this program was not installed correctly, \
+            "unable to uninstall as the installation directory appears to be corrupted, \
             try manually remove the following directory:\n\n\
             {}\n",
             maybe_install_dir.display()

@@ -151,7 +151,7 @@ pub(super) fn add_to_path(path: &Path) -> Result<()> {
         for rc in sh.update_rcs() {
             let rc_content = utils::read_to_string(&rc)?;
             let new_content = config_section_with_updated_path(sh.as_ref(), path_str, &rc_content);
-            utils::write_file(&rc, &new_content, true).with_context(|| {
+            utils::write_file(&rc, &new_content, false).with_context(|| {
                 format!(
                     "failed to append PATH variable to shell profile: '{}'",
                     rc.display()
