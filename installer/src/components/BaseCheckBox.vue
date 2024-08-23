@@ -1,22 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue';
 import MdiCheck from './icons/MdiCheck.vue';
 
-const { modelValue, title, disabled } = defineProps({
-  modelValue: Boolean,
+const { title, disabled } = defineProps({
   title: String,
   disabled: Boolean,
 });
 
 const emit = defineEmits(['update:modelValue', 'titleClick']);
 
-const isChecked = ref(modelValue);
+const isChecked = defineModel<boolean>();
 
 const toggleCheck = () => {
-  if (!disabled) {
-    isChecked.value = !isChecked.value;
-    emit('update:modelValue', isChecked.value);
+  if (disabled) {
+    return;
   }
+
+  isChecked.value = !isChecked.value;
 };
 
 function titleClick() {

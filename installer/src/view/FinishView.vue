@@ -6,7 +6,7 @@ const runApp = ref(true);
 
 function closeWindow() {
   if (runApp.value) {
-    invokeCommand('run_app', { install_dir: installConf.value.path });
+    invokeCommand('run_app', { install_dir: installConf.path.value });
   }
   invokeCommand('finish');
 }
