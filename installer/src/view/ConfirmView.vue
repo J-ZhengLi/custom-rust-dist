@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { installConf, invokeCommand } from '../utils';
+import { installConf, invokeCommand, TauriComponent } from '../utils';
 import { useCustomRouter } from '../router';
 import ScrollBox from '../components/ScrollBox.vue';
 import { computed } from 'vue';
@@ -10,8 +10,8 @@ const components = computed(() => installConf.getCheckedComponents());
 
 function handleNextClick() {
   invokeCommand('install_toolchain', {
-    components_list: components,
-    install_dir: path.value,
+    components_list: components.value as TauriComponent[],
+    install_dir: path.value as string,
   }).then(() => routerPush('/install'));
 }
 </script>
@@ -35,7 +35,7 @@ function handleNextClick() {
       <p mb="8px">组件：</p>
       <div ml="12px">
         <p my="4px" v-for="component in components" :key="component.name">
-          {{ component.name }}
+          {{ `${component.name} ${component.required ? '(required)' : ''} ` }}
         </p>
       </div>
     </scroll-box>

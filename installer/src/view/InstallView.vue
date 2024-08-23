@@ -36,7 +36,7 @@ onMounted(() => {
 
   event.listen('install-details', (event) => {
     if (typeof event.payload === 'string') {
-      event.payload.split("\n").forEach(line => {
+      event.payload.split('\n').forEach((line) => {
         output.value.push(line);
       });
       toBottom();
