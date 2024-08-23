@@ -13,6 +13,8 @@ pub(crate) mod windows;
 use anyhow::{bail, Context, Result};
 use std::path::{Path, PathBuf};
 
+use crate::utils;
+
 /// Try getting the installation root judging be current executable path.
 //
 // This program should be installed under `{install_dir}/.cargo/bin/`,
@@ -29,12 +31,21 @@ pub(crate) fn install_dir_from_exe_path() -> Result<PathBuf> {
         .take(comp_count.saturating_sub(3))
         .collect();
 
-    if !maybe_install_dir.is_dir() {
-        // Check if it exists, this could fail if comp_count was less then `3`,
-        // meaning the current exe was put into root dir, or any folder that are not deep enough.
+    if maybe_install_dir.parent().is_none() {
+        bail!("unable to uninstall as it appears that this program was mistakenly installed in root directory.");
+    }
+    // Make sure this directory match some signature by checking its content.
+    // This is still unsafe, we're desparetely in need of an install manifest.
+    let install_dir_contents = utils::walk_dir(&maybe_install_dir, false)
+        .context("unable to uninstall as the installation directory cannot be determined.")?;
+    if !install_dir_contents.contains(&".cargo".into())
+        || !install_dir_contents.contains(&".rustup".into())
+    {
         bail!(
-            "install directory does not exist, \
-        make sure this binary is in its original location before running uninstall."
+            "unable to uninstall as it appears that this program was not installed correctly, \
+            try manually remove the following directory:\n\n\
+            {}\n",
+            maybe_install_dir.display()
         );
     }
 

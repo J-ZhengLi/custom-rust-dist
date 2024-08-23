@@ -8,7 +8,10 @@ use super::{
     tools::Tool,
     CARGO_HOME, RUSTUP_DIST_SERVER, RUSTUP_HOME, RUSTUP_UPDATE_ROOT,
 };
-use crate::utils::{self, Extractable};
+use crate::{
+    core::os::add_to_path,
+    utils::{self, Extractable},
+};
 use anyhow::{anyhow, bail, Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -193,6 +196,7 @@ impl InstallConfiguration {
     ) -> Result<()> {
         println!("installing rustup and rust toolchain");
         Rustup::init().download_toolchain(self, manifest, override_components)?;
+        add_to_path(self.cargo_bin())?;
         self.cargo_is_installed = true;
         Ok(())
     }

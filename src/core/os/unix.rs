@@ -54,27 +54,10 @@ impl EnvConfig for InstallConfiguration {
 impl Uninstallation for UninstallConfiguration {
     // This is basically removing the section marked with `rustup config section` in shell profiles.
     fn remove_rustup_env_vars(&self) -> Result<()> {
-        // Remove the shell profiles content from `RC_FILE_SECTION_START` to `RC_FILE_SECTION_END`
-        remove_shell_profile_content(shell::RC_FILE_SECTION_START, shell::RC_FILE_SECTION_END)?;
-
-        let installed_dir = install_dir_from_exe_path()?;
-
-        // Remove the `. "$CARGO_HOME/.cargo/env"` which is added by rustup
-        let env_file = installed_dir.join(".cargo").join("env");
-        if env_file.exists() {
-            let rustup_env_profile = format!(". {:?}", env_file.as_path());
-            remove_single_shell_profile_content(rustup_env_profile.as_str())?;
-        } else {
-            unimplemented!("Fish");
-        };
-
-        Ok(())
+        remove_shell_profile_content()
     }
 
     fn remove_self(&self) -> Result<()> {
-        // TODO: Run `rustup self uninstall` first
-        // TODO: Remove possibly installed extensions for other software, such as `vs-code` plugins.
-
         // Remove the installer dir.
         let installed_dir = install_dir_from_exe_path()?;
         std::fs::remove_dir_all(installed_dir)?;
@@ -102,30 +85,11 @@ where
     Ok(())
 }
 
-fn remove_single_shell_profile_content(value: &str) -> Result<()> {
-    for sh in shell::get_available_shells() {
-        for rc in sh.rcfiles().iter().filter(|rc| rc.is_file()) {
-            remove_section_or_warn_(rc, value, |cont| remove_single_string(cont, value))?;
-        }
-    }
-
-    Ok(())
-}
-
-fn remove_single_string(input: String, value: &str) -> Option<String> {
-    // Remove the first match one.
-    let pos = input.lines().position(|line| line == value)?;
-    let result = input
-        .lines()
-        .take(pos)
-        .chain(input.lines().skip(pos + 1))
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    Some(result)
-}
-
-fn remove_shell_profile_content(start: &str, end: &str) -> Result<()> {
+fn remove_shell_profile_content() -> Result<()> {
+    // Remove the profiles content wrapped between `RC_FILE_SECTION_START` to `RC_FILE_SECTION_END`,
+    // which is our dedicated configuration sections.
+    let start = shell::RC_FILE_SECTION_START;
+    let end = shell::RC_FILE_SECTION_END;
     for sh in shell::get_available_shells() {
         for rc in sh.rcfiles().iter().filter(|rc| rc.is_file()) {
             let to_remove_summary = format!("{start}\n...\n{end}");
@@ -186,34 +150,7 @@ pub(super) fn add_to_path(path: &Path) -> Result<()> {
     for sh in shell::get_available_shells() {
         for rc in sh.update_rcs() {
             let rc_content = utils::read_to_string(&rc)?;
-            let new_content = if let Some(existing_configs) = get_sub_string_between(
-                &rc_content,
-                shell::RC_FILE_SECTION_START,
-                shell::RC_FILE_SECTION_END,
-            ) {
-                // Find the line that is setting path variable
-                let maybe_setting_path =
-                    existing_configs.lines().find(|line| line.contains("PATH"));
-                // Safe to unwrap, the function could only return `None` when removing.
-                let new_content = sh
-                    .command_to_update_path(maybe_setting_path, path_str, false)
-                    .unwrap();
-
-                let mut new_configs = existing_configs.clone();
-                if let Some(setting_path) = maybe_setting_path {
-                    new_configs = existing_configs.replace(setting_path, &new_content);
-                } else {
-                    new_configs.push('\n');
-                    new_configs.push_str(&new_content);
-                }
-
-                rc_content.replace(&existing_configs, &new_configs)
-            } else {
-                // No previous configuration (this might never happed tho)
-                let path_configs = sh.command_to_update_path(None, path_str, false).unwrap();
-                sh.script_content(&path_configs)
-            };
-
+            let new_content = config_section_with_updated_path(sh.as_ref(), path_str, &rc_content);
             utils::write_file(&rc, &new_content, true).with_context(|| {
                 format!(
                     "failed to append PATH variable to shell profile: '{}'",
@@ -229,6 +166,39 @@ pub(super) fn add_to_path(path: &Path) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn config_section_with_updated_path(
+    sh: &dyn shell::UnixShell,
+    path_str: &str,
+    old_content: &str,
+) -> String {
+    if let Some(existing_configs) = get_sub_string_between(
+        old_content,
+        shell::RC_FILE_SECTION_START,
+        shell::RC_FILE_SECTION_END,
+    ) {
+        // Find the line that is setting path variable
+        let maybe_setting_path = existing_configs.lines().find(|line| line.contains("PATH"));
+        // Safe to unwrap, the function could only return `None` when removing.
+        let new_content = sh
+            .command_to_update_path(maybe_setting_path, path_str, false)
+            .unwrap();
+
+        let mut new_configs = existing_configs.clone();
+        if let Some(setting_path) = maybe_setting_path {
+            new_configs = existing_configs.replace(setting_path, &new_content);
+        } else {
+            new_configs.push('\n');
+            new_configs.push_str(&new_content);
+        }
+
+        old_content.replace(&existing_configs, &new_configs)
+    } else {
+        // No previous configuration (this might never happed tho)
+        let path_configs = sh.command_to_update_path(None, path_str, false).unwrap();
+        sh.script_content(&path_configs)
+    }
 }
 
 pub(super) fn remove_from_path(_path: &Path) -> Result<()> {
@@ -480,7 +450,10 @@ mod tests {
     use crate::utils;
     use std::path::PathBuf;
 
-    use super::shell::{self, UnixShell};
+    use super::{
+        config_section_with_updated_path,
+        shell::{self, UnixShell},
+    };
 
     #[test]
     fn remove_labeled_section() {
@@ -687,6 +660,80 @@ export PATH="/path/to/bin:$PATH""#
         assert_eq!(
             cmd,
             Some("set -Ux PATH /path/to/tool/bin $PATH".to_string())
+        );
+    }
+
+    #[test]
+    fn add_new_path_to_config_section() {
+        let existing_rc = r#"\
+alias autoremove='sudo pacman -Rcns $(pacman -Qdtq)'
+. "$HOME/.cargo/env"
+
+# ===== rustup config section START =====
+export CARGO_HOME='/path/to/cargo'
+export RUSTUP_HOME='/path/to/rustup'
+# ===== rustup config section END =====
+
+export PATH=/some/user/defined/bin:$PATH
+"#;
+
+        let path_to_add = "/path/to/rust/bin";
+        let shell = shell::Bash;
+        let new_content = config_section_with_updated_path(&shell, path_to_add, existing_rc);
+
+        assert_eq!(
+            new_content,
+            r#"\
+alias autoremove='sudo pacman -Rcns $(pacman -Qdtq)'
+. "$HOME/.cargo/env"
+
+# ===== rustup config section START =====
+export CARGO_HOME='/path/to/cargo'
+export RUSTUP_HOME='/path/to/rustup'
+export PATH="/path/to/rust/bin:$PATH"
+# ===== rustup config section END =====
+
+export PATH=/some/user/defined/bin:$PATH
+"#
+        );
+    }
+
+    #[test]
+    fn add_path_to_config_section_with_existing_path() {
+        let existing_rc = r#"\
+alias autoremove='sudo pacman -Rcns $(pacman -Qdtq)'
+. "$HOME/.cargo/env"
+
+# ===== rustup config section START =====
+export CARGO_HOME='/path/to/cargo'
+export RUSTUP_HOME='/path/to/rustup'
+export PATH="/path/to/rust/bin:$PATH"
+# ===== rustup config section END =====
+
+export PATH=/some/user/defined/bin:$PATH
+"#;
+
+        let path_to_add = "/path/to/python/bin";
+        let another_path_to_add = "/path/to/ruby/bin";
+        let shell = shell::Bash;
+        let new_content = config_section_with_updated_path(&shell, path_to_add, existing_rc);
+        let new_content =
+            config_section_with_updated_path(&shell, another_path_to_add, &new_content);
+
+        assert_eq!(
+            new_content,
+            r#"\
+alias autoremove='sudo pacman -Rcns $(pacman -Qdtq)'
+. "$HOME/.cargo/env"
+
+# ===== rustup config section START =====
+export CARGO_HOME='/path/to/cargo'
+export RUSTUP_HOME='/path/to/rustup'
+export PATH="/path/to/ruby/bin:/path/to/python/bin:/path/to/rust/bin:$PATH"
+# ===== rustup config section END =====
+
+export PATH=/some/user/defined/bin:$PATH
+"#
         );
     }
 }
