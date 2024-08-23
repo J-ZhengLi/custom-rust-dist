@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { Ref } from 'vue';
 import { event } from '@tauri-apps/api';
+import { message } from '@tauri-apps/api/dialog';
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { useCustomRouter } from '../router';
+import { invokeCommand } from '../utils';
 
 const { routerPush } = useCustomRouter();
 const progress = ref(0);
@@ -55,7 +57,9 @@ onMounted(() => {
     if (typeof event.payload === 'string') {
       output.value.push(event.payload);
       toBottom();
-      // TODO: Handle installation failure here, showing the reason and let user exit the program.
+      message(event.payload, { title: '错误', type: 'error' }).then(() =>
+        invokeCommand('close_window')
+      );
     }
   });
 });
