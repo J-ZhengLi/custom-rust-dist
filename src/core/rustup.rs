@@ -38,6 +38,8 @@ impl Rustup {
 
     pub(crate) fn generate_rustup(&self, rustup_init: &PathBuf) -> Result<()> {
         let args = [
+            // tell rustup not to add `. $HOME/.cargo/env` because we are writing one for them.
+            "--no-modify-path",
             "--default-toolchain",
             "none",
             "--default-host",

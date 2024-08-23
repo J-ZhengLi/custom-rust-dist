@@ -18,7 +18,6 @@ class InstallConf {
       return;
     }
     this.path.value = newPath;
-    localStorage.setItem('installPath', newPath);
   }
 
   setComponents(newComponents: CheckItem<Component>[]) {
@@ -68,15 +67,8 @@ class InstallConf {
   }
 
   async loadPath() {
-    const localPath = localStorage.getItem('installPath');
-    if (localPath !== null) {
-      this.setPath(localPath);
-      return;
-    }
-
     const defaultPath = await invokeCommand('default_install_dir');
     if (typeof defaultPath === 'string' && defaultPath.trim() !== '') {
-      localStorage.setItem('installPath', defaultPath);
       this.setPath(defaultPath);
     }
   }
@@ -109,7 +101,7 @@ class InstallConf {
           const { group_name, is_toolchain_component, desc, ...rest } = item;
           return {
             label: item.name,
-            checked: item.required,
+            checked: !item.installed && (item.required || !item.optional),
             value: {
               ...rest,
               desc: item.desc.split('\n'),

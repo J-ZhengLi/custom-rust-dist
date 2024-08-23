@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use tempfile::TempDir;
 use url::Url;
 
+use crate::core::custom_instructions;
 use crate::core::install::InstallConfiguration;
 use crate::utils;
 
@@ -70,6 +71,16 @@ impl ToolsetManifest {
     pub fn current_target_tools_mut(&mut self) -> Option<&mut ToolMap> {
         let cur_target = env!("TARGET");
         self.tools.target.get_mut(cur_target)
+    }
+
+    /// Get a list of tool names if those are already installed in current target.
+    pub fn already_installed_tools(&self) -> Vec<&String> {
+        let Some(map) = self.current_target_tools() else {
+            return vec![];
+        };
+        map.keys()
+            .filter(|name| custom_instructions::already_installed(name))
+            .collect()
     }
 
     /// Turn all the relative paths in the `tools` section to some absolute paths.

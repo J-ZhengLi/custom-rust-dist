@@ -1,9 +1,8 @@
 pub mod components;
 pub type Result<T> = core::result::Result<T, InstallerError>;
 
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
-#[derive(Debug)]
 pub enum InstallerError {
     Anyhow(anyhow::Error),
 }
@@ -11,7 +10,15 @@ pub enum InstallerError {
 impl Display for InstallerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Anyhow(..) => write!(f, "anyhow error"),
+            Self::Anyhow(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl Debug for InstallerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Anyhow(e) => write!(f, "{e}"),
         }
     }
 }
