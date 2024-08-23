@@ -100,7 +100,8 @@ class InstallConf {
         if (a.group_name !== null && b.group_name === null) {
           return -1;
         }
-        return 0;
+        // 名称排序
+        return a.name.localeCompare(b.name);
       });
 
       const newComponents: CheckItem<Component>[] = componentList.map(
