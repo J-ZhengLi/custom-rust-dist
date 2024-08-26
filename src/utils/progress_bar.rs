@@ -1,7 +1,50 @@
 //! Progress bar indicator for commandline user interface.
 
+use std::sync::mpsc::Sender;
+
 use anyhow::Result;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+
+#[derive(Debug, Clone, Copy, Default)]
+/// Help to send install progress across threads.
+pub struct MultiThreadProgress<'a> {
+    msg_sender: Option<&'a Sender<String>>,
+    prog_sender: Option<&'a Sender<usize>>,
+    pub val: usize,
+    cur_progress: usize,
+}
+
+impl<'a> MultiThreadProgress<'a> {
+    pub fn new(
+        msg_sender: &'a Sender<String>,
+        progress_sender: &'a Sender<usize>,
+        initial_progress: usize,
+    ) -> Self {
+        Self {
+            msg_sender: Some(msg_sender),
+            prog_sender: Some(progress_sender),
+            cur_progress: initial_progress,
+            ..Default::default()
+        }
+    }
+    pub fn send_msg(&self, msg: String) -> Result<()> {
+        if let Some(sender) = self.msg_sender {
+            sender.send(msg)?;
+        }
+        Ok(())
+    }
+    pub fn send_progress(&mut self) -> Result<()> {
+        if let Some(sender) = self.prog_sender {
+            self.cur_progress += self.val;
+            sender.send(self.cur_progress)?;
+        }
+        Ok(())
+    }
+    pub fn send_any_progress(&mut self, prog: usize) -> Result<()> {
+        self.val = prog;
+        self.send_progress()
+    }
+}
 
 /// Convinent struct with methods that are useful to indicate download progress.
 #[derive(Debug, Clone, Copy)]

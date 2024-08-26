@@ -52,8 +52,8 @@ impl UninstallConfiguration {
         // Make sure the installation order are: plugin > ...
         tools_to_remove.sort_by(|a, b| match (a, b) {
             (Tool::Plugin { .. }, Tool::Plugin { .. }) => Ordering::Equal,
-            (Tool::Plugin { .. }, _) => Ordering::Greater,
-            (_, Tool::Plugin { .. }) => Ordering::Less,
+            (Tool::Plugin { .. }, _) => Ordering::Less,
+            (_, Tool::Plugin { .. }) => Ordering::Greater,
             _ => Ordering::Equal,
         });
 

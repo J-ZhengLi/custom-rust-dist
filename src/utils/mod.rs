@@ -15,6 +15,7 @@ pub use download::download_from_start;
 pub use extraction::{Extractable, ExtractableKind};
 pub use file_system::*;
 pub use process::*;
+pub use progress_bar::MultiThreadProgress;
 
 use anyhow::Result;
 use url::Url;
