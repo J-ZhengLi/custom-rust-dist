@@ -65,7 +65,7 @@ function menuItemActive(order: number) {
         {{ item.meta?.title }}
       </div>
     </div>
-    <div mb="8px">
+    <div mb="8px" text="center">
       <img src="/logo.svg" alt="Xuanwu logo" w="90%" />
     </div>
   </div>
