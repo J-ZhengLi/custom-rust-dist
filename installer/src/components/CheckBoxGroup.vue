@@ -79,8 +79,8 @@ watch(group.items, (newValue) => {
           v-for="item of group.items"
           :key="item.value.name"
           v-model="item.checked"
-          :title="`${item.value.name}${item.value.required ? ' (required)' : item.value.installed ? ' (installed)' : ''}`"
-          :disabled="item.value.required"
+          :title="`${item.value.name}${item.value.installed ? ' (installed)' : item.value.required ? ' (required)' : ''}`"
+          :disabled="item.value.installed ? false : item.value.required"
           decoration="hover:underline"
           :class="{
             'decoration-underline': item.selected,

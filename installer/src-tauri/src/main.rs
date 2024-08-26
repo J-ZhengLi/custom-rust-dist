@@ -2,15 +2,17 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::fs::{self, File};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 use std::sync::{mpsc, Arc, OnceLock};
+use std::time::Duration;
 use std::{env, thread};
 
 use anyhow::Context;
 use custom_rust_dist::cli::{parse_installer_cli, parse_manager_cli, Installer};
 use custom_rust_dist::manifest::{baked_in_manifest, ToolInfo};
+use custom_rust_dist::utils::MultiThreadProgress;
 use custom_rust_dist::{try_it, utils, EnvConfig, InstallConfiguration};
 use indexmap::IndexMap;
 use tauri::api::dialog::FileDialogBuilder;
@@ -75,17 +77,19 @@ macro_rules! steps_counter {
 /// - `progress_sender` ident - similar to `info_sender`, but sends progress as integer.
 /// - (`info`, `step`); - This whole thing is a list of steps to perform.
 macro_rules! steps {
-    ($redir:expr, $detail_sender:ident, $progress_sender:ident, $(($info:expr, $($step:tt)+));+) => {
+    ($redir:expr, $detail_sender:ident, $progress_sender:ident, $(($info:expr, $p:expr, $($step:tt)+));+) => {
         let __steps_count__ = steps_counter!($($info);*);
-        let __step__ =  100_f32 / __steps_count__ as f32;
-        let mut __cur_progress__ = 0_f32;
+        let mut __cur_step__ =  1_usize;
         $(
             println!("{}", &$info);
-            send(&$detail_sender, $info);
-            $($step)*
-            __cur_progress__ += __step__;
-            send(&$progress_sender, __cur_progress__.ceil().min(100_f32));
+            send(&$detail_sender, format!("(Step {__cur_step__}/{__steps_count__}) {}", &$info));
+            $($step)*;
+            if let Some(__prog__) = $p {
+                send(&$progress_sender, __prog__);
+            }
+            __cur_step__ += 1;
         )*
+        send(&$progress_sender, 100_usize);
     };
 }
 
@@ -144,22 +148,36 @@ fn install_toolchain(
         let config_info = "Configuring environment variables...".to_string();
         let cargo_config_info = "Writing cargo configuration...".to_string();
         let req_install_info = "Installing dependencies & standalone tools...".to_string();
-        let tc_install_info = "Installing rust toolchain components...".to_string();
+        let tc_install_info =
+            "Installing rust minimal toolchain and extra components...".to_string();
         let cargo_install_info = "Installing cargo tools...".to_string();
+
+        // Initialize a progress sender.
+        // NOTE: the first 10 percent is not sended by this helper struct.
+        let mut progress_sender = MultiThreadProgress::new(&tx_detail, &tx_progress, 10);
 
         // TODO: Use continuous progress
         steps! {
             redirect,
             tx_detail,
             tx_progress,
-            (init_info, let mut config = InstallConfiguration::init(Path::new(&install_dir), false)?;);
-            (config_info, config.config_rustup_env_vars()?;);
-            (cargo_config_info, config.config_cargo()?;);
+            (init_info, Some(5), let mut config = InstallConfiguration::init(Path::new(&install_dir), false)?);
+            (config_info, Some(7), config.config_rustup_env_vars()?);
+            (cargo_config_info, Some(10), config.config_cargo()?);
             // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
-            (req_install_info, config.install_set_of_tools(&toolset_components)?;);
-            (tc_install_info, config.install_rust_with_optional_components(&manifest, Some(toolchain_components.as_slice()))?;);
+            (req_install_info, None, {
+                progress_sender.val = 30;
+                config.install_set_of_tools(&toolset_components, &mut progress_sender)?;
+            });
+            (tc_install_info, None, {
+                progress_sender.val = 30;
+                config.install_rust_with_optional_components(&manifest, Some(toolchain_components.as_slice()), &mut progress_sender)?;
+            });
             // install third-party tools via cargo that got installed by rustup
-            (cargo_install_info, config.cargo_install_set_of_tools(&toolset_components)?;)
+            (cargo_install_info, None, {
+                progress_sender.val = 30;
+                config.cargo_install_set_of_tools(&toolset_components, &mut progress_sender)?;
+            })
         };
 
         // Manually drop this, to tell instruct the thread stop capturing output.
@@ -173,31 +191,33 @@ fn install_toolchain(
 
     // 在主线程中接收进度并发送事件
     let gui_update_thread = thread::spawn(move || -> anyhow::Result<()> {
+        let mut existing_log = String::new();
         loop {
             // 接收进度
-            if let Ok(progress) = rx_progress.recv() {
+            if let Ok(progress) = rx_progress.try_recv() {
                 main_thread_window_clone.emit("install-progress", progress)?;
             }
-            if let Ok(detail) = rx_detail.recv() {
+            if let Ok(detail) = rx_detail.try_recv() {
                 main_thread_window_clone.emit("install-details", detail)?;
             }
 
-            if install_thread.is_finished() {
-                // Install log should be created once the install thread starts running,
-                // unless it hasn't, which means something was wrong before it could be created,
-                // and we should give up writting logs and exit this thread.
-                let Some(mut log_file) = LOG_FILE.get().and_then(|path| {
-                    fs::OpenOptions::new()
-                        .read(true)
-                        .append(true)
-                        .open(path)
-                        .ok()
-                }) else {
-                    main_thread_window_clone
-                        .emit("install-details", "ERROR: unable to read install log.")?;
-                    return Ok(());
-                };
+            // Install log should be created once the install thread starts running,
+            // otherwise we'll keep waiting.
+            let Some(mut log_file) = LOG_FILE.get().and_then(|path| {
+                fs::OpenOptions::new()
+                    .read(true)
+                    .append(true)
+                    .open(path)
+                    .ok()
+            }) else {
+                continue;
+            };
 
+            if let Some(new_content) = get_new_log_content(&mut existing_log, &mut log_file) {
+                main_thread_window_clone.emit("install-details", new_content)?;
+            }
+
+            if install_thread.is_finished() {
                 return if let Err(known_error) = install_thread
                     .join()
                     .expect("unexpected error occurs when running installation thread.")
@@ -214,6 +234,8 @@ fn install_toolchain(
                     Ok(())
                 };
             }
+
+            thread::sleep(Duration::from_millis(500));
         }
     });
 
@@ -224,6 +246,22 @@ fn install_toolchain(
     }
 
     Ok(())
+}
+
+fn get_new_log_content(old_content: &mut String, file: &mut File) -> Option<String> {
+    let mut new_content = String::new();
+    file.read_to_string(&mut new_content).ok()?;
+
+    if new_content.len() > old_content.len() {
+        let new_stuff = new_content[old_content.len()..].to_string();
+        *old_content = new_content;
+        // TODO: We need some advance rule to filter irrelevant infomation instead.
+        if new_stuff.trim().starts_with("info") {
+            return Some(new_stuff);
+        }
+    }
+
+    None
 }
 
 fn capture_output_to_file(

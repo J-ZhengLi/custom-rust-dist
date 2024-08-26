@@ -229,6 +229,13 @@ impl ToolInfo {
         }
     }
 
+    pub fn is_cargo_tool(&self) -> bool {
+        matches!(
+            self,
+            ToolInfo::PlainVersion(_) | ToolInfo::Git { .. } | ToolInfo::DetailedVersion { .. }
+        )
+    }
+
     pub fn convert_to_path(&mut self, path: PathBuf) {
         match self {
             Self::PlainVersion(ver) => {

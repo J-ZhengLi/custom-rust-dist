@@ -113,6 +113,10 @@ mod windows_related {
         let have_msvc = windows_registry::find_tool(env!("TARGET"), "cl.exe").is_some();
         if !have_msvc  {
             missing_comps.push(BuildToolsComponents::Msvc);
+        } else {
+            // Assuming the build tools were already installed if `MSVC` was installed.
+            // This is because checking `WindowsSDK` using the below method is not guranteed to work.
+            return vec![];
         }
 
         let have_windows_sdk_libs = || {
