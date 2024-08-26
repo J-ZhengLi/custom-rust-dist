@@ -95,8 +95,8 @@ onMounted(() => {
         <div>组件</div>
         <div ml="1.5rem">
           <base-check-box
+            flex="~ items-center"
             v-model="checkedAllBundle"
-            h="1.5rem"
             title="全选"
             @click="handleSelectAll"
           />

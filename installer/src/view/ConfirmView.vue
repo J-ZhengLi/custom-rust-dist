@@ -6,7 +6,12 @@ import { computed } from 'vue';
 
 const { routerPush, routerBack } = useCustomRouter();
 const path = installConf.path;
-const components = computed(() => installConf.getCheckedComponents());
+
+const components = computed(() => {
+  const list = installConf.getCheckedComponents();
+  list.sort((a, b) => a.id - b.id);
+  return list;
+});
 
 function handleNextClick() {
   invokeCommand('install_toolchain', {
