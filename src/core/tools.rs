@@ -209,10 +209,21 @@ impl PluginType {
                             "{op}ing extension '{}' for program '{program}'",
                             plugin_path.display()
                         );
-                        utils::execute(
+                        match utils::execute(
                             program,
                             &[arg_opt.as_str(), utils::path_to_str(plugin_path)?],
-                        )?;
+                        ) {
+                            Ok(()) => continue,
+                            // Ignore error when uninstalling.
+                            Err(_) if uninstall => {
+                                println!(
+                                    "warning: plugin '{}' for '{program}' is not installed, skipping...",
+                                    plugin_path.display()
+                                );
+                                continue;
+                            }
+                            Err(e) => return Err(e),
+                        }
                     }
                 }
             }
