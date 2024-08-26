@@ -76,6 +76,7 @@ watch(group.items, (newValue) => {
     <transition name="group">
       <div v-if="groupExpand" ml="3rem">
         <base-check-box
+          flex="~ items-center"
           v-for="item of group.items"
           :key="item.value.name"
           v-model="item.checked"
