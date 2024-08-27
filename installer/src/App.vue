@@ -28,7 +28,7 @@ onMounted(() => {
     Segoe UI Symbol;
   font-size: 14px;
   line-height: 24px;
-  letter-spacing: 1px;
+  letter-spacing: normal;
   font-weight: 400;
   --uno: bg-back c-header;
   font-synthesis: none;

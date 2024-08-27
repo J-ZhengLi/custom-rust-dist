@@ -91,8 +91,8 @@ onMounted(() => {
   <div flex="~ col" w="full" h="full">
     <h4 ml="12px">安装选项</h4>
     <div flex="1 ~" p="12px" overflow="auto">
-      <scroll-box grow="1" basis="150px">
-        <div>组件</div>
+      <scroll-box overflow-auto p="4px" grow="1">
+        <div p="t-8px l-8px">组件</div>
         <div ml="1.5rem">
           <base-check-box
             flex="~ items-center"

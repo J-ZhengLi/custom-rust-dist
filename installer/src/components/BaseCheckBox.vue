@@ -49,7 +49,7 @@ function titleClick() {
         <mdi-check v-if="isChecked" c="active" />
       </slot>
     </span>
-    <span ml="4px" line-clamp="1" @click="titleClick">
+    <span ml="4px" @click="titleClick" whitespace-nowrap>
       <slot>{{ title }}</slot>
     </span>
   </label>
