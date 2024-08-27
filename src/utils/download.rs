@@ -4,10 +4,11 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::time::Duration;
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use reqwest::blocking::{Client, ClientBuilder};
-use reqwest::Proxy;
 use url::Url;
+
+use crate::manifest::Proxy;
 
 use super::progress_bar::{ProgressIndicator, Style};
 
@@ -32,8 +33,9 @@ impl<T: Sized> DownloadOpt<T> {
         proxy: Option<Proxy>,
         handler: Option<ProgressIndicator<T>>,
     ) -> Result<Self> {
-        let proxy = proxy.unwrap_or_else(|| Proxy::custom(|url| env_proxy::for_url(url).to_url()));
-        let client = client_builder().proxy(proxy).build()?;
+        let client = client_builder()
+            .proxy(proxy.unwrap_or_default().try_into()?)
+            .build()?;
         Ok(Self {
             name,
             client,
@@ -52,11 +54,16 @@ impl<T: Sized> DownloadOpt<T> {
             return Ok(());
         }
 
-        let mut resp = self.client.get(url.as_ref()).send()?;
+        let mut resp = self.client.get(url.as_ref()).send().with_context(|| {
+            format!(
+                "failed to receive surver response when downloading from '{}':",
+                url.as_str()
+            )
+        })?;
         let status = resp.status();
         if !status.is_success() {
             bail!(
-                "failed to receive surver response when downloading from '{}': {status}",
+                "server returns error when attempting download from '{}': {status}",
                 url.as_str()
             );
         }
@@ -118,12 +125,11 @@ impl<T: Sized> DownloadOpt<T> {
     }
 }
 
-/// Download a file without resuming.
-pub fn download_from_start<S: ToString>(name: S, url: &Url, dest: &Path) -> Result<()> {
+/// Download a file without resuming, with proxy settings.
+pub fn download<S: ToString>(name: S, url: &Url, dest: &Path, proxy: Option<&Proxy>) -> Result<()> {
     let dl_opt = DownloadOpt::new(
         name.to_string(),
-        // Keep proxy to `None` for now.
-        None,
+        proxy.cloned(),
         Some(ProgressIndicator::new()),
     )?;
     dl_opt.download_file(url, dest, false)

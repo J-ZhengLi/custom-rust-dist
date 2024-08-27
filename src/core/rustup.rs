@@ -6,10 +6,8 @@ use url::Url;
 
 use super::install::InstallConfiguration;
 use super::parser::manifest::ToolsetManifest;
-use crate::utils;
-use crate::utils::create_executable_file;
-use crate::utils::download_from_start;
-use crate::utils::execute;
+use crate::manifest::Proxy;
+use crate::utils::{create_executable_file, download, execute, force_url_join};
 
 #[cfg(windows)]
 pub(crate) const RUSTUP_INIT: &str = "rustup-init.exe";
@@ -29,11 +27,16 @@ impl Rustup {
         Self
     }
 
-    pub(crate) fn download_rustup_init(&self, dest: &Path, server: &Url) -> Result<()> {
+    pub(crate) fn download_rustup_init(
+        &self,
+        dest: &Path,
+        server: &Url,
+        proxy: Option<&Proxy>,
+    ) -> Result<()> {
         let download_url =
-            utils::force_url_join(server, &format!("dist/{}/{RUSTUP_INIT}", env!("TARGET")))
+            force_url_join(server, &format!("dist/{}/{RUSTUP_INIT}", env!("TARGET")))
                 .context("Failed to init rustup download url.")?;
-        download_from_start(RUSTUP_INIT, &download_url, dest).context("Failed to download rustup.")
+        download(RUSTUP_INIT, &download_url, dest, proxy).context("Failed to download rustup.")
     }
 
     pub(crate) fn generate_rustup(&self, rustup_init: &PathBuf) -> Result<()> {
@@ -78,7 +81,11 @@ impl Rustup {
         let temp_dir = config.create_temp_dir("rustup-init")?;
         let rustup_init = temp_dir.path().join(RUSTUP_INIT);
         // Download rustup-init.
-        self.download_rustup_init(&rustup_init, &config.rustup_update_root)?;
+        self.download_rustup_init(
+            &rustup_init,
+            &config.rustup_update_root,
+            manifest.proxy.as_ref(),
+        )?;
         // File permission
         create_executable_file(&rustup_init)?;
         // Install rustup.

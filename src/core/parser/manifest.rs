@@ -19,12 +19,14 @@ use super::TomlParser;
 /// A map of tools, contains the name and source package information.
 pub type ToolMap = IndexMap<String, ToolInfo>;
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToolsetManifest {
     pub(crate) rust: RustToolchain,
     #[serde(default)]
     pub(crate) tools: Tools,
+    /// Proxy settings that used for download.
+    pub proxy: Option<Proxy>,
     /// Path to the manifest file.
     #[serde(skip)]
     path: Option<PathBuf>,
@@ -121,6 +123,37 @@ impl ToolsetManifest {
             }
         }
         Ok(())
+    }
+}
+
+/// The proxy for download, if not set, the program will fallback to use
+/// environment settings instead.
+#[derive(Debug, Deserialize, PartialEq, Eq, Default, Clone)]
+pub struct Proxy {
+    http: Option<Url>,
+    https: Option<Url>,
+    #[serde(alias = "no-proxy")]
+    no_proxy: Option<String>,
+}
+
+impl TryFrom<Proxy> for reqwest::Proxy {
+    type Error = anyhow::Error;
+    fn try_from(value: Proxy) -> std::result::Result<Self, Self::Error> {
+        let base = match (value.http, value.https) {
+            // When nothing provided, use env proxy if there is.
+            (None, None) => reqwest::Proxy::custom(|url| env_proxy::for_url(url).to_url()),
+            // When both are provided, use the provided https proxy.
+            (Some(http), Some(https)) => reqwest::Proxy::all(https)?,
+            (Some(http), None) => reqwest::Proxy::http(http)?,
+            (None, Some(https)) => reqwest::Proxy::https(https)?,
+        };
+        let with_no_proxy = if let Some(no_proxy) = value.no_proxy {
+            base.no_proxy(reqwest::NoProxy::from_string(&no_proxy))
+        } else {
+            // Fallback to using env var
+            base.no_proxy(reqwest::NoProxy::from_env())
+        };
+        Ok(with_no_proxy)
     }
 }
 
@@ -376,8 +409,7 @@ version = "1.0.0"
             ToolsetManifest::from_str(input).unwrap(),
             ToolsetManifest {
                 rust: RustToolchain::new("1.0.0"),
-                tools: Tools::default(),
-                path: None,
+                ..Default::default()
             }
         )
     }
@@ -455,7 +487,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
                     aarch64_linux_gnu_tools,
                 ),
             ]),
-            path: None,
+            ..Default::default()
         };
 
         assert_eq!(ToolsetManifest::from_str(input).unwrap(), expected);
@@ -508,7 +540,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
                     ]),
                 ),
             ]),
-            path: None,
+            ..Default::default()
         };
         assert_eq!(ToolsetManifest::from_str(input).unwrap(), expected);
     }
@@ -818,6 +850,29 @@ description = "Everything provided by official Rust-lang"
                 name: "complete".into(),
                 verbose_name: Some("Everything".into()),
                 description: Some("Everything provided by official Rust-lang".into()),
+            }
+        );
+    }
+
+    #[test]
+    fn with_proxy() {
+        let input = r#"
+[rust]
+version = "1.0.0"
+[proxy]
+http = "http://username:password@proxy.example.com:8080"
+https = "https://username:password@proxy.example.com:8080"
+no-proxy = "localhost,some.domain.com"
+"#;
+        let expected = ToolsetManifest::from_str(input).unwrap();
+        assert_eq!(
+            expected.proxy.unwrap(),
+            Proxy {
+                http: Some(Url::parse("http://username:password@proxy.example.com:8080").unwrap()),
+                https: Some(
+                    Url::parse("https://username:password@proxy.example.com:8080").unwrap()
+                ),
+                no_proxy: Some("localhost,some.domain.com".into())
             }
         );
     }
