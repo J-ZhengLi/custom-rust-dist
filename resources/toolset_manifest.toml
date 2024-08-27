@@ -1,8 +1,13 @@
 [rust]
 version = "stable"
-profile = "minimal"
+group = "Rust"
 components = ["clippy", "rustfmt", "rust-src", "rust-docs"]
 optional-components = ["llvm-tools-preview", "rust-analysis"]
+
+[rust.profile]
+name = "minimal"
+verbose-name = "Basic"
+description = "Basic set of tools to use Rust properly"
 
 [tools.descriptions]
 clippy = "A collection of lints to catch common mistakes and improve your Rust code."

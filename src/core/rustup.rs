@@ -54,7 +54,7 @@ impl Rustup {
         let version = manifest.rust.version.clone();
         let mut args = vec!["toolchain", "install", &version, "--no-self-update"];
         if let Some(profile) = &manifest.rust.profile {
-            args.extend(["--profile", profile]);
+            args.extend(["--profile", &profile.name]);
         }
         execute(rustup, &args)
     }
