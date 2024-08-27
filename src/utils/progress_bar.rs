@@ -35,7 +35,7 @@ impl<'a> MultiThreadProgress<'a> {
     }
     pub fn send_progress(&mut self) -> Result<()> {
         if let Some(sender) = self.prog_sender {
-            self.cur_progress += self.val;
+            self.cur_progress = (self.cur_progress + self.val).min(100);
             sender.send(self.cur_progress)?;
         }
         Ok(())

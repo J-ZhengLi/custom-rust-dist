@@ -11,7 +11,7 @@ mod progress_bar;
 
 use std::path::{Path, PathBuf};
 
-pub use download::download_from_start;
+pub use download::download;
 pub use extraction::{Extractable, ExtractableKind};
 pub use file_system::*;
 pub use process::*;

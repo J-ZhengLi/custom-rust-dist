@@ -167,7 +167,7 @@ fn install_toolchain(
             // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
             (req_install_info, None, {
                 progress_sender.val = 30;
-                config.install_set_of_tools(&toolset_components, &mut progress_sender)?;
+                config.install_set_of_tools(&toolset_components, &mut progress_sender, manifest.proxy.as_ref())?;
             });
             (tc_install_info, None, {
                 progress_sender.val = 30;

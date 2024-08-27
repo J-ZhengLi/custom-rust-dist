@@ -8,6 +8,7 @@ use anyhow::{bail, Result};
 
 use crate::{core::custom_instructions, utils, InstallConfiguration};
 
+#[derive(Debug)]
 /// Representing the structure of an (extracted) tool's directory.
 pub(crate) enum Tool<'a> {
     /// Pre-built executable files.

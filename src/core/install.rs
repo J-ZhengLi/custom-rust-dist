@@ -10,6 +10,7 @@ use super::{
 };
 use crate::{
     core::os::add_to_path,
+    manifest::Proxy,
     utils::{self, Extractable, MultiThreadProgress},
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -97,6 +98,9 @@ impl Default for InstallConfiguration {
 
 impl InstallConfiguration {
     pub fn init(install_dir: &Path, dry_run: bool) -> Result<Self> {
+        if install_dir.parent().is_none() {
+            bail!("unable to install in root directory");
+        }
         let this = Self {
             install_dir: install_dir.to_path_buf(),
             ..Default::default()
@@ -189,13 +193,19 @@ impl InstallConfiguration {
         let Some(tools_to_install) = manifest.current_target_tools() else {
             return Ok(());
         };
-        self.install_set_of_tools(tools_to_install.iter(), &mut MultiThreadProgress::default())
+        let proxy = manifest.proxy.as_ref();
+        self.install_set_of_tools(
+            tools_to_install.iter(),
+            &mut MultiThreadProgress::default(),
+            proxy,
+        )
     }
 
     pub fn install_set_of_tools<'a, M: IntoIterator<Item = (&'a String, &'a ToolInfo)>>(
         &self,
         tools: M,
         mt_prog: &mut MultiThreadProgress,
+        proxy: Option<&Proxy>,
     ) -> Result<()> {
         // Ignore tools that need to be installed using `cargo install`
         let to_install = tools
@@ -208,10 +218,10 @@ impl InstallConfiguration {
             mt_prog.val / to_install.len()
         };
 
-        for (idx, (name, tool)) in to_install.iter().enumerate() {
+        for (name, tool) in to_install {
             send_and_print(&format!("installing '{name}'"), mt_prog)?;
-            install_tool(self, name, tool)?;
-            mt_prog.send_any_progress((idx + 1) * sub_progress_delta)?;
+            install_tool(self, name, tool, proxy)?;
+            mt_prog.send_any_progress(sub_progress_delta)?;
         }
 
         Ok(())
@@ -267,12 +277,10 @@ impl InstallConfiguration {
             mt_prog.val / to_install.len()
         };
 
-        for (idx, (name, tool)) in to_install.iter().enumerate() {
-            if tool.is_cargo_tool() {
-                send_and_print(&format!("installing '{name}' using cargo"), mt_prog)?;
-                install_tool(self, name, tool)?;
-                mt_prog.send_any_progress((idx + 1) * sub_progress_delta)?;
-            }
+        for (name, tool) in to_install {
+            send_and_print(&format!("installing '{name}' using cargo"), mt_prog)?;
+            install_tool(self, name, tool, None)?;
+            mt_prog.send_any_progress(sub_progress_delta)?;
         }
 
         Ok(())
@@ -319,7 +327,12 @@ pub fn default_install_dir() -> PathBuf {
 
 // TODO: Write version info after installing each tool,
 // which is later used for updating.
-fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> Result<()> {
+fn install_tool(
+    config: &InstallConfiguration,
+    name: &str,
+    tool: &ToolInfo,
+    proxy: Option<&Proxy>,
+) -> Result<()> {
     match tool {
         ToolInfo::PlainVersion(version) => {
             if config.cargo_is_installed {
@@ -372,7 +385,7 @@ fn install_tool(config: &InstallConfiguration, name: &str, tool: &ToolInfo) -> R
 
             let dest = temp_dir.path().join(downloaded_file_name);
 
-            utils::download_from_start(name, url, &dest)?;
+            utils::download(name, url, &dest, proxy)?;
             // TODO: Then do the `extract or copy to` like `ToolInfo::Path`
             try_install_from_path(config, name, &dest)?;
         }
