@@ -51,12 +51,18 @@ impl ToolsetManifest {
 
     /// Get the group name of a certain tool, if exist.
     pub fn group_name(&self, toolname: &str) -> Option<&str> {
-        for (group, tools) in &self.tools.group {
-            if tools.contains(toolname) {
-                return Some(group);
-            }
-        }
-        None
+        self.tools
+            .group
+            .iter()
+            .find_map(|(group, tools)| tools.contains(toolname).then_some(group.as_str()))
+    }
+
+    pub fn toolchain_group_name(&self) -> &str {
+        self.rust.name.as_deref().unwrap_or("Rust Toolchain")
+    }
+
+    pub fn toolchain_profile(&self) -> Option<&ToolchainProfile> {
+        self.rust.profile.as_ref()
     }
 
     /// Get a map of [`Tool`] that are available only in current target.
@@ -118,26 +124,54 @@ impl ToolsetManifest {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct RustToolchain {
     pub(crate) version: String,
-    pub(crate) profile: Option<String>,
+    pub(crate) profile: Option<ToolchainProfile>,
     /// Components are installed by default
     #[serde(default)]
     pub(crate) components: Vec<String>,
     /// Optional components are only installed if user choose to.
     #[serde(default)]
     pub(crate) optional_components: Vec<String>,
+    /// Specifies a verbose name if this was provided.
+    #[serde(alias = "group")]
+    pub(crate) name: Option<String>,
 }
 
 impl RustToolchain {
     pub(crate) fn new(ver: &str) -> Self {
         Self {
             version: ver.to_string(),
-            profile: None,
-            components: vec![],
-            optional_components: vec![],
+            ..Default::default()
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct ToolchainProfile {
+    pub name: String,
+    pub verbose_name: Option<String>,
+    pub description: Option<String>,
+}
+
+impl Default for ToolchainProfile {
+    fn default() -> Self {
+        Self {
+            name: "default".to_string(),
+            verbose_name: None,
+            description: None,
+        }
+    }
+}
+
+impl From<&str> for ToolchainProfile {
+    fn from(value: &str) -> Self {
+        Self {
+            name: value.to_string(),
+            ..Default::default()
         }
     }
 }
@@ -353,7 +387,7 @@ version = "1.0.0"
         let input = r#"
 [rust]
 version = "1.0.0"
-profile = "minimal"
+profile = { name = "minimal" }
 components = ["clippy-preview", "llvm-tools-preview"]
 
 [tools.target.x86_64-pc-windows-msvc]
@@ -405,7 +439,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
                 version: "1.0.0".into(),
                 profile: Some("minimal".into()),
                 components: vec!["clippy-preview".into(), "llvm-tools-preview".into()],
-                optional_components: vec![],
+                ..Default::default()
             },
             tools: Tools::new([
                 (
@@ -435,7 +469,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
                 version: "stable".into(),
                 profile: Some("minimal".into()),
                 components: vec!["clippy-preview".into(), "rustfmt".into()],
-                optional_components: vec![],
+                ..Default::default()
             },
             tools: Tools::new([
                 (
@@ -734,6 +768,57 @@ t3 = { ver = "0.3.0", optional = true } # use cargo install
                 required: false,
                 optional: true
             })
+        );
+    }
+
+    #[test]
+    fn with_rust_toolchain_name() {
+        let specified = r#"
+[rust]
+version = "1.0.0"
+name = "Rust-lang"
+"#;
+        let expected = ToolsetManifest::from_str(specified).unwrap();
+        assert_eq!(expected.toolchain_group_name(), "Rust-lang");
+
+        let unspecified = "[rust]\nversion = \"1.0.0\"";
+        let expected = ToolsetManifest::from_str(unspecified).unwrap();
+        assert_eq!(expected.toolchain_group_name(), "Rust Toolchain");
+    }
+
+    #[test]
+    fn detailed_profile() {
+        let basic = r#"
+[rust]
+version = "1.0.0"
+[rust.profile]
+name = "minimal"
+"#;
+        let expected = ToolsetManifest::from_str(basic).unwrap();
+        assert_eq!(
+            expected.rust.profile.unwrap(),
+            ToolchainProfile {
+                name: "minimal".into(),
+                ..Default::default()
+            }
+        );
+
+        let full = r#"
+[rust]
+version = "1.0.0"
+[rust.profile]
+name = "complete"
+verbose-name = "Everything"
+description = "Everything provided by official Rust-lang"
+"#;
+        let expected = ToolsetManifest::from_str(full).unwrap();
+        assert_eq!(
+            expected.rust.profile.unwrap(),
+            ToolchainProfile {
+                name: "complete".into(),
+                verbose_name: Some("Everything".into()),
+                description: Some("Everything provided by official Rust-lang".into()),
+            }
         );
     }
 }

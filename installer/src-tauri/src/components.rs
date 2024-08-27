@@ -61,16 +61,19 @@ impl Component {
 }
 
 pub fn get_component_list_from_manifest() -> Result<Vec<Component>> {
-    let mut components = vec![
-        Component::new("Rust", "Basic set of tools to run Rust compiler")
-            .group_name(Some("Rust toolchain"))
-            .is_toolchain_component(true)
-            .required(true),
-    ];
-
     // TODO: Download manifest form remote server for online build
     let mut manifest = manifest::baked_in_manifest()?;
     manifest.adjust_paths()?;
+
+    let profile = manifest.toolchain_profile().cloned().unwrap_or_default();
+    let profile_name = profile.verbose_name.as_deref().unwrap_or(&profile.name);
+    let mut components = vec![Component::new(
+        profile_name,
+        profile.description.as_deref().unwrap_or_default(),
+    )
+    .group_name(Some(manifest.toolchain_group_name()))
+    .is_toolchain_component(true)
+    .required(true)];
 
     for component in manifest.optional_toolchain_components() {
         components.push(
@@ -78,7 +81,7 @@ pub fn get_component_list_from_manifest() -> Result<Vec<Component>> {
                 component,
                 manifest.get_tool_description(component).unwrap_or_default(),
             )
-            .group_name(Some("Rust toolchain"))
+            .group_name(Some(manifest.toolchain_group_name()))
             .optional(true)
             .is_toolchain_component(true),
         );

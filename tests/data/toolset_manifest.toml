@@ -1,6 +1,6 @@
 [rust]
 version = "stable"
-profile = "minimal"
+profile = { name = "minimal" }
 components = ["clippy-preview", "rustfmt"]
 
 [tools.target.x86_64-pc-windows-msvc]
