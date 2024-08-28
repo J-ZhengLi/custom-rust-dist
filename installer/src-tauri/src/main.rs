@@ -109,8 +109,11 @@ fn install_toolchain(
     );
     let toolchain_components: Vec<String> = components_list
         .into_iter()
+        // Skip the mocked `rust toolchain` component that we added first,
+        // it will be installed as requirement anyway.
+        .skip(1)
         .filter_map(|comp| {
-            if comp.is_toolchain_component && comp.name != "Rust" {
+            if comp.is_toolchain_component {
                 Some(comp.name)
             } else {
                 None

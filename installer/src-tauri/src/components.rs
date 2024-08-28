@@ -67,6 +67,7 @@ pub fn get_component_list_from_manifest() -> Result<Vec<Component>> {
 
     let profile = manifest.toolchain_profile().cloned().unwrap_or_default();
     let profile_name = profile.verbose_name.as_deref().unwrap_or(&profile.name);
+    // Add a component that represents rust toolchain
     let mut components = vec![Component::new(
         profile_name,
         profile.description.as_deref().unwrap_or_default(),
