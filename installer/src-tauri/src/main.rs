@@ -109,8 +109,11 @@ fn install_toolchain(
     );
     let toolchain_components: Vec<String> = components_list
         .into_iter()
+        // Skip the mocked `rust toolchain` component that we added first,
+        // it will be installed as requirement anyway.
+        .skip(1)
         .filter_map(|comp| {
-            if comp.is_toolchain_component && comp.name != "Rust" {
+            if comp.is_toolchain_component {
                 Some(comp.name)
             } else {
                 None
@@ -162,7 +165,7 @@ fn install_toolchain(
             tx_detail,
             tx_progress,
             (init_info, Some(5), let mut config = InstallConfiguration::init(Path::new(&install_dir), false)?);
-            (config_info, Some(7), config.config_rustup_env_vars()?);
+            (config_info, Some(7), config.config_env_vars(&manifest)?);
             (cargo_config_info, Some(10), config.config_cargo()?);
             // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
             (req_install_info, None, {

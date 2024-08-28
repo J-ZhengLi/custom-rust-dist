@@ -9,21 +9,30 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
     use anyhow::anyhow;
 
     fn any_existing_child_path(root: &Path, childs: &[&str]) -> Option<PathBuf> {
-        for child in childs {
-            let child_path = root.join(child);
-            if child_path.exists() {
-                return Some(child_path);
-            }
+        fn inner_(root: &Path, childs: &[&str]) -> Option<PathBuf> {
+            childs.iter().find_map(|child| {
+                let child_path = root.join(child);
+                child_path.exists().then_some(child_path)
+            })
         }
-        None
-    }
 
-    // Step 1: Make an install command, or no command if everything are already installed.
-    let missing_components = windows_related::get_missing_build_tools_components();
-    if missing_components.is_empty() {
-        println!("skipping build tools installation, no need to re-install");
-        return Ok(());
+        if let Some(found) = inner_(root, childs) {
+            Some(found)
+        } else {
+            // Keep looking in sub dir.
+            // TODO: This is due to the fact that we have poor zip extraction function atm.
+            // Since it doesn't skip common prefix, we have to manually look for matches
+            // by getting into sub directories at depth 1. Delete this branch once it can skip prefix.
+            let Ok(entries) = utils::walk_dir(root, false) else { return None };
+            for sub_dir in entries.iter().filter(|p| p.is_dir()) {
+                if let Some(found) = inner_(sub_dir.as_path(), childs) {
+                    return Some(found);
+                }
+            }
+            None
+        }
     }
+    
     // VS Build Tools changed their installer binary name to `CamelCase` at some point.
     let buildtools_exe = any_existing_child_path(path, &["vs_BuildTools.exe", "vs_buildtools.exe"])
         .ok_or_else(|| anyhow!("unable to find the build tools installer binary."))?;
@@ -35,7 +44,7 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
         "--passive",
         "--focusedUi",
     ];
-    for component in missing_components {
+    for component in windows_related::required_components() {
         cmd.push("--add");
         cmd.push(component.component_id());
     }
@@ -73,7 +82,7 @@ pub(super) fn uninstall() -> Result<()> {
 
 #[cfg(windows)]
 pub(super) fn already_installed() -> bool {
-    windows_related::get_missing_build_tools_components().is_empty()
+    windows_related::is_msvc_installed()
 }
 
 #[cfg(not(windows))]
@@ -103,37 +112,31 @@ mod windows_related {
         }
     }
 
-    pub(crate) fn get_missing_build_tools_components() -> Vec<BuildToolsComponents> {
+    pub(super) fn is_msvc_installed() -> bool {
+        // Other targets don't need MSVC, so assume it has already installed
         if !env!("TARGET").contains("msvc") {
-            return vec![];
+            return true;
         }
 
-        let mut missing_comps = vec![];
+        windows_registry::find_tool(env!("TARGET"), "cl.exe").is_some()
+    }
 
-        let have_msvc = windows_registry::find_tool(env!("TARGET"), "cl.exe").is_some();
-        if !have_msvc  {
-            missing_comps.push(BuildToolsComponents::Msvc);
+    fn is_windows_sdk_installed() -> bool {
+        if let Some(paths) = std::env::var_os("lib") {
+            std::env::split_paths(&paths)
+                .any(|path| {
+                    path.join("kernel32.lib").exists()
+                })
         } else {
-            // Assuming the build tools were already installed if `MSVC` was installed.
-            // This is because checking `WindowsSDK` using the below method is not guranteed to work.
-            return vec![];
-        }
-
-        let have_windows_sdk_libs = || {
-            if let Some(paths) = std::env::var_os("lib") {
-                for mut path in std::env::split_paths(&paths) {
-                    path.push("kernel32.lib");
-                    if path.exists() {
-                        return true;
-                    }
-                }
-            }
             false
-        };
-        if !have_windows_sdk_libs() {
-            missing_comps.push(BuildToolsComponents::WinSDK);
         }
+    }
 
-        missing_comps
+    pub(crate) fn required_components() -> Vec<BuildToolsComponents> {
+        if is_windows_sdk_installed() {
+            vec![BuildToolsComponents::Msvc]
+        } else {
+            vec![BuildToolsComponents::Msvc, BuildToolsComponents::WinSDK]
+        }
     }
 }

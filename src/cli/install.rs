@@ -1,9 +1,9 @@
 //! Separated module to handle installation related behaviors in command line.
 
 use crate::core::install::{
-    default_rustup_dist_server, default_rustup_update_root, InstallConfiguration,
+    default_rustup_dist_server, default_rustup_update_root, EnvConfig, InstallConfiguration,
 };
-use crate::core::{try_it, EnvConfig};
+use crate::core::try_it;
 use crate::manifest::baked_in_manifest;
 use crate::utils;
 
@@ -32,6 +32,10 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         .unwrap_or_else(utils::home_dir)
         .join(env!("CARGO_PKG_NAME"));
 
+    // TODO: Download manifest form remote server for online build
+    let mut manifest = baked_in_manifest()?;
+    manifest.adjust_paths()?;
+
     let mut config = InstallConfiguration::init(&install_dir, false)?
         .cargo_registry(cargo_registry)
         .rustup_dist_server(
@@ -44,13 +48,8 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
                 .clone()
                 .unwrap_or_else(|| default_rustup_update_root().clone()),
         );
-    config.config_rustup_env_vars()?;
+    config.config_env_vars(&manifest)?;
     config.config_cargo()?;
-
-    // TODO: Download manifest form remote server for online build
-
-    let mut manifest = baked_in_manifest()?;
-    manifest.adjust_paths()?;
 
     // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
     config.install_tools(&manifest)?;

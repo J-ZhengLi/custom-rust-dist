@@ -130,10 +130,10 @@ impl ToolsetManifest {
 /// environment settings instead.
 #[derive(Debug, Deserialize, PartialEq, Eq, Default, Clone)]
 pub struct Proxy {
-    http: Option<Url>,
-    https: Option<Url>,
+    pub http: Option<Url>,
+    pub https: Option<Url>,
     #[serde(alias = "no-proxy")]
-    no_proxy: Option<String>,
+    pub no_proxy: Option<String>,
 }
 
 impl TryFrom<Proxy> for reqwest::Proxy {

@@ -1,16 +1,16 @@
 use std::process::Command;
 
 use super::install_dir_from_exe_path;
-use crate::core::install::InstallConfiguration;
+use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
-use crate::core::EnvConfig;
+use crate::manifest::ToolsetManifest;
 use anyhow::Result;
 
 pub(crate) use rustup::*;
 
 impl EnvConfig for InstallConfiguration {
-    fn config_rustup_env_vars(&self) -> Result<()> {
-        let vars_raw = self.env_vars()?;
+    fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()> {
+        let vars_raw = self.env_vars(manifest)?;
         for (key, val) in vars_raw {
             set_env_var(key, val.encode_utf16().collect())?;
         }
@@ -212,6 +212,9 @@ pub(crate) mod rustup {
             if env.get_raw_value(key).is_err() {
                 return Ok(());
             }
+            // Delete for current process
+            env::remove_var(key);
+            // Delete for user environment
             env.delete_value(key)?;
         } else {
             // Set for current process
@@ -221,7 +224,7 @@ pub(crate) mod rustup {
                 bytes: to_winreg_bytes(val),
                 vtype: RegType::REG_EXPAND_SZ,
             };
-            // Set for persist user environment
+            // Set for user environment
             env.set_raw_value(key, &reg_value)?;
         }
 
@@ -244,11 +247,23 @@ pub(crate) mod rustup {
         }
     }
 
+    /// Attempt to find the position of given path in the `PATH` environment variable.
+    fn find_path_in_env(paths: &[u16], path_bytes: &[u16]) -> Option<usize> {
+        paths
+            .windows(path_bytes.len())
+            .position(|path| path == path_bytes)
+    }
+
     pub(crate) fn add_to_path(path: &Path) -> Result<()> {
         let Some(old_path) = get_windows_path_var()? else {
             return Ok(());
         };
         let path_bytes = path.as_os_str().encode_wide().collect::<Vec<_>>();
+
+        if find_path_in_env(&old_path, &path_bytes).is_some() {
+            // The path is already added, return without doing anything.
+            return Ok(());
+        };
 
         let mut new_path = path_bytes;
         new_path.push(b';' as u16);
@@ -268,10 +283,7 @@ pub(crate) mod rustup {
         };
         let path_bytes = path.as_os_str().encode_wide().collect::<Vec<_>>();
 
-        let Some(idx) = old_path
-            .windows(path_bytes.len())
-            .position(|path| path == path_bytes)
-        else {
+        let Some(idx) = find_path_in_env(&old_path, &path_bytes) else {
             // The path is not added, return without doing anything.
             return Ok(());
         };
