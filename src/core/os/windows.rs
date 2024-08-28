@@ -1,16 +1,16 @@
 use std::process::Command;
 
 use super::install_dir_from_exe_path;
-use crate::core::install::InstallConfiguration;
+use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
-use crate::core::EnvConfig;
+use crate::manifest::ToolsetManifest;
 use anyhow::Result;
 
 pub(crate) use rustup::*;
 
 impl EnvConfig for InstallConfiguration {
-    fn config_rustup_env_vars(&self) -> Result<()> {
-        let vars_raw = self.env_vars()?;
+    fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()> {
+        let vars_raw = self.env_vars(manifest)?;
         for (key, val) in vars_raw {
             set_env_var(key, val.encode_utf16().collect())?;
         }

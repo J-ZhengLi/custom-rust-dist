@@ -65,6 +65,18 @@ declare_install_paths!(
     TOOLS_DIR
 );
 
+/// Contains definition of installation steps, including pre-install configs.
+///
+/// Make sure to always call `init()` as it creates essential folders to
+/// hold the installation files.
+pub trait EnvConfig {
+    /// Configure environment variables.
+    ///
+    /// This will set persistent environment variables including
+    /// `RUSTUP_DIST_SERVER`, `RUSTUP_UPDATE_ROOT`, `CARGO_HOME`, `RUSTUP_HOME`, etc.
+    fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()>;
+}
+
 // If you change any public fields in this struct,
 // make sure to change `installer/src/utils/types/InstallConfiguration.ts` as well.
 #[derive(Debug, Deserialize, Serialize)]
@@ -169,7 +181,10 @@ impl InstallConfiguration {
         get_path_and_create!(TOOLS_DIR, self.install_dir.join("tools"))
     }
 
-    pub(crate) fn env_vars(&self) -> Result<Vec<(&'static str, String)>> {
+    pub(crate) fn env_vars(
+        &self,
+        manifest: &ToolsetManifest,
+    ) -> Result<Vec<(&'static str, String)>> {
         let cargo_home = self
             .cargo_home()
             .to_str()
@@ -179,12 +194,26 @@ impl InstallConfiguration {
         // converted to string with the `cargo_home` variable.
         let rustup_home = self.rustup_home().to_str().unwrap().to_string();
 
-        let env_vars: Vec<(&str, String)> = vec![
+        let mut env_vars: Vec<(&str, String)> = vec![
             (RUSTUP_DIST_SERVER, self.rustup_dist_server.to_string()),
             (RUSTUP_UPDATE_ROOT, self.rustup_update_root.to_string()),
             (CARGO_HOME, cargo_home),
             (RUSTUP_HOME, rustup_home),
         ];
+
+        // Add proxy settings if has
+        if let Some(proxy) = &manifest.proxy {
+            if let Some(url) = &proxy.http {
+                env_vars.push(("http_proxy", url.to_string()));
+            }
+            if let Some(url) = &proxy.https {
+                env_vars.push(("https_proxy", url.to_string()));
+            }
+            if let Some(s) = &proxy.no_proxy {
+                env_vars.push(("no_proxy", s.to_string()));
+            }
+        }
+
         Ok(env_vars)
     }
 

@@ -1,9 +1,9 @@
 use std::{env, path::Path};
 
 use super::install_dir_from_exe_path;
-use crate::core::install::InstallConfiguration;
+use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
-use crate::core::EnvConfig;
+use crate::manifest::ToolsetManifest;
 use crate::utils;
 use anyhow::{Context, Result};
 
@@ -13,8 +13,8 @@ impl EnvConfig for InstallConfiguration {
     // to invoke `$CARGO_HOME/env.{sh|fish}`. Sadly we'll have to re-implement a similar procedure here,
     // because rustup will not write those file if a user has choose to pass `--no-modify-path`.
     // Which is not ideal for env vars such as `RUSTUP_DIST_SERVER`.
-    fn config_rustup_env_vars(&self) -> Result<()> {
-        let vars_raw = self.env_vars()?;
+    fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()> {
+        let vars_raw = self.env_vars(manifest)?;
         for sh in shell::get_available_shells() {
             // Shell commands to set env var, such as `export KEY='val'`
             let vars_shell_lines = vars_raw
