@@ -150,7 +150,16 @@ pub(super) fn add_to_path(path: &Path) -> Result<()> {
     for sh in shell::get_available_shells() {
         for rc in sh.update_rcs() {
             let rc_content = utils::read_to_string(&rc)?;
-            let new_content = config_section_with_updated_path(sh.as_ref(), path_str, &rc_content);
+            let Some(new_content) =
+                config_section_with_updated_path(sh.as_ref(), path_str, &rc_content)
+            else {
+                println!(
+                    "warning: unable to add path '{}' to rc file '{}' as it might already exists.",
+                    path.display(),
+                    rc.display(),
+                );
+                continue;
+            };
             utils::write_file(&rc, &new_content, false).with_context(|| {
                 format!(
                     "failed to append PATH variable to shell profile: '{}'",
@@ -168,11 +177,13 @@ pub(super) fn add_to_path(path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Attempt to return a new config section with updated path string.
+/// Return `None` if it doesn't need to be updated or it cannot be updated.
 fn config_section_with_updated_path(
     sh: &dyn shell::UnixShell,
     path_str: &str,
     old_content: &str,
-) -> String {
+) -> Option<String> {
     if let Some(existing_configs) = get_sub_string_between(
         old_content,
         shell::RC_FILE_SECTION_START,
@@ -180,10 +191,15 @@ fn config_section_with_updated_path(
     ) {
         // Find the line that is setting path variable
         let maybe_setting_path = existing_configs.lines().find(|line| line.contains("PATH"));
-        // Safe to unwrap, the function could only return `None` when removing.
-        let new_content = sh
-            .command_to_update_path(maybe_setting_path, path_str, false)
-            .unwrap();
+
+        // Check if the path was already exported.
+        if let Some(path_export) = maybe_setting_path {
+            if path_export.contains(path_str) {
+                return None;
+            }
+        }
+
+        let new_content = sh.command_to_update_path(maybe_setting_path, path_str, false)?;
 
         let mut new_configs = existing_configs.clone();
         if let Some(setting_path) = maybe_setting_path {
@@ -193,11 +209,11 @@ fn config_section_with_updated_path(
             new_configs.push_str(&new_content);
         }
 
-        old_content.replace(&existing_configs, &new_configs)
+        Some(old_content.replace(&existing_configs, &new_configs))
     } else {
         // No previous configuration (this might never happed tho)
-        let path_configs = sh.command_to_update_path(None, path_str, false).unwrap();
-        sh.script_content(&path_configs)
+        let path_configs = sh.command_to_update_path(None, path_str, false)?;
+        Some(sh.script_content(&path_configs))
     }
 }
 
@@ -679,7 +695,8 @@ export PATH=/some/user/defined/bin:$PATH
 
         let path_to_add = "/path/to/rust/bin";
         let shell = shell::Bash;
-        let new_content = config_section_with_updated_path(&shell, path_to_add, existing_rc);
+        let new_content =
+            config_section_with_updated_path(&shell, path_to_add, existing_rc).unwrap();
 
         assert_eq!(
             new_content,
@@ -716,9 +733,10 @@ export PATH=/some/user/defined/bin:$PATH
         let path_to_add = "/path/to/python/bin";
         let another_path_to_add = "/path/to/ruby/bin";
         let shell = shell::Bash;
-        let new_content = config_section_with_updated_path(&shell, path_to_add, existing_rc);
         let new_content =
-            config_section_with_updated_path(&shell, another_path_to_add, &new_content);
+            config_section_with_updated_path(&shell, path_to_add, existing_rc).unwrap();
+        let new_content =
+            config_section_with_updated_path(&shell, another_path_to_add, &new_content).unwrap();
 
         assert_eq!(
             new_content,

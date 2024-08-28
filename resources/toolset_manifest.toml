@@ -1,3 +1,6 @@
+[proxy]
+no-proxy = "localhost,127.0.0.1"
+
 [rust]
 version = "stable"
 group = "Rust"
@@ -28,8 +31,8 @@ Misc = [ "flamegraph", "cargo-expand" ]
 [tools.target.x86_64-pc-windows-msvc]
 buildtools = { required = true, path = "packages/x86_64-pc-windows-msvc/BuildTools-With-SDK.zip", version = "1" }
 cargo-llvm-cov = { optional = true, url = "https://github.com/taiki-e/cargo-llvm-cov/releases/download/v0.6.11/cargo-llvm-cov-x86_64-pc-windows-msvc.zip", version = "0.6.11" }
-vscode = { path = "packages/x86_64-pc-windows-msvc/VSCode-win32-x64-1.91.1.zip", version = "1.91.1" }
-vscode-rust-analyzer = { path = "packages/x86_64-pc-windows-msvc/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix", version = "0.4.2054" }
+vscode = { path = "packages/x86_64-pc-windows-gnu/VSCode-win32-x64-1.91.1.zip", version = "1.91.1" }
+vscode-rust-analyzer = { path = "packages/x86_64-pc-windows-gnu/rust-lang.rust-analyzer-0.4.2054@win32-x64.vsix", version = "0.4.2054" }
 cargo-expand = { optional = true, ver = "1.0.88" }
 
 [tools.target.x86_64-pc-windows-gnu]

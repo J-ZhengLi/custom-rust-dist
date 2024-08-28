@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { event } from '@tauri-apps/api';
-import { onMounted, ref } from 'vue';
+import { onMounted } from 'vue';
 import { useCustomRouter } from '../router';
 import { installConf, invokeCommand } from '../utils';
 
 const { routerPush, routerBack } = useCustomRouter();
-const diskRequire = ref(33);
+// const diskRequire = ref(33);
 
 function handleNextClick() {
   routerPush('/components');
@@ -49,9 +49,9 @@ onMounted(() => {
         <base-button ml="12px" @click="openFolder">选择文件夹</base-button>
       </div>
     </div>
-    <div mx="12px">
+    <!-- <div mx="12px">
       <p>至少需要{{ diskRequire.toFixed(1) }}M的磁盘空间</p>
-    </div>
+    </div> -->
     <div h="60px" flex="~ justify-end items-center">
       <base-button mr="12px" @click="routerBack">上一步</base-button>
       <base-button mr="12px" @click="handleNextClick">下一步</base-button>
