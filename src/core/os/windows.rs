@@ -217,8 +217,15 @@ pub(crate) mod rustup {
             // Delete for user environment
             env.delete_value(key)?;
         } else {
-            // Set for current process
-            env::set_var(key, OsString::from_wide(&val));
+            // TODO: We need a better approch (?)
+            // `PATH` changes for current process should be applied before passing to this function.
+            // Because on windows, PATH variable are splited into `user` and `system`,
+            // since the `val` passed here usually for `user` only, setting var here will erase the
+            // system PATH variable.
+            if key != "PATH" {
+                // Set for current process
+                env::set_var(key, OsString::from_wide(&val));
+            }
 
             let reg_value = RegValue {
                 bytes: to_winreg_bytes(val),
@@ -254,6 +261,30 @@ pub(crate) mod rustup {
             .position(|path| path == path_bytes)
     }
 
+    pub(super) fn update_path_for_current_process(path: &Path, is_remove: bool) -> Result<()> {
+        let orig_path = env::var_os("PATH");
+        match (orig_path, is_remove) {
+            (Some(path_oss), false) => {
+                let mut path_list = env::split_paths(&path_oss).collect::<Vec<_>>();
+                // Bruh... come on, rustc
+                if path_list.contains(&path.to_path_buf()) {
+                    return Ok(());
+                }
+                path_list.insert(0, path.to_path_buf());
+                env::set_var("PATH", env::join_paths(path_list)?);
+            }
+            (None, false) => env::set_var("PATH", path.as_os_str()),
+            (Some(path_oss), true) => {
+                let path_list = env::split_paths(&path_oss).collect::<Vec<_>>();
+                let new_paths = path_list.iter().filter(|p| *p != path);
+                env::set_var("PATH", env::join_paths(new_paths)?);
+            }
+            // Nothing to remove
+            (None, true) => (),
+        }
+        Ok(())
+    }
+
     pub(crate) fn add_to_path(path: &Path) -> Result<()> {
         let Some(old_path) = get_windows_path_var()? else {
             return Ok(());
@@ -271,6 +302,7 @@ pub(crate) mod rustup {
 
         // Apply the new path
         set_env_var("PATH", new_path)?;
+        update_path_for_current_process(path, false)?;
         // Sync changes
         update_env();
 
@@ -306,9 +338,36 @@ pub(crate) mod rustup {
 
         // Apply the new path
         set_env_var("PATH", new_path)?;
+        update_path_for_current_process(path, true)?;
         // Sync changes
         update_env();
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::rustup;
+
+    #[test]
+    fn update_path() {
+        let dummy_path = PathBuf::from("/path/to/non_exist/bin");
+        let cur_paths = std::env::var_os("PATH").unwrap_or_default();
+
+        // ADD
+        rustup::update_path_for_current_process(&dummy_path, false).unwrap();
+        let new_paths = std::env::var_os("PATH").unwrap();
+        let mut expected = dummy_path.as_os_str().to_os_string();
+        expected.push(";");
+        expected.push(cur_paths.clone());
+        assert_eq!(new_paths, expected);
+
+        // REMOVE
+        rustup::update_path_for_current_process(&dummy_path, true).unwrap();
+        let new_paths = std::env::var_os("PATH").unwrap();
+        assert_eq!(new_paths, cur_paths);
     }
 }

@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use custom_rust_dist::utils;
+use custom_rust::utils;
 
 #[test]
 fn walk_dir_recursive() {

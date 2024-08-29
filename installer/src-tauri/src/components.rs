@@ -1,5 +1,5 @@
 use crate::Result;
-use custom_rust_dist::manifest;
+use custom_rust::manifest;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU32, Ordering};
 

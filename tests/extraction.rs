@@ -1,4 +1,4 @@
-use custom_rust_dist::utils::{self, Extractable};
+use custom_rust::utils::{self, Extractable};
 use std::path::PathBuf;
 use tempfile::TempDir;
 
