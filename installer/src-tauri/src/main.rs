@@ -10,10 +10,10 @@ use std::time::Duration;
 use std::{env, thread};
 
 use anyhow::Context;
-use custom_rust_dist::cli::{parse_installer_cli, parse_manager_cli, Installer};
-use custom_rust_dist::manifest::{baked_in_manifest, ToolInfo};
-use custom_rust_dist::utils::MultiThreadProgress;
-use custom_rust_dist::{try_it, utils, EnvConfig, InstallConfiguration};
+use custom_rust::cli::{parse_installer_cli, parse_manager_cli, Installer};
+use custom_rust::manifest::{baked_in_manifest, ToolInfo};
+use custom_rust::utils::MultiThreadProgress;
+use custom_rust::{try_it, utils, EnvConfig, InstallConfiguration};
 use indexmap::IndexMap;
 use tauri::api::dialog::FileDialogBuilder;
 use xuanwu_installer::components::{get_component_list_from_manifest, Component};
@@ -39,7 +39,7 @@ fn default_install_dir() -> String {
     CLI_ARGS
         .get()
         .and_then(|opt| opt.install_dir().map(|p| p.to_path_buf()))
-        .unwrap_or_else(custom_rust_dist::default_install_dir)
+        .unwrap_or_else(custom_rust::default_install_dir)
         .to_string_lossy()
         .to_string()
 }
@@ -309,7 +309,7 @@ fn component_list_to_map(list: Vec<&Component>) -> IndexMap<String, ToolInfo> {
 
 fn main() -> Result<()> {
     match utils::lowercase_program_name() {
-        Some(s) if s.starts_with("xuanwu-manager") => {
+        Some(s) if s.contains("-manager") => {
             let cli = parse_manager_cli();
             if !cli.no_gui {
                 // TODO: Add manager UI to manage install toolchain/tools, including
