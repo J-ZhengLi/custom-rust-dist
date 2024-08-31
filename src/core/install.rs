@@ -443,7 +443,7 @@ fn try_install_from_path(config: &InstallConfiguration, name: &str, path: &Path)
 /// If `maybe_file` is a path to compressed file, this will try to extract it to `dest`;
 /// otherwise this will copy that file into dest.
 fn extract_or_copy_to(maybe_file: &Path, dest: &Path) -> Result<PathBuf> {
-    if let Ok(extractable) = Extractable::try_from(maybe_file) {
+    if let Ok(mut extractable) = Extractable::load(maybe_file) {
         extractable.extract_to(dest)?;
         Ok(dest.to_path_buf())
     } else {

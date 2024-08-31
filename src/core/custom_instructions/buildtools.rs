@@ -9,28 +9,10 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
     use anyhow::anyhow;
 
     fn any_existing_child_path(root: &Path, childs: &[&str]) -> Option<PathBuf> {
-        fn inner_(root: &Path, childs: &[&str]) -> Option<PathBuf> {
-            childs.iter().find_map(|child| {
-                let child_path = root.join(child);
-                child_path.exists().then_some(child_path)
-            })
-        }
-
-        if let Some(found) = inner_(root, childs) {
-            Some(found)
-        } else {
-            // Keep looking in sub dir.
-            // TODO: This is due to the fact that we have poor zip extraction function atm.
-            // Since it doesn't skip common prefix, we have to manually look for matches
-            // by getting into sub directories at depth 1. Delete this branch once it can skip prefix.
-            let Ok(entries) = utils::walk_dir(root, false) else { return None };
-            for sub_dir in entries.iter().filter(|p| p.is_dir()) {
-                if let Some(found) = inner_(sub_dir.as_path(), childs) {
-                    return Some(found);
-                }
-            }
-            None
-        }
+        childs.iter().find_map(|child| {
+            let child_path = root.join(child);
+            child_path.exists().then_some(child_path)
+        })
     }
     
     // VS Build Tools changed their installer binary name to `CamelCase` at some point.
