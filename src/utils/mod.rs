@@ -12,7 +12,7 @@ mod progress_bar;
 use std::path::{Path, PathBuf};
 
 pub use download::download;
-pub use extraction::{Extractable, ExtractableKind};
+pub use extraction::Extractable;
 pub use file_system::*;
 pub use process::*;
 pub use progress_bar::MultiThreadProgress;
