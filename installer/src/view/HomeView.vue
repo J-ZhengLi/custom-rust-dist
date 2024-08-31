@@ -46,26 +46,17 @@ function handleInstallClick(custom: boolean) {
       </a>
     </div>
     <div grow="2">
-      <h1>欢迎使用玄武 Rust 一键式安装工具</h1>
+      <h1>欢迎使用玄武 Rust 一站式开发套件</h1>
     </div>
     <div basis="120px" w="full" text="center">
       <div flex="~ items-end justify-center">
-        <div w="6rem"></div>
         <base-button
           w="12rem"
           mx="8px"
           text="1.2rem"
           font="bold"
-          @click="handleInstallClick(false)"
-          >快速安装</base-button
-        >
-        <a
-          w="6rem"
-          c="active"
-          decoration="hover:underline"
-          cursor="pointer"
           @click="handleInstallClick(true)"
-          >自定义安装</a
+          >安装</base-button
         >
       </div>
       <base-check-box v-model="isUserAgree" mt="8px"
