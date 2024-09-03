@@ -20,6 +20,7 @@ tempfile.workspace = true
 gag = "1"
 custom_rust = { path = "../..", features = [ "gui" ] }
 indexmap.workspace = true
+rust-i18n.workspace = true
 
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!

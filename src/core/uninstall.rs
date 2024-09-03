@@ -58,7 +58,7 @@ impl UninstallConfiguration {
         });
 
         for tool in tools_to_remove {
-            println!("uninstalling '{}'", tool.name());
+            println!("{}", t!("uninstalling_tool_info", name = tool.name()));
             tool.uninstall()?;
         }
 

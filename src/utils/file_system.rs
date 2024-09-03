@@ -277,10 +277,7 @@ pub fn move_to(src: &Path, dest: &Path, force: bool) -> Result<()> {
     // try copy and delete.
     copy_as(src, dest)?;
     if remove(src).is_err() {
-        println!(
-            "warning: unable to remove '{}', please try manually removing it",
-            src.display()
-        )
+        println!("{}", t!("remove_path_fail_warn", path = src.display()));
     }
 
     Ok(())

@@ -207,8 +207,13 @@ impl PluginType {
                         let op = if uninstall { "uninstall" } else { "install" };
                         let arg_opt = format!("--{op}-extension");
                         println!(
-                            "{op}ing extension '{}' for program '{program}'",
-                            plugin_path.display()
+                            "{}",
+                            t!(
+                                "handling_extension_info",
+                                op = op,
+                                ext = plugin_path.display(),
+                                program = program
+                            )
                         );
                         match utils::execute(
                             program,
@@ -218,8 +223,12 @@ impl PluginType {
                             // Ignore error when uninstalling.
                             Err(_) if uninstall => {
                                 println!(
-                                    "warning: plugin '{}' for '{program}' is not installed, skipping...",
-                                    plugin_path.display()
+                                    "{}",
+                                    t!(
+                                        "skip_extension_uninstall_warn",
+                                        ext = plugin_path.display(),
+                                        program = program
+                                    )
                                 );
                                 continue;
                             }

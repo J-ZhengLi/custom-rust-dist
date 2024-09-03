@@ -57,10 +57,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
     // install third-party tools via cargo that got installed by rustup
     config.cargo_install(&manifest)?;
 
-    println!(
-        "Rust is installed, \
-        this setup will soon create an example project at current directory for you to try Rust!"
-    );
+    println!("{}", t!("install_finish_info"));
     try_it::try_it(Some(&install_dir))?;
 
     Ok(())

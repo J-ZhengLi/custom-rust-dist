@@ -1,6 +1,9 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[macro_use]
+extern crate rust_i18n;
+
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -22,6 +25,8 @@ use xuanwu_installer::Result;
 static CLI_ARGS: OnceLock<Installer> = OnceLock::new();
 static LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
 
+i18n!("../../locales", fallback = "en");
+
 #[tauri::command]
 fn finish(window: tauri::Window) {
     window.close().unwrap();
@@ -35,7 +40,6 @@ fn close_window(window: tauri::Window) {
 
 #[tauri::command]
 fn default_install_dir() -> String {
-    println!("using default install directory");
     CLI_ARGS
         .get()
         .and_then(|opt| opt.install_dir().map(|p| p.to_path_buf()))
@@ -147,13 +151,12 @@ fn install_toolchain(
         // Note that `rustup` collect `info:` strings in stderr.
         let drop_with_care = capture_output_to_file(file)?;
 
-        let init_info = format!("Initalizing & Creating directory '{install_dir}'...");
-        let config_info = "Configuring environment variables...".to_string();
-        let cargo_config_info = "Writing cargo configuration...".to_string();
-        let req_install_info = "Installing dependencies & standalone tools...".to_string();
-        let tc_install_info =
-            "Installing rust minimal toolchain and extra components...".to_string();
-        let cargo_install_info = "Installing cargo tools...".to_string();
+        let init_info = t!("install_init", dir = install_dir);
+        let config_info = t!("install_env_config");
+        let cargo_config_info = t!("install_cargo_config");
+        let req_install_info = t!("install_tools");
+        let tc_install_info = t!("install_toolchain");
+        let cargo_install_info = t!("install_via_cargo");
 
         // Initialize a progress sender.
         // NOTE: the first 10 percent is not sended by this helper struct.
@@ -284,10 +287,9 @@ fn run_app(install_dir: String) -> Result<()> {
 }
 
 fn send<T>(sender: &Sender<T>, msg: T) {
-    sender.send(msg).unwrap_or_else(|e| {
-        // TODO: Change to error log
-        println!("[ERROR] unable to send tx details: {e}");
-    });
+    sender
+        .send(msg)
+        .unwrap_or_else(|e| println!("{}", t!("channel_communicate_err", sum = e)));
 }
 
 fn component_list_to_map(list: Vec<&Component>) -> IndexMap<String, ToolInfo> {

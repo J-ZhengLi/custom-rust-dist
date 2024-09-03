@@ -38,7 +38,7 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
     utils::copy_file_to(&buildtools_exe, &installer_dir)?;
 
     // Step 3: Invoke the install command.
-    println!("running VS BuildTools installer...");
+    println!("{}", t!("installing_msvc_info"));
     utils::execute(buildtools_exe, &cmd)?;
 
     Ok(())

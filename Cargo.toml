@@ -18,6 +18,7 @@ url = { version = "2", features = ["serde"] }
 toml = "0.8.15"
 tempfile = "3"
 indexmap = { version = "2", features = ["serde"] }
+rust-i18n = "3"
 
 [dependencies]
 anyhow.workspace = true
@@ -40,6 +41,7 @@ common-path = "1.0.0"
 cfg-if = "1"
 env_proxy = "0.4.1"
 indexmap.workspace = true
+rust-i18n.workspace = true
 
 [target."cfg(windows)".dependencies]
 winreg = "0.52.0"
