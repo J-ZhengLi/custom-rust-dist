@@ -28,7 +28,7 @@ pub struct Extractable<'a> {
 
 impl<'a> Extractable<'a> {
     pub fn load(path: &'a Path) -> Result<Self> {
-        println!("loading archive '{}'", path.display());
+        println!("{}", t!("loading_archive_info", path = path.display()));
 
         let ext = path
             .extension()

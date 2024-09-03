@@ -192,10 +192,7 @@ pub(crate) mod rustup {
                 if let Some(s) = from_winreg_value(&val) {
                     Ok(Some(s))
                 } else {
-                    println!(
-                        "the registry key HKEY_CURRENT_USER\\Environment\\PATH is not a string. \
-                        Not modifying the PATH variable"
-                    );
+                    println!("{}", t!("windows_not_modify_path_warn"));
                     Ok(None)
                 }
             }

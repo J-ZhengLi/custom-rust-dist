@@ -75,12 +75,13 @@ where
         .is_none()
     {
         println!(
-            "warning: unable to remove the desired content from file: '{}'. \
-            This could mean it was already removed, \
-            please try manually removing the following content from that file if there's any: \n\n\
-            {to_remove_sum}\n",
-            path.display()
-        )
+            "{}",
+            t!(
+                "unix_remove_env_fail_warn",
+                path = path.display(),
+                val = to_remove_sum
+            )
+        );
     }
     Ok(())
 }
@@ -154,9 +155,12 @@ pub(super) fn add_to_path(path: &Path) -> Result<()> {
                 config_section_with_updated_path(sh.as_ref(), path_str, &rc_content)
             else {
                 println!(
-                    "warning: unable to add path '{}' to rc file '{}' as it might already exists.",
-                    path.display(),
-                    rc.display(),
+                    "{}",
+                    t!(
+                        "unix_add_path_fail_warn",
+                        val = path.display(),
+                        rc_path = rc.display()
+                    )
                 );
                 continue;
             };

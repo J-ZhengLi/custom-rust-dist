@@ -40,9 +40,8 @@ pub fn try_it(path: Option<&Path>) -> Result<()> {
         }
 
         println!(
-            "unable to open example directory with `VSCode` or `file explorer`, \
-            try open it manually: {}",
-            example_dir.display()
+            "{}",
+            t!("open_example_project_warn", dir = example_dir.display())
         );
     }
 
