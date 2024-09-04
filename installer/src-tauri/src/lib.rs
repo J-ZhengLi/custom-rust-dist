@@ -1,4 +1,3 @@
-pub mod components;
 pub type Result<T> = core::result::Result<T, InstallerError>;
 
 use std::fmt::{Debug, Display};

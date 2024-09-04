@@ -1,5 +1,6 @@
 //! Contains all the definition of command line arguments.
 
+mod common;
 mod install;
 mod tryit;
 mod uninstall;

@@ -1,4 +1,6 @@
 {
+    "vendor": "XuanWu",
+
     "install_init": "Initalizing & Creating directory '%{dir}'...",
     "install_env_config": "Configuring environment variables...",
     "install_cargo_config": "Writing cargo configuration...",
@@ -24,5 +26,11 @@
     "skip_extension_uninstall_warn": "warn: extension '%{ext}' for '%{program}' is not installed, skipping...",
 
     "loading_archive_info": "info: loading archive '%{path}'",
-    "channel_communicate_err": "error: unable to send tx details: %{sum}"
+    "channel_communicate_err": "error: unable to send tx details: %{sum}",
+
+    "default": "default",
+    "welcome": "Thanks for using %{vendor} Rust installer.\n\nThis program will guide you through installing the Rust programming language, with additional third party tools of your choice.",
+    "custom_install_help": "Enter the value of each installation options, or just press 'Enter' key to use the default value.",
+    "question_install_dir": "Installation path:",
+    "question_component_choice": "Choose any tools you want to install, separated by spaces (required tools are seleted no matter the input):"
 }

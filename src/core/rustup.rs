@@ -75,7 +75,7 @@ impl Rustup {
         &self,
         config: &InstallConfiguration,
         manifest: &ToolsetManifest,
-        optional_components: Option<&[String]>,
+        optional_components: &[String],
     ) -> Result<()> {
         // We are putting the binary here so that it will be deleted automatically after done.
         let temp_dir = config.create_temp_dir("rustup-init")?;
@@ -96,22 +96,13 @@ impl Rustup {
 
         // Install extra rust components via rustup.
         // NOTE: that the `component` field in manifest is essential
-        let components_to_install = if let Some(opt) = optional_components {
-            manifest
-                .rust
-                .components
-                .iter()
-                .map(|s| s.as_str())
-                .chain(opt.iter().map(|s| s.as_str()))
-                .collect()
-        } else {
-            manifest
-                .rust
-                .components
-                .iter()
-                .map(|s| s.as_str())
-                .collect()
-        };
+        let components_to_install = manifest
+            .rust
+            .components
+            .iter()
+            .map(|s| s.as_str())
+            .chain(optional_components.iter().map(|s| s.as_str()))
+            .collect();
         self.download_rust_components(&rustup, components_to_install)?;
 
         // Remove the `rustup` uninstall entry on windows, because we don't want

@@ -10,7 +10,7 @@ use super::{
 };
 use crate::{
     core::os::add_to_path,
-    manifest::Proxy,
+    manifest::{Proxy, ToolMap},
     utils::{self, Extractable, MultiThreadProgress},
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -217,24 +217,11 @@ impl InstallConfiguration {
         Ok(env_vars)
     }
 
-    /// Steps to install third-party softwares (excluding the ones that requires `cargo install`).
-    pub(crate) fn install_tools(&self, manifest: &ToolsetManifest) -> Result<()> {
-        let Some(tools_to_install) = manifest.current_target_tools() else {
-            return Ok(());
-        };
-        let proxy = manifest.proxy.as_ref();
-        self.install_set_of_tools(
-            tools_to_install.iter(),
-            &mut MultiThreadProgress::default(),
-            proxy,
-        )
-    }
-
-    pub fn install_set_of_tools<'a, M: IntoIterator<Item = (&'a String, &'a ToolInfo)>>(
+    pub fn install_tools_with_progress(
         &self,
-        tools: M,
+        manifest: &ToolsetManifest,
+        tools: &ToolMap,
         mt_prog: &mut MultiThreadProgress,
-        proxy: Option<&Proxy>,
     ) -> Result<()> {
         // Ignore tools that need to be installed using `cargo install`
         let to_install = tools
@@ -249,51 +236,31 @@ impl InstallConfiguration {
 
         for (name, tool) in to_install {
             println!("{}", t!("installing_tool_info", name = name));
-            install_tool(self, name, tool, proxy)?;
+            install_tool(self, name, tool, manifest.proxy.as_ref())?;
             mt_prog.send_any_progress(sub_progress_delta)?;
         }
 
         Ok(())
     }
 
-    /// Install rust's toolchain manager `rustup` with a default toolchain
-    pub(crate) fn install_rust(&mut self, manifest: &ToolsetManifest) -> Result<()> {
-        self.install_rust_with_optional_components(
-            manifest,
-            None,
-            &mut MultiThreadProgress::default(),
-        )
-    }
-
-    pub fn install_rust_with_optional_components(
+    pub fn install_rust_with_progress(
         &mut self,
         manifest: &ToolsetManifest,
-        override_components: Option<&[String]>,
+        optional_components: &[String],
         mt_prog: &mut MultiThreadProgress,
     ) -> Result<()> {
         println!("{}", t!("installing_toolchain_info"));
 
-        Rustup::init().download_toolchain(self, manifest, override_components)?;
+        Rustup::init().download_toolchain(self, manifest, optional_components)?;
         add_to_path(self.cargo_bin())?;
         self.cargo_is_installed = true;
 
         mt_prog.send_progress()
     }
 
-    /// Steps to install `cargo` compatible softwares, should only be called after toolchain installation.
-    pub(crate) fn cargo_install(&self, manifest: &ToolsetManifest) -> Result<()> {
-        let Some(tools_to_install) = manifest.current_target_tools() else {
-            return Ok(());
-        };
-        self.cargo_install_set_of_tools(
-            tools_to_install.iter(),
-            &mut MultiThreadProgress::default(),
-        )
-    }
-
-    pub fn cargo_install_set_of_tools<'a, M: IntoIterator<Item = (&'a String, &'a ToolInfo)>>(
+    pub fn cargo_install_with_progress(
         &self,
-        tools: M,
+        tools: &ToolMap,
         mt_prog: &mut MultiThreadProgress,
     ) -> Result<()> {
         let to_install = tools
