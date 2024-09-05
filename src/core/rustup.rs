@@ -52,22 +52,22 @@ impl Rustup {
         execute(rustup_init, &args)
     }
 
-    fn download_rust_toolchain(&self, rustup: &Path, manifest: &ToolsetManifest) -> Result<()> {
+    fn install_toolchain_via_rustup(
+        &self,
+        rustup: &Path,
+        manifest: &ToolsetManifest,
+        components: Vec<&str>,
+    ) -> Result<()> {
         // TODO: check local manifest.
         let version = manifest.rust.version.clone();
         let mut args = vec!["toolchain", "install", &version, "--no-self-update"];
         if let Some(profile) = &manifest.rust.profile {
             args.extend(["--profile", &profile.name]);
         }
-        execute(rustup, &args)
-    }
-
-    fn download_rust_components(&self, rustup: &Path, components: Vec<&str>) -> Result<()> {
-        if components.is_empty() {
-            return Ok(());
+        if !components.is_empty() {
+            args.push("--component");
+            args.extend(components);
         }
-        let mut args = vec!["component", "add"];
-        args.extend(components);
         execute(rustup, &args)
     }
 
@@ -92,7 +92,6 @@ impl Rustup {
         self.generate_rustup(&rustup_init)?;
         // Install rust toolchain via rustup.
         let rustup = config.cargo_bin().join(RUSTUP);
-        self.download_rust_toolchain(&rustup, manifest)?;
 
         // Install extra rust components via rustup.
         // NOTE: that the `component` field in manifest is essential
@@ -103,7 +102,7 @@ impl Rustup {
             .map(|s| s.as_str())
             .chain(optional_components.iter().map(|s| s.as_str()))
             .collect();
-        self.download_rust_components(&rustup, components_to_install)?;
+        self.install_toolchain_via_rustup(&rustup, manifest, components_to_install)?;
 
         // Remove the `rustup` uninstall entry on windows, because we don't want
         // uses to accidently uninstall `rustup` thus removing the installed binary of this program.
