@@ -48,11 +48,6 @@ pub fn force_url_join(root: &Url, s: &str) -> Result<Url> {
     Ok(result)
 }
 
-/// Flip `Option<Result<T, E>>` to `Result<Option<T>, E>`
-pub fn flip_option_result<T, E>(x: Option<Result<T, E>>) -> Result<Option<T>, E> {
-    x.map_or(Ok(None), |v| v.map(Some))
-}
-
 pub fn path_to_str(path: &Path) -> Result<&str> {
     path.to_str().ok_or_else(|| {
         anyhow::anyhow!(

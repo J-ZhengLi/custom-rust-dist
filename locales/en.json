@@ -1,4 +1,7 @@
 {
+    "vendor": "XuanWu",
+    "vendor_en": "xuanwu",
+
     "install_init": "Initalizing & Creating directory '%{dir}'...",
     "install_env_config": "Configuring environment variables...",
     "install_cargo_config": "Writing cargo configuration...",
@@ -10,7 +13,7 @@
     "installing_toolchain_info": "info: installing rustup and rust toolchain",
     "installing_via_cargo_info": "info: installing '%{name}' using cargo",
     "installing_msvc_info": "info: running VS BuildTools installer...",
-    "install_finish_info": "info: Rust is installed, this setup will soon create an example project at current directory for you to try Rust!",
+    "install_finish_info": "info: Rust is successfully installed!",
 
     "uninstalling_tool_info": "info: uninstalling '%{name}'",
     "unix_remove_env_fail_warn": "warn: unable to remove the desired content from file: '%{path}'. This could mean it was already removed, please try manually removing the following content from that file if there's any: \n\n%{val}\n",
@@ -24,5 +27,24 @@
     "skip_extension_uninstall_warn": "warn: extension '%{ext}' for '%{program}' is not installed, skipping...",
 
     "loading_archive_info": "info: loading archive '%{path}'",
-    "channel_communicate_err": "error: unable to send tx details: %{sum}"
+    "channel_communicate_err": "error: unable to send tx details: %{sum}",
+
+    "default": "default",
+    "required": "required",
+    "description": "Description",
+    "welcome": "Thanks for using %{vendor} Rust installer.\n\nThis program will guide you through installing the Rust programming language, with additional third party tools of your choice.",
+    "custom_install_help": "Enter the value of each installation options, or just press 'Enter' key to use the default value.",
+    "question_install_dir": "Installation path?",
+    "question_component_choice": "Choose what to install: (separated by spaces, required tools are automatically selected)",
+    "question_try_demo": "Do you want to try Rust with a demo project?",
+    
+    "question_install_options": "Proceed with above installation options?",
+    "confirm": "Confirm",
+    "reenter": "Re-enter",
+    "cancel": "Cancel installation",
+    "list_of_ids": "space separated integers less than %{bound}", 
+    "invalid_input": "Invalid input '%{actual}', expecting %{expect}, please try again",
+    "current_install_option": "Current installation options:",
+    "install_dir": "installation path",
+    "selected_components": "selected components"
 }

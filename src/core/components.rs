@@ -1,7 +1,8 @@
-use crate::Result;
-use custom_rust::manifest;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU32, Ordering};
+
+use crate::manifest::{ToolInfo, ToolsetManifest};
 
 static COMPONENTS_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -13,7 +14,7 @@ pub struct Component {
     pub desc: String,
     pub required: bool,
     pub optional: bool,
-    pub tool_installer: Option<manifest::ToolInfo>,
+    pub tool_installer: Option<ToolInfo>,
     pub is_toolchain_component: bool,
     /// Indicates whether this component was already installed or not.
     pub installed: bool,
@@ -38,8 +39,7 @@ macro_rules! setter {
 impl Component {
     #[must_use]
     fn new(name: &str, desc: &str) -> Self {
-        COMPONENTS_COUNTER.fetch_add(1, Ordering::SeqCst);
-        Component {
+        let comp = Component {
             id: COMPONENTS_COUNTER.load(Ordering::Relaxed),
             group_name: None,
             name: name.into(),
@@ -49,7 +49,10 @@ impl Component {
             tool_installer: None,
             is_toolchain_component: false,
             installed: false,
-        }
+        };
+        COMPONENTS_COUNTER.fetch_add(1, Ordering::SeqCst);
+
+        comp
     }
 
     setter!(required(self, bool));
@@ -57,14 +60,10 @@ impl Component {
     setter!(installed(self, bool));
     setter!(is_toolchain_component(self, bool));
     setter!(group_name(self, group: Option<&str>) { group.map(ToOwned::to_owned) });
-    setter!(tool_installer(self, installer: &manifest::ToolInfo) { Some(installer.clone()) });
+    setter!(tool_installer(self, installer: &ToolInfo) { Some(installer.clone()) });
 }
 
-pub fn get_component_list_from_manifest() -> Result<Vec<Component>> {
-    // TODO: Download manifest form remote server for online build
-    let mut manifest = manifest::baked_in_manifest()?;
-    manifest.adjust_paths()?;
-
+pub fn get_component_list_from_manifest(manifest: &ToolsetManifest) -> Result<Vec<Component>> {
     let profile = manifest.toolchain_profile().cloned().unwrap_or_default();
     let profile_name = profile.verbose_name.as_deref().unwrap_or(&profile.name);
     // Add a component that represents rust toolchain

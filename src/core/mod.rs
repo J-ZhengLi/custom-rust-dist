@@ -2,6 +2,7 @@
 //!
 //! Including configuration, toolchain, toolset management.
 
+pub(crate) mod components;
 mod custom_instructions;
 pub mod install;
 mod os;

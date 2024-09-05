@@ -16,10 +16,11 @@ use anyhow::Context;
 use custom_rust::cli::{parse_installer_cli, parse_manager_cli, Installer};
 use custom_rust::manifest::{baked_in_manifest, ToolInfo};
 use custom_rust::utils::MultiThreadProgress;
-use custom_rust::{try_it, utils, EnvConfig, InstallConfiguration};
+use custom_rust::{
+    get_component_list_from_manifest, try_it, utils, Component, EnvConfig, InstallConfiguration,
+};
 use indexmap::IndexMap;
 use tauri::api::dialog::FileDialogBuilder;
-use xuanwu_installer::components::{get_component_list_from_manifest, Component};
 use xuanwu_installer::Result;
 
 static CLI_ARGS: OnceLock<Installer> = OnceLock::new();
@@ -63,7 +64,12 @@ fn select_folder(window: tauri::Window) {
 #[tauri::command]
 fn get_component_list() -> Result<Vec<Component>> {
     // 这里可以放置生成组件列表的逻辑
-    get_component_list_from_manifest()
+
+    // TODO: Download manifest form remote server for online build
+    let mut manifest = baked_in_manifest()?;
+    manifest.adjust_paths()?;
+
+    Ok(get_component_list_from_manifest(&manifest)?)
 }
 
 macro_rules! steps_counter {
@@ -160,7 +166,7 @@ fn install_toolchain(
 
         // Initialize a progress sender.
         // NOTE: the first 10 percent is not sended by this helper struct.
-        let mut progress_sender = MultiThreadProgress::new(&tx_detail, &tx_progress, 10);
+        let mut progress_sender = MultiThreadProgress::new(&tx_progress, 10);
 
         // TODO: Use continuous progress
         steps! {
@@ -173,16 +179,16 @@ fn install_toolchain(
             // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
             (req_install_info, None, {
                 progress_sender.val = 30;
-                config.install_set_of_tools(&toolset_components, &mut progress_sender, manifest.proxy.as_ref())?;
+                config.install_tools_with_progress(&manifest, &toolset_components, &mut progress_sender)?;
             });
             (tc_install_info, None, {
                 progress_sender.val = 30;
-                config.install_rust_with_optional_components(&manifest, Some(toolchain_components.as_slice()), &mut progress_sender)?;
+                config.install_rust_with_progress(&manifest, &toolchain_components, &mut progress_sender)?;
             });
             // install third-party tools via cargo that got installed by rustup
             (cargo_install_info, None, {
                 progress_sender.val = 30;
-                config.cargo_install_set_of_tools(&toolset_components, &mut progress_sender)?;
+                config.cargo_install_with_progress(&toolset_components, &mut progress_sender)?;
             })
         };
 
