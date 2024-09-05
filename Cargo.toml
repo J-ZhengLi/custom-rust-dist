@@ -1,5 +1,5 @@
 [package]
-name = "custom_rust"
+name = "custom-rust"
 version = "0.1.0-alpha.4"
 edition = "2021"
 description = "Manage Rust toolchain and a set of extra tools with ease"

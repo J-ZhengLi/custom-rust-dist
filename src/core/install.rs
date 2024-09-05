@@ -128,11 +128,7 @@ impl InstallConfiguration {
                 // Create a copy of this binary to CARGO_HOME/bin
                 let self_exe = std::env::current_exe()?;
                 // promote this installer to manager
-                let manager_name = self_exe
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .map(|name| name.replace("installer", "manager"))
-                    .unwrap_or(format!("manager{}", utils::EXE_EXT));
+                let manager_name = format!("{}-manager{}", t!("vendor_en"), utils::EXE_EXT);
 
                 let manager_exe = this.cargo_bin().join(manager_name);
                 utils::copy_as(self_exe, &manager_exe)?;
@@ -312,7 +308,7 @@ impl InstallConfiguration {
 }
 
 pub fn default_install_dir() -> PathBuf {
-    utils::home_dir().join(env!("CARGO_PKG_NAME"))
+    utils::home_dir().join(format!("{}-rust", t!("vendor_en")))
 }
 
 // TODO: Write version info after installing each tool,
