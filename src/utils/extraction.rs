@@ -26,10 +26,17 @@ pub struct Extractable<'a> {
     kind: ExtractableKind,
 }
 
+fn print_load_msg(ext: &str, path: &Path) -> Result<()> {
+    writeln!(
+        std::io::stdout(),
+        "{}",
+        t!("loading_archive_info", kind = ext, path = path.display())
+    )?;
+    Ok(())
+}
+
 impl<'a> Extractable<'a> {
     pub fn load(path: &'a Path) -> Result<Self> {
-        println!("{}", t!("loading_archive_info", path = path.display()));
-
         let ext = path
             .extension()
             .ok_or_else(|| {
@@ -47,13 +54,21 @@ impl<'a> Extractable<'a> {
             })?;
 
         let kind = match ext {
-            "7z" => ExtractableKind::SevenZ(SevenZReader::open(path, Password::empty())?),
-            "zip" => ExtractableKind::Zip(ZipArchive::new(File::open(path)?)?),
+            "7z" => {
+                print_load_msg(ext, path)?;
+                ExtractableKind::SevenZ(SevenZReader::open(path, Password::empty())?)
+            }
+            "zip" => {
+                print_load_msg(ext, path)?;
+                ExtractableKind::Zip(ZipArchive::new(File::open(path)?)?)
+            }
             "gz" => {
+                print_load_msg(ext, path)?;
                 let tar_gz = GzDecoder::new(File::open(path)?);
                 ExtractableKind::Gz(tar::Archive::new(tar_gz))
             }
             "xz" => {
+                print_load_msg(ext, path)?;
                 let tar_xz = XzDecoder::new(File::open(path)?);
                 ExtractableKind::Xz(tar::Archive::new(tar_xz))
             }

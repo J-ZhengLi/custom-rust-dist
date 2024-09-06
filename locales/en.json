@@ -26,7 +26,7 @@
     "handling_extension_info": "info: %{op}ing extension '%{ext}' for program '%{program}'",
     "skip_extension_uninstall_warn": "warn: extension '%{ext}' for '%{program}' is not installed, skipping...",
 
-    "loading_archive_info": "info: loading archive '%{path}'",
+    "loading_archive_info": "info: loading %{kind} archive '%{path}'",
     "channel_communicate_err": "error: unable to send tx details: %{sum}",
 
     "default": "default",
