@@ -166,7 +166,7 @@ fn install_toolchain(
 
         // Initialize a progress sender.
         // NOTE: the first 10 percent is not sended by this helper struct.
-        let mut progress_sender = MultiThreadProgress::new(&tx_progress, 10);
+        let mut progress_sender = MultiThreadProgress::new(&tx_detail, &tx_progress, 10);
 
         // TODO: Use continuous progress
         steps! {

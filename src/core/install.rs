@@ -231,7 +231,7 @@ impl InstallConfiguration {
         };
 
         for (name, tool) in to_install {
-            println!("{}", t!("installing_tool_info", name = name));
+            send_and_print(t!("installing_tool_info", name = name), mt_prog)?;
             install_tool(self, name, tool, manifest.proxy.as_ref())?;
             mt_prog.send_any_progress(sub_progress_delta)?;
         }
@@ -245,7 +245,7 @@ impl InstallConfiguration {
         optional_components: &[String],
         mt_prog: &mut MultiThreadProgress,
     ) -> Result<()> {
-        println!("{}", t!("installing_toolchain_info"));
+        send_and_print(t!("installing_toolchain_info"), mt_prog)?;
 
         Rustup::init().download_toolchain(self, manifest, optional_components)?;
         add_to_path(self.cargo_bin())?;
@@ -270,7 +270,7 @@ impl InstallConfiguration {
         };
 
         for (name, tool) in to_install {
-            println!("{}", t!("installing_via_cargo_info", name = name));
+            send_and_print(t!("installing_via_cargo_info", name = name), mt_prog)?;
             install_tool(self, name, tool, None)?;
             mt_prog.send_any_progress(sub_progress_delta)?;
         }
@@ -305,6 +305,12 @@ impl InstallConfiguration {
             .tempdir_in(root)
             .with_context(|| format!("unable to create temp directory under '{}'", root.display()))
     }
+}
+
+fn send_and_print<S: std::fmt::Display>(msg: S, sender: &mut MultiThreadProgress) -> Result<()> {
+    println!("{msg}");
+    sender.send_msg(msg.to_string())?;
+    Ok(())
 }
 
 pub fn default_install_dir() -> PathBuf {
