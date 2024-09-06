@@ -3,7 +3,7 @@ use std::ffi::OsStr;
 use std::fmt::Debug;
 use std::process::{Command, Stdio};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 
 cfg_if::cfg_if! {
     if #[cfg(windows)] {
@@ -38,6 +38,14 @@ pub fn cmd_exist(cmd: &str) -> bool {
         .any(|p| p.exists())
 }
 
+pub fn execute_for_ret_code<P, A>(program: P, args: &[A]) -> Result<i32>
+where
+    P: AsRef<OsStr> + Debug,
+    A: AsRef<OsStr>,
+{
+    shell_execute_with_env(program, args, [], false)
+}
+
 /// Execute a commands using [`Command`] api.
 ///
 /// # Platform specific behaviors:
@@ -55,7 +63,7 @@ where
     A: AsRef<OsStr>,
 {
     #[cfg(windows)]
-    shell_execute_with_env(program, args, [])?;
+    shell_execute_with_env(program, args, [], true)?;
     #[cfg(not(windows))]
     execute_program_with_env(program, args, [])?;
 
@@ -80,7 +88,7 @@ where
     I: IntoIterator<Item = (&'a str, &'a str)>,
 {
     #[cfg(windows)]
-    shell_execute_with_env(program, args, envs)?;
+    shell_execute_with_env(program, args, envs, true)?;
     #[cfg(not(windows))]
     execute_program_with_env(program, args, envs)?;
 
@@ -133,22 +141,12 @@ where
 /// This will return errors if:
 /// 1. The specific command cannot be execute.
 /// 2. The command was executed but failed.
-pub fn shell_execute<P, A>(program: P, args: &[A]) -> Result<()>
-where
-    P: AsRef<OsStr> + Debug,
-    A: AsRef<OsStr>,
-{
-    shell_execute_with_env(program, args, [])
-}
-
-/// Execute commands by invoking shell program, such as `sh` on Unix, `cmd` on Windows.
-///
-/// # Errors
-///
-/// This will return errors if:
-/// 1. The specific command cannot be execute.
-/// 2. The command was executed but failed.
-pub fn shell_execute_with_env<'a, P, A, I>(program: P, args: &[A], vars: I) -> Result<()>
+fn shell_execute_with_env<'a, P, A, I>(
+    program: P,
+    args: &[A],
+    vars: I,
+    expect_success: bool,
+) -> Result<i32>
 where
     P: AsRef<OsStr> + Debug,
     A: AsRef<OsStr>,
@@ -173,11 +171,17 @@ where
     let output = command
         .output()
         .with_context(|| exec_err!(program, args, ""))?;
-    // 检查子进程的退出状态
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(exec_err!(program, args, stderr));
-    }
 
-    Ok(())
+    if !expect_success {
+        output.status.code().ok_or_else(|| {
+            anyhow!(
+                "failed to retrive exit code because the program {:?} was terminated by a signal",
+                program.as_ref()
+            )
+        })
+    } else {
+        // 检查子进程的退出状态
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(exec_err!(program, args, stderr))
+    }
 }
