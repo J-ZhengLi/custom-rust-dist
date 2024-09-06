@@ -1,8 +1,8 @@
 use std::path::Path;
 use anyhow::Result;
+use cc::windows_registry;
 use crate::core::install::InstallConfiguration;
 
-#[cfg(windows)]
 pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> {
     use std::path::PathBuf;
     use crate::utils;
@@ -24,9 +24,10 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
         "--noWeb",
         "--nocache",
         "--passive",
+        "--norestart",
         "--focusedUi",
     ];
-    for component in windows_related::required_components() {
+    for component in required_components() {
         cmd.push("--add");
         cmd.push(component.component_id());
     }
@@ -39,17 +40,20 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> 
 
     // Step 3: Invoke the install command.
     println!("{}", t!("installing_msvc_info"));
-    utils::execute(buildtools_exe, &cmd)?;
-
-    Ok(())
+    let exit_code: VSExitCode = utils::execute_for_ret_code(buildtools_exe, &cmd)?.into();
+    match exit_code {
+        VSExitCode::Success => {
+            println!("info: {}", exit_code);
+            Ok(())
+        }
+        VSExitCode::RebootRequired | VSExitCode::RebootInitiated => {
+            println!("warn: {}", exit_code);
+            Ok(())
+        }
+        _ => Err(anyhow!("unable to install VS buildtools: {}", exit_code))
+    }
 }
 
-#[cfg(not(windows))]
-pub(super) fn install(_path: &Path, _config: &InstallConfiguration) -> Result<()> {
-    Ok(())
-}
-
-#[cfg(windows)]
 pub(super) fn uninstall() -> Result<()> {
     // TODO: Navigate to the vs_buildtools exe that we copied when installing, then execute it with:
     // .\vs_BuildTools.exe uninstall --productId Microsoft.VisualStudio.Product.BuildTools --channelId VisualStudio.17.Release --wait
@@ -57,68 +61,101 @@ pub(super) fn uninstall() -> Result<()> {
     Ok(())
 }
 
-#[cfg(not(windows))]
-pub(super) fn uninstall() -> Result<()> {
-    Ok(())
-}
-
-#[cfg(windows)]
 pub(super) fn already_installed() -> bool {
-    windows_related::is_msvc_installed()
-}
-
-#[cfg(not(windows))]
-pub(super) fn already_installed() -> bool {
-    true
-}
-
-#[cfg(windows)]
-// TODO: move these code that are copied... *ahem* inspired from `rustup` into `utils`
-mod windows_related {
-    use cc::windows_registry;
-
-    #[derive(Debug, Clone, Copy)]
-    pub(crate) enum BuildToolsComponents {
-        Msvc,
-        WinSDK,
+    // Other targets don't need MSVC, so assume it has already installed
+    if !env!("TARGET").contains("msvc") {
+        return true;
     }
 
-    impl BuildToolsComponents {
-        // FIXME: (?) Id might change depending on the version etc.
-        pub(crate) fn component_id(&self) -> &'static str {
-            use BuildToolsComponents::*;
-            match self {
-                Msvc => "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
-                WinSDK => "Microsoft.VisualStudio.Component.Windows11SDK.22000",
+    windows_registry::find_tool(env!("TARGET"), "cl.exe").is_some()
+}
+
+#[derive(Debug, Clone, Copy)]
+enum BuildToolsComponents {
+    Msvc,
+    WinSDK,
+}
+
+impl BuildToolsComponents {
+    // FIXME: (?) Id might change depending on the version etc.
+    fn component_id(&self) -> &'static str {
+        use BuildToolsComponents::*;
+        match self {
+            Msvc => "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+            WinSDK => "Microsoft.VisualStudio.Component.Windows11SDK.22000",
+        }
+    }
+}
+
+fn required_components() -> Vec<BuildToolsComponents> {
+    let is_windows_sdk_installed = if let Some(paths) = std::env::var_os("lib") {
+        std::env::split_paths(&paths)
+            .any(|path| {
+                path.join("kernel32.lib").exists()
+            })
+    } else {
+        false
+    };
+
+    if is_windows_sdk_installed {
+        vec![BuildToolsComponents::Msvc]
+    } else {
+        vec![BuildToolsComponents::Msvc, BuildToolsComponents::WinSDK]
+    }
+}
+
+macro_rules! integer_enum_with_fallback {
+    ($name:ident ( $itype:ty ) { $fallback_var:ident : $fs:expr, $($varient:ident : $s:expr => ($($val:tt)+)),+ }) => {
+        #[non_exhaustive]
+        enum $name {
+            $fallback_var($itype),
+            $($varient),+
+        }
+        impl From<$itype> for $name {
+            fn from(value: $itype) -> $name {
+                match value {
+                    $(
+                        $($val)+ => $name::$varient,
+                    )*
+                    n => $name::$fallback_var(n),
+                }
             }
         }
-    }
-
-    pub(super) fn is_msvc_installed() -> bool {
-        // Other targets don't need MSVC, so assume it has already installed
-        if !env!("TARGET").contains("msvc") {
-            return true;
+        impl std::fmt::Display for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                use $name::*;
+                match self {
+                    $(
+                        $varient => write!(f, "{}", $s),
+                    )*
+                    $fallback_var(n) => write!(f, "{} {n}", $fs)
+                }
+            }
         }
+    };
+}
 
-        windows_registry::find_tool(env!("TARGET"), "cl.exe").is_some()
-    }
-
-    fn is_windows_sdk_installed() -> bool {
-        if let Some(paths) = std::env::var_os("lib") {
-            std::env::split_paths(&paths)
-                .any(|path| {
-                    path.join("kernel32.lib").exists()
-                })
-        } else {
-            false
-        }
-    }
-
-    pub(crate) fn required_components() -> Vec<BuildToolsComponents> {
-        if is_windows_sdk_installed() {
-            vec![BuildToolsComponents::Msvc]
-        } else {
-            vec![BuildToolsComponents::Msvc, BuildToolsComponents::WinSDK]
-        }
+integer_enum_with_fallback! {
+    VSExitCode (i32) {
+        Unknown: "Unknown error",
+        Success: "Operation completed successfully" => (0),
+        RequireElevation: "Elevation required" => (740),
+        VSInstallerRunning: "Visual Studio installer process is running" => (1001),
+        VSProcessRunning: "Visual Studio processes are running" => (8006),
+        VSInUse: "Visual Studio is in use" => (1003),
+        VSInstallerTerminated: "Microsoft Visual Studio Installer was terminated (by the user or external process)" => (-1073741510),
+        AnotherInstallerRunning: "Another installation running" => (1618),
+        RebootInitiated: "Operation completed successfully, and reboot was initiated" => (1641),
+        RebootRequired: "Operation completed successfully, but install requires reboot before it can be used" => (3010),
+        ArgParseError: "Bootstrapper command-line parse error" => (5005),
+        OperationCanceled: "Operation was canceled" => (1602 | 5004),
+        OperationBlocked: "Operation was blocked - the computer does not meet the requirements" => (5007),
+        ArmCheckFailure: "Arm machine check failure" => (8001),
+        DownloadPrecheckFailure: "Background download precheck failure" => (8002),
+        ComponentOutOfSupport: "Out of support selectable failure" => (8003),
+        TargetDirectoryFailure: "Target directory failure" => (8004),
+        PayloadVerifyFailure: "Verifying source payloads failure" => (8005),
+        UnsupportedOS: "Operating System not supported" => (8010),
+        ConnectivityFailure: "Connectivity failure" => (-1073720687)
     }
 }
