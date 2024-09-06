@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, Ref, ref, watch } from 'vue';
-import ScrollBox from '../components/ScrollBox.vue';
-import { installConf } from '../utils';
-import type { Component } from '../utils';
-import { useCustomRouter } from '../router';
-import CheckBoxGroup from '../components/CheckBoxGroup.vue';
+import ScrollBox from '@/components/ScrollBox.vue';
+import { installConf } from '@/utils/index';
+import type {
+  CheckGroup,
+  CheckGroupItem,
+  CheckItem,
+  Component,
+} from '@/utils/index';
+import { useCustomRouter } from '@/router/index';
+import CheckBoxGroup from '@/components/CheckBoxGroup.vue';
 
 const { routerPush, routerBack } = useCustomRouter();
 const selectComponentId = ref(0);
@@ -120,7 +125,7 @@ onMounted(() => {
 
     <div basis="60px" flex="~ justify-end items-center">
       <base-button mr="12px" @click="routerBack">上一步</base-button>
-      <base-button mr="12px" @click="routerPush('/confirm')"
+      <base-button mr="12px" @click="routerPush('/installer/confirm')"
         >下一步</base-button
       >
     </div>

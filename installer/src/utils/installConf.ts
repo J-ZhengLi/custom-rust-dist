@@ -1,6 +1,7 @@
 import { ref, Ref } from 'vue';
 import type { Component, TauriComponent } from './types/Component';
 import { invokeCommand } from './invokeCommand';
+import { CheckGroup, CheckItem } from './types/CheckBoxGroup';
 
 class InstallConf {
   path: Ref<string>;
@@ -119,6 +120,7 @@ class InstallConf {
   async loadAll() {
     await this.loadPath();
     await this.loadComponents();
+    console.log(this.checkComponents.value);
   }
 }
 

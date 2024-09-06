@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import MdiMenuRight from './icons/MdiMenuRight.vue';
 import MdiCheck from './icons/MdiCheck.vue';
 import MdiMinus from './icons/MdiMinus.vue';
+import { CheckGroup, CheckGroupItem } from '@/utils';
 
 type Props<T> = {
   expand: boolean;

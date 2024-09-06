@@ -16,3 +16,7 @@ export interface TauriComponent extends OriginComponent {
   group_name: string | null;
   is_toolchain_component: boolean;
 }
+
+export interface ManagerComponent extends Component {
+  version: string;
+}

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
-import { installConf, invokeCommand } from '../utils';
+import { installConf, invokeCommand } from '@/utils/index';
 
 const runApp = ref(true);
 

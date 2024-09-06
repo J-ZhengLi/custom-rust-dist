@@ -1,14 +1,14 @@
-interface CheckItem<T> {
+export interface CheckItem<T> {
   label: string;
   checked: boolean;
   value: T;
 }
 
-interface CheckGroupItem<T> extends CheckItem<T> {
+export interface CheckGroupItem<T> extends CheckItem<T> {
   selected: boolean;
 }
 
-interface CheckGroup<T> {
+export interface CheckGroup<T> {
   label: string;
   items: CheckGroupItem<T>[];
 }

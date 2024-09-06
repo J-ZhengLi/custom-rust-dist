@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { event } from '@tauri-apps/api';
 import { onMounted } from 'vue';
-import { useCustomRouter } from '../router';
-import { installConf, invokeCommand } from '../utils';
+import { useCustomRouter } from '@/router/index';
+import { installConf, invokeCommand } from '@/utils/index';
 
 const { routerPush, routerBack } = useCustomRouter();
 // const diskRequire = ref(33);
 
 function handleNextClick() {
-  routerPush('/components');
+  routerPush('/installer/components');
 }
 
 function openFolder() {

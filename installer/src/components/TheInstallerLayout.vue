@@ -6,7 +6,7 @@ import TheAside from './TheAside.vue';
 
 const route = useRoute();
 const isBack = computed(() => useCustomRouter().isBack);
-const isHome = computed(() => route.path === '/');
+const isHome = computed(() => route.name === 'Home');
 
 const transitionName = computed(() => {
   if (isBack.value.value === true) return 'back';

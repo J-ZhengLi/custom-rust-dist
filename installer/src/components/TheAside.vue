@@ -6,25 +6,33 @@ import { installConf } from '../utils';
 const router = useRouter();
 
 const menuFirstItem = computed(() => {
-  return router.options.routes.find(
+  const index = router.options.routes.findIndex(
+    (route) => route.name === 'Installer'
+  );
+  return router.options.routes[index].children?.find(
     (item) => (item.meta?.order as number) === 0
   );
 });
-const menu = computed(() =>
-  router.options.routes.filter((item) => {
-    const hasValidOrder = (item.meta?.order as number) > 0;
+const menu = computed(() => {
+  const index = router.options.routes.findIndex(
+    (route) => route.name === 'Installer'
+  );
+  return (
+    router.options.routes[index].children?.filter((item) => {
+      const hasValidOrder = (item.meta?.order as number) > 0;
 
-    if (installConf.isCustomInstall) {
-      return hasValidOrder;
-    }
+      if (installConf.isCustomInstall) {
+        return hasValidOrder;
+      }
 
-    return hasValidOrder && item.meta?.required;
-  })
-);
+      return hasValidOrder && item.meta?.required;
+    }) || []
+  );
+});
 
 const beforeTop = computed(() => {
   return {
-    '--beforeTop': `${(menu.value.findIndex((i) => i.path === router.currentRoute.value.path) + 1) * 150}%`,
+    '--beforeTop': `${(menu.value.findIndex((i) => `/installer/${i.path}` === router.currentRoute.value.path) + 1) * 150}%`,
   };
 });
 
