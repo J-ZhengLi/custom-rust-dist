@@ -180,13 +180,8 @@ pub(crate) enum PluginType {
 }
 
 // This list has a fallback order, DO NOT change the order.
-pub(crate) static VSCODE_FAMILY: &[&str] = &[
-    "hwcode",
-    "wecode",
-    "code-exploration",
-    "code-oss",
-    "code",
-];
+pub(crate) static VSCODE_FAMILY: &[&str] =
+    &["hwcode", "wecode", "code-exploration", "code-oss", "code"];
 
 impl FromStr for PluginType {
     type Err = anyhow::Error;
