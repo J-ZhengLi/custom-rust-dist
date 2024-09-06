@@ -179,9 +179,11 @@ where
                 program.as_ref()
             )
         })
-    } else {
+    } else if !output.status.success() {
         // 检查子进程的退出状态
         let stderr = String::from_utf8_lossy(&output.stderr);
         Err(exec_err!(program, args, stderr))
+    } else {
+        Ok(0)
     }
 }

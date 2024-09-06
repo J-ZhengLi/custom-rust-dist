@@ -123,10 +123,10 @@ impl<'a> Tool<'a> {
                 install_dir_with_bin_(config, name, bin_dir)?;
             }
             Self::Plugin { kind, path, .. } => {
-                // First, we need to "cache" to installer, so that we could uninstall with it.
-                utils::copy_file_to(path, config.tools_dir())?;
-                // Then, run the installation command.
+                // run the installation command.
                 kind.install_plugin(path)?;
+                // we need to "cache" to installer, so that we could uninstall with it.
+                utils::copy_file_to(path, config.tools_dir())?;
             }
         }
         Ok(())
@@ -181,7 +181,7 @@ pub(crate) enum PluginType {
 
 // This list has a fallback order, DO NOT change the order.
 pub(crate) static VSCODE_FAMILY: &[&str] = &[
-    "vscode-huawei",
+    "hwcode",
     "wecode",
     "code-exploration",
     "code-oss",
