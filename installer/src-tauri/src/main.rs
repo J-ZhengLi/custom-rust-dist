@@ -1,6 +1,3 @@
-// Prevents additional console window on Windows in release, DO NOT REMOVE!!
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
 #[macro_use]
 extern crate rust_i18n;
 
@@ -13,14 +10,15 @@ use std::time::Duration;
 use std::{env, thread};
 
 use anyhow::Context;
+use indexmap::IndexMap;
+use tauri::api::dialog::FileDialogBuilder;
+
 use custom_rust::cli::{parse_installer_cli, parse_manager_cli, Installer};
 use custom_rust::manifest::{baked_in_manifest, ToolInfo};
 use custom_rust::utils::MultiThreadProgress;
 use custom_rust::{
     get_component_list_from_manifest, try_it, utils, Component, EnvConfig, InstallConfiguration,
 };
-use indexmap::IndexMap;
-use tauri::api::dialog::FileDialogBuilder;
 use xuanwu_installer::Result;
 
 static CLI_ARGS: OnceLock<Installer> = OnceLock::new();
@@ -341,6 +339,8 @@ fn main() -> Result<()> {
 }
 
 fn gui_main() -> Result<()> {
+    hide_console();
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             close_window,
@@ -354,4 +354,12 @@ fn gui_main() -> Result<()> {
         .run(tauri::generate_context!())
         .context("unknown error occurs while running tauri application")?;
     Ok(())
+}
+
+/// Prevents additional console window on Windows in release
+fn hide_console() {
+    #[cfg(all(windows, not(debug_assertions)))]
+    unsafe {
+        winapi::um::wincon::FreeConsole();
+    }
 }
