@@ -26,11 +26,13 @@
     "handling_extension_info": "info: %{op}ing extension '%{ext}' for program '%{program}'",
     "skip_extension_uninstall_warn": "warn: extension '%{ext}' for '%{program}' is not installed, skipping...",
 
-    "loading_archive_info": "info: loading archive '%{path}'",
+    "loading_archive_info": "info: loading %{kind} archive '%{path}'",
     "channel_communicate_err": "error: unable to send tx details: %{sum}",
 
     "default": "default",
     "required": "required",
+    "installed": "installed",
+    "reinstall": "installed, re-installing",
     "description": "Description",
     "welcome": "Thanks for using %{vendor} Rust installer.\n\nThis program will guide you through installing the Rust programming language, with additional third party tools of your choice.",
     "custom_install_help": "Enter the value of each installation options, or just press 'Enter' key to use the default value.",
@@ -39,6 +41,7 @@
     "question_try_demo": "Do you want to try Rust with a demo project?",
     
     "question_install_options": "Proceed with above installation options?",
+    "pause_prompt": "press ENTER key to continue...",
     "confirm": "Confirm",
     "reenter": "Re-enter",
     "cancel": "Cancel installation",

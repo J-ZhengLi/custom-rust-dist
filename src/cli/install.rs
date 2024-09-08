@@ -3,9 +3,7 @@
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use crate::cli::common::{
-    confirm, confirm_install, question_str, question_str_with_retry, Confirm,
-};
+use crate::cli::common::{self, Confirm};
 use crate::core::install::{
     default_rustup_dist_server, default_rustup_update_root, EnvConfig, InstallConfiguration,
 };
@@ -74,9 +72,12 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
 
     println!("\n{}\n", t!("install_finish_info"));
 
-    if confirm(t!("question_try_demo"), true)? {
+    if common::confirm(t!("question_try_demo"), true)? {
         try_it::try_it(Some(&install_dir))?;
     }
+
+    #[cfg(windows)]
+    common::pause()?;
 
     Ok(())
 }
@@ -96,7 +97,10 @@ impl CustomInstallOpt {
     /// then return user specified installation options.
     fn collect_from_user(prefix: &Path, components: Vec<Component>) -> Result<Self> {
         // This clear the console screen while also move the cursor to top left
+        #[cfg(not(windows))]
         const CLEAR_SCREEN_SPELL: &str = "\x1B[2J\x1B[1:1H";
+        #[cfg(windows)]
+        const CLEAR_SCREEN_SPELL: &str = "";
 
         println!(
             "{CLEAR_SCREEN_SPELL}\n\n{}",
@@ -109,8 +113,10 @@ impl CustomInstallOpt {
         let mut default_choices = vec![];
         let mut enforced_choices = vec![];
         for (idx, c) in components.iter().enumerate() {
-            if c.required {
-                enforced_choices.push(idx);
+            if !c.installed {
+                if c.required {
+                    enforced_choices.push(idx);
+                }
                 if !c.optional {
                     default_choices.push(idx);
                 }
@@ -128,7 +134,7 @@ impl CustomInstallOpt {
         loop {
             // NB: Do NOT change `Some(res?)` to `result.ok()` in this case here,
             // we want to throw error if the input cannot be read.
-            install_dir = question_str(
+            install_dir = common::question_str(
                 t!("question_install_dir"),
                 None,
                 if install_dir.is_empty() {
@@ -137,7 +143,7 @@ impl CustomInstallOpt {
                     &install_dir
                 },
             )?;
-            raw_choices = Some(question_str_with_retry(
+            raw_choices = Some(common::question_str_with_retry(
                 t!("question_component_choice"),
                 Some(&component_list),
                 raw_choices.as_deref().unwrap_or(&default_choices_str),
@@ -168,7 +174,7 @@ impl CustomInstallOpt {
 
             show_confirmation(&install_dir, &choices)?;
 
-            match confirm_install()? {
+            match common::confirm_install()? {
                 Confirm::Yes => {
                     let mut toolchain_components = vec![];
                     let mut toolset = ToolMap::default();
@@ -235,25 +241,31 @@ fn show_confirmation(install_dir: &str, choices: &[&Component]) -> Result<()> {
 
 fn displayed_component_list<'a, I: Iterator<Item = &'a Component>>(
     components: I,
-    name_only: bool,
+    is_confirm: bool,
 ) -> String {
     components
         .enumerate()
         .map(|(idx, c)| {
             format!(
                 "{}{}{}{}",
-                if name_only {
+                if is_confirm {
                     "".to_string()
                 } else {
                     format!("{idx}) ")
                 },
                 &c.name,
-                if c.required {
+                if c.installed {
+                    if is_confirm {
+                        format!(" ({})", t!("reinstall"))
+                    } else {
+                        format!(" ({})", t!("installed"))
+                    }
+                } else if c.required {
                     format!(" ({})", t!("required"))
                 } else {
                     "".to_string()
                 },
-                if name_only || c.desc.is_empty() {
+                if is_confirm || c.desc.is_empty() {
                     "".to_string()
                 } else {
                     format!("\n\t{}: {}", t!("description"), &c.desc)
