@@ -104,6 +104,16 @@ pub(crate) fn confirm_install() -> Result<Confirm> {
     Ok(choice)
 }
 
+#[cfg(windows)]
+pub(crate) fn pause() -> Result<()> {
+    let mut stdout = io::stdout();
+    writeln!(&mut stdout, "\n{}", t!("pause_prompt"))?;
+    _ = stdout.flush();
+
+    readline()?;
+    Ok(())
+}
+
 fn readline() -> Result<String> {
     let mut input_buf = String::new();
     io::stdin()
