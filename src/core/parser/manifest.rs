@@ -1,17 +1,12 @@
-#![allow(unused)]
-
 use std::collections::{HashMap, HashSet};
-use std::ops::Deref;
 use std::{collections::BTreeMap, path::PathBuf};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use tempfile::TempDir;
 use url::Url;
 
 use crate::core::custom_instructions;
-use crate::core::install::InstallConfiguration;
 use crate::utils;
 
 use super::TomlParser;
@@ -67,6 +62,27 @@ impl ToolsetManifest {
         self.rust.profile.as_ref()
     }
 
+    /// Get the path to bundled `rustup-init` binary if there has one.
+    pub fn rustup_bin(&self) -> Result<Option<PathBuf>> {
+        let cur_target = env!("TARGET");
+        let par_dir = self.parent_dir()?;
+        let rel_path = self.rust.rustup.get(cur_target);
+
+        Ok(rel_path.map(|p| par_dir.join(p)))
+    }
+
+    pub fn offline_dist_server(&self) -> Result<Option<Url>> {
+        let par_dir = self.parent_dir()?;
+        let Some(server) = &self.rust.offline_dist_server else {
+            return Ok(None);
+        };
+        let full_path = par_dir.join(server);
+
+        Url::from_directory_path(&full_path)
+            .map(Option::Some)
+            .map_err(|_| anyhow!("path '{}' cannot be converted to URL", full_path.display()))
+    }
+
     /// Get a map of [`Tool`] that are available only in current target.
     pub fn current_target_tools(&self) -> Option<&ToolMap> {
         let cur_target = env!("TARGET");
@@ -91,6 +107,27 @@ impl ToolsetManifest {
             .collect()
     }
 
+    /// The parent directory of this manifest.
+    ///
+    /// If this manifest is baked in, the parent dir will be the same as the parent
+    /// of current binary.
+    ///
+    /// Otherwise, if this manifest was loaded from a path, the parent dir will be the parent
+    /// of that path.
+    fn parent_dir(&self) -> Result<PathBuf> {
+        let res = if let Some(p) = &self.path {
+            p.to_path_buf()
+        } else if env!("PROFILE") == "debug" {
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources")
+        } else {
+            std::env::current_exe()?
+                .parent()
+                .unwrap_or_else(|| unreachable!("an executable always have a parent directory"))
+                .to_path_buf()
+        };
+        Ok(res)
+    }
+
     /// Turn all the relative paths in the `tools` section to some absolute paths.
     ///
     /// There are some rules applied when converting, including:
@@ -103,17 +140,8 @@ impl ToolsetManifest {
     /// # Errors
     /// Return `Result::Err` if the manifest was not loaded from path, and the current executable path
     /// cannot be determined as well.
-    pub fn adjust_paths(&mut self) -> anyhow::Result<()> {
-        let parent_dir = if let Some(p) = &self.path {
-            p.to_path_buf()
-        } else if env!("PROFILE") == "debug" {
-            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources")
-        } else {
-            std::env::current_exe()?
-                .parent()
-                .unwrap_or_else(|| unreachable!("an executable always have a parent directory"))
-                .to_path_buf()
-        };
+    pub fn adjust_paths(&mut self) -> Result<()> {
+        let parent_dir = self.parent_dir()?;
 
         for tool in self.tools.target.values_mut() {
             for tool_info in tool.values_mut() {
@@ -143,7 +171,7 @@ impl TryFrom<Proxy> for reqwest::Proxy {
             // When nothing provided, use env proxy if there is.
             (None, None) => reqwest::Proxy::custom(|url| env_proxy::for_url(url).to_url()),
             // When both are provided, use the provided https proxy.
-            (Some(http), Some(https)) => reqwest::Proxy::all(https)?,
+            (Some(_), Some(https)) => reqwest::Proxy::all(https)?,
             (Some(http), None) => reqwest::Proxy::http(http)?,
             (None, Some(https)) => reqwest::Proxy::https(https)?,
         };
@@ -171,9 +199,15 @@ pub(crate) struct RustToolchain {
     /// Specifies a verbose name if this was provided.
     #[serde(alias = "group")]
     pub(crate) name: Option<String>,
+    /// File [`Url`] to install rust toolchain.
+    offline_dist_server: Option<String>,
+    /// Contains target specific `rustup-init` binaries.
+    #[serde(default)]
+    rustup: HashMap<String, String>,
 }
 
 impl RustToolchain {
+    #[allow(unused)]
     pub(crate) fn new(ver: &str) -> Self {
         Self {
             version: ver.to_string(),
@@ -223,6 +257,7 @@ pub(crate) struct Tools {
 }
 
 impl Tools {
+    #[allow(unused)]
     pub(crate) fn new<I>(targeted_tools: I) -> Tools
     where
         I: IntoIterator<Item = (String, ToolMap)>,
@@ -875,5 +910,51 @@ no-proxy = "localhost,some.domain.com"
                 no_proxy: Some("localhost,some.domain.com".into())
             }
         );
+    }
+
+    #[test]
+    fn with_offline_dist_server() {
+        let input = r#"
+[rust]
+version = "1.0.0"
+offline-dist-server = "packages/"
+"#;
+        let expected = ToolsetManifest::from_str(input).unwrap();
+        let expected_offline_dist_server = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("resources")
+            .join("packages/");
+        assert_eq!(
+            expected
+                .offline_dist_server()
+                .unwrap()
+                .unwrap()
+                .to_file_path()
+                .unwrap(),
+            expected_offline_dist_server
+        );
+    }
+
+    #[test]
+    fn with_bundled_rustup() {
+        let input = r#"
+[rust]
+version = "1.0.0"
+[rust.rustup]
+x86_64-pc-windows-msvc = "packages/x86_64-pc-windows-msvc/rustup-init.exe"
+x86_64-unknown-linux-gnu = "packages/x86_64-unknown-linux-gnu/rustup-init"
+"#;
+        let expected = ToolsetManifest::from_str(input).unwrap();
+
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("resources");
+        cfg_if::cfg_if! {
+            if #[cfg(windows)] {
+                path.push("packages/x86_64-pc-windows-msvc/rustup-init.exe");
+            } else if #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))] {
+                path.push("packages/x86_64-unknown-linux-gnu/rustup-init");
+            }
+        }
+
+        assert_eq!(expected.rustup_bin().unwrap().unwrap(), path);
     }
 }
