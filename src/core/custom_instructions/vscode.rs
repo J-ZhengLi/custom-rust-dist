@@ -108,7 +108,7 @@ Keywords=vscode;
                 show_failure_warning();
                 return Ok(())
             }
-            let _ = utils::create_executable_file(&path_to_write);
+            let _ = utils::set_exec_permission(&path_to_write);
         }
 
         Ok(())
