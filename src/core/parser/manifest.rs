@@ -125,8 +125,8 @@ impl ToolsetManifest {
         Ok(())
     }
 
-    pub fn rust_version(&self) -> String {
-        self.rust.version.clone()
+    pub fn rust_version(&self) -> &str {
+        self.rust.version.as_str()
     }
 }
 

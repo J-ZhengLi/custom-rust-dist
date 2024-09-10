@@ -41,11 +41,37 @@ impl FingerPrint {
         self
     }
 
-    pub(crate) fn record_tool(&mut self, name: String, path: PathBuf) -> &mut Self {
+    pub(crate) fn record_tool(
+        &mut self,
+        use_cargo: bool,
+        name: String,
+        path: Option<PathBuf>,
+    ) -> &mut Self {
         self.tools
             .entry(name)
-            .and_modify(|tool| tool.path = path.clone())
-            .or_insert(ToolDetailInfo { path });
+            .and_modify(|tool| {
+                if use_cargo {
+                    tool.paths = Vec::new();
+                } else if let Some(p) = &path {
+                    if !tool.paths.contains(p) {
+                        tool.paths.push(p.to_path_buf());
+                    }
+                }
+            })
+            .or_insert(ToolDetailInfo {
+                use_cargo,
+                paths: {
+                    if use_cargo {
+                        Vec::new()
+                    } else if let Some(p) = &path {
+                        vec![p.to_path_buf()]
+                    } else {
+                        /// FIXME: should throw error if path is not found.
+                        Vec::new()
+                    }
+                },
+            });
+
         self
     }
 }
@@ -61,5 +87,6 @@ pub(crate) struct RustInstallInfo {
 #[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct ToolDetailInfo {
-    path: PathBuf,
+    use_cargo: bool,
+    paths: Vec<PathBuf>,
 }

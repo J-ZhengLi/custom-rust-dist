@@ -5,7 +5,7 @@
 //! and then create a desktop shortcut. The last part is a bit harder to do,
 //! there's currently no suitable solution other than execute some commands to hack it.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use crate::core::install::InstallConfiguration;
 use crate::{core::os::add_to_path, utils};
 use anyhow::Result;
@@ -36,7 +36,7 @@ impl Default for VSCodeInstaller<'_> {
 }
 
 impl VSCodeInstaller<'_> {
-    pub(crate) fn install(&self, path: &Path, config: &InstallConfiguration) -> Result<()> {
+    pub(crate) fn install(&self, path: &Path, config: &InstallConfiguration) -> Result<PathBuf> {
         // Step 1: Move the root of the directory into `tools` directory
         let vscode_dir = config.tools_dir().join(self.tool_name);
         utils::move_to(path, &vscode_dir, true)?;
@@ -62,7 +62,7 @@ impl VSCodeInstaller<'_> {
                 dir.join(format!("{}.lnk", self.verbose_name))
             } else {
                 show_no_folder_warning();
-                return Ok(());
+                return Ok(vscode_dir);
             };
             let target_path = vscode_dir.join(format!("{}.exe", self.binary_name));
             let weird_powershell_cmd = format!(
@@ -100,18 +100,18 @@ Keywords=vscode;
 
             let Some(mut path_to_write)  = dirs::data_local_dir().map(|d| d.join("applications")) else {
                 show_no_folder_warning();
-                return Ok(());
+                return Ok(vscode_dir);
             };
             let _ = utils::ensure_dir(&path_to_write);
             path_to_write.push(format!("{}.desktop", self.cmd));
             if utils::write_file(&path_to_write, &desktop_sc, false).is_err() {
                 show_failure_warning();
-                return Ok(())
+                return Ok(vscode_dir)
             }
             let _ = utils::create_executable_file(&path_to_write);
         }
 
-        Ok(())
+        Ok(vscode_dir)
     }
 
     pub(crate) fn uninstall(&self) -> Result<()> {
@@ -153,7 +153,7 @@ Keywords=vscode;
     }
 }
 
-pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<()> {
+pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<PathBuf> {
     VSCodeInstaller::default().install(path, config)
 }
 

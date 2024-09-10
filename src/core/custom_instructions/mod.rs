@@ -3,7 +3,7 @@ macro_rules! declare_instrcutions {
         $(pub(crate) mod $name;)*
         pub(crate) static SUPPORTED_TOOLS: &[&str] = &[$(stringify!($name)),+];
 
-        pub(crate) fn install(tool: &str, path: &std::path::Path, config: &super::install::InstallConfiguration) -> anyhow::Result<()> {
+        pub(crate) fn install(tool: &str, path: &std::path::Path, config: &super::install::InstallConfiguration) -> anyhow::Result<std::path::PathBuf> {
             match tool.replace('-', "_").as_str() {
                 $(
                     stringify!($name) => $name::install(path, config),
