@@ -124,6 +124,10 @@ impl ToolsetManifest {
         }
         Ok(())
     }
+
+    pub fn rust_version(&self) -> String {
+        self.rust.version.clone()
+    }
 }
 
 /// The proxy for download, if not set, the program will fallback to use

@@ -161,6 +161,7 @@ fn install_toolchain(
         let req_install_info = t!("install_tools");
         let tc_install_info = t!("install_toolchain");
         let cargo_install_info = t!("install_via_cargo");
+        let local_install_info = t!("install_local_info");
 
         // Initialize a progress sender.
         // NOTE: the first 10 percent is not sended by this helper struct.
@@ -180,13 +181,22 @@ fn install_toolchain(
                 config.install_tools_with_progress(&manifest, &toolset_components, &mut progress_sender)?;
             });
             (tc_install_info, None, {
-                progress_sender.val = 30;
+                progress_sender.val = 25;
                 config.install_rust_with_progress(&manifest, &toolchain_components, &mut progress_sender)?;
             });
             // install third-party tools via cargo that got installed by rustup
             (cargo_install_info, None, {
-                progress_sender.val = 30;
+                progress_sender.val = 25;
                 config.cargo_install_with_progress(&toolset_components, &mut progress_sender)?;
+            });
+            // generate local installation info as fingerprint.
+            (local_install_info, None, {
+                progress_sender.val = 10;
+                config.create_local_install_info(
+                    &manifest.rust_version(), 
+                    &toolchain_components,
+                    &toolset_components
+                )?;
             })
         };
 

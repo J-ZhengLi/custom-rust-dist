@@ -1,8 +1,6 @@
 use super::{
     parser::{
-        cargo_config::CargoConfig,
-        manifest::{ToolInfo, ToolsetManifest},
-        TomlParser,
+        cargo_config::CargoConfig, fingerprint::FingerPrint, manifest::{ToolInfo, ToolsetManifest}, TomlParser
     },
     rustup::Rustup,
     tools::Tool,
@@ -305,6 +303,40 @@ impl InstallConfiguration {
             .tempdir_in(root)
             .with_context(|| format!("unable to create temp directory under '{}'", root.display()))
     }
+
+    pub fn create_local_install_info(
+        &self,
+        rust_version: &String,
+        rust_components: &[String],
+        tools: &ToolMap,
+    ) -> Result<()> {
+        let mut install_manifest = FingerPrint::new();
+        install_manifest.record_rust(rust_version.to_string(), rust_components.to_vec());
+        
+        println!("tools: {:?}", tools);
+
+        for tool in tools.iter() {
+            let tool_name = tool.0;
+            let mut tool_path = {
+                self.cargo_bin().join(tool_name)
+            };
+            #[cfg(target_os = "windows")]
+            {
+                tool_path.set_extension("exe");
+            }
+            if tool_path.exists() && tool_path.is_file() {
+                install_manifest.record_tool(tool_name.to_string(), tool_path);
+            }
+        }
+
+        let install_manifest = install_manifest.to_toml()?;
+        if !install_manifest.trim().is_empty() {
+            let install_manifest_path = self.install_dir.join(".fingerprint");
+            utils::write_file(install_manifest_path, &install_manifest, false)?;
+        }
+
+        Ok(())
+    }
 }
 
 fn send_and_print<S: std::fmt::Display>(msg: S, sender: &mut MultiThreadProgress) -> Result<()> {
@@ -431,5 +463,29 @@ mod tests {
             default_update_root.as_str(),
             "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
         );
+    }
+
+    #[test]
+    fn test_create_local_install_info() {
+        let mut install_manifest = FingerPrint::new();
+        let rust_version = "stable";
+        let rust_components = vec![String::from("rustfmt"), String::from("cargo")];
+
+        install_manifest.record_rust(rust_version.to_string(), rust_components);
+
+        install_manifest.record_tool("aaa".to_string(), PathBuf::from("/path/to/aaa"));
+
+        let install_manifest = install_manifest.to_toml().unwrap();
+        
+        let v0 = 
+r#"[rust]
+version = "stable"
+components = ["rustfmt", "cargo"]
+
+[tools.aaa]
+path = "/path/to/aaa"
+"#;
+        assert_eq!(v0, install_manifest);
+
     }
 }
