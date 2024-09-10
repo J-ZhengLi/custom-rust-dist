@@ -22,7 +22,6 @@ const handleUninstall = () => {
 const handleInstall = () => {
   managerConf.setOperation('update');
   routerPush('/manager/change');
-  console.log('install');
 };
 </script>
 <template>

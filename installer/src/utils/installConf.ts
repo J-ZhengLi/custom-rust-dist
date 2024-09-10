@@ -11,7 +11,7 @@ class InstallConf {
   constructor(path: string, components: CheckItem<Component>[]) {
     this.path = ref(path);
     this.checkComponents = ref(components);
-    this.isCustomInstall = false;
+    this.isCustomInstall = true;
   }
 
   setPath(newPath: string) {
@@ -136,7 +136,6 @@ class InstallConf {
   async loadAll() {
     await this.loadPath();
     await this.loadComponents();
-    console.log(this.checkComponents.value);
   }
 }
 

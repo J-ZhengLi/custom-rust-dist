@@ -29,14 +29,8 @@ function handleNextClick() {
       <p mb="4px">单击“安装”以继续。如果需要修改配置请点击“上一步”。</p>
     </div>
     <scroll-box flex="1" mx="12px" overflow="auto">
-      <p mt="0" mb="8px">安装位置：</p>
-      <base-input
-        :value="path"
-        border-color="focus:base"
-        ml="12px"
-        w="90%"
-        readonly
-      />
+      <p m="0">安装位置：</p>
+      <p my="4px">{{ path }}</p>
       <p mb="8px">组件：</p>
       <div ml="12px">
         <p my="4px" v-for="component in components" :key="component.name">

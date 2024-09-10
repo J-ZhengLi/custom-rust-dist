@@ -329,7 +329,7 @@ fn main() -> Result<()> {
             // fallback to installer mode
             let cli = parse_installer_cli();
             if !cli.no_gui {
-                gui_manager()?;
+                gui_main()?;
             } else {
                 cli.execute()?;
             }

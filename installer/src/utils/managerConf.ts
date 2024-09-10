@@ -219,7 +219,6 @@ class ManagerConf {
         (i) => i.installed || i.required
       ) || []
     );
-    console.log(kits);
   }
 }
 
