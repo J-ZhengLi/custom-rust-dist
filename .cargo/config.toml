@@ -1,0 +1,2 @@
+[alias]
+run-manager = "test --test manager_mode --"

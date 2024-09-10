@@ -11,7 +11,7 @@ use crate::core::try_it;
 use crate::manifest::{baked_in_manifest, ToolMap};
 use crate::{default_install_dir, get_component_list_from_manifest, utils, Component};
 
-use super::Installer;
+use super::{GlobalOpt, Installer, ManagerSubcommands};
 
 use anyhow::Result;
 use indexmap::IndexSet;
@@ -274,6 +274,14 @@ fn displayed_component_list<'a, I: Iterator<Item = &'a Component>>(
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+pub(super) fn execute_manager(manager: &ManagerSubcommands, _opt: GlobalOpt) -> Result<bool> {
+    let ManagerSubcommands::Install { version } = manager else {
+        return Ok(false);
+    };
+
+    todo!("install dist with version '{version}'");
 }
 
 #[cfg(test)]

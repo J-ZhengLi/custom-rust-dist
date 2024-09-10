@@ -1,33 +1,40 @@
 //! Separated module to handle uninstallation in command line.
 
-use crate::cli::UninstallCommand;
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
 
-use super::{GlobalOpt, ManagerSubcommands};
+use super::{common, GlobalOpt, ManagerSubcommands};
 
 use anyhow::Result;
 
 /// Execute `uninstall` command.
-pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Result<()> {
-    let ManagerSubcommands::Uninstall {
-        commands: Some(uninst_cmd),
-    } = subcommand
-    else {
-        return Ok(());
+pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Result<bool> {
+    let ManagerSubcommands::Uninstall { remove_self } = subcommand else {
+        return Ok(false);
     };
 
-    match uninst_cmd {
-        UninstallCommand::All => {
-            let config = UninstallConfiguration;
-            config.remove_rustup_env_vars()?;
-            config.remove_tools()?;
-            config.remove_self()?;
-        }
-        UninstallCommand::Tool { names } => {
-            // TODO: remove a certain tool, or component
-            unimplemented!("attempt to remove '{names:?}', but this is not yet implemented.")
-        }
+    // Ask confirmation
+    // TODO: format an installed list instead
+    let installed = "Rust-toolchain";
+    let prompt = if *remove_self {
+        t!(
+            "uninstall_all_confirmation",
+            vendor = t!("vendor"),
+            list = installed
+        )
+    } else {
+        t!("uninstall_confirmation", list = installed)
+    };
+    if !common::confirm(prompt, false)? {
+        return Ok(true);
     }
 
-    Ok(())
+    let config = UninstallConfiguration;
+    config.remove_rustup_env_vars()?;
+    config.remove_tools()?;
+    // TODO: remove rust toolchain
+    if *remove_self {
+        config.remove_self()?;
+    }
+
+    Ok(true)
 }
