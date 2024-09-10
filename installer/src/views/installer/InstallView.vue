@@ -87,6 +87,7 @@ onMounted(() => {
     <div basis="60px" flex="~ justify-end items-center">
       <base-button
         v-show="progress === 100"
+        theme="primary"
         @click="() => routerPush('/installer/finish')"
         mr="12px"
         >下一步</base-button

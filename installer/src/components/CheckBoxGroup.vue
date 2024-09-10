@@ -10,7 +10,7 @@ type Props<T> = {
   group: CheckGroup<T>;
 };
 
-const { expand, group } = defineProps<Props<any>>();
+const { expand, group } = defineProps<Props<unknown>>();
 const emit = defineEmits(['itemClick', 'change']);
 
 const groupExpand = ref(expand);
@@ -26,11 +26,15 @@ function handleExpandClick() {
 function handleCheckAllClick() {
   if (isCheckedNull.value) {
     group.items.forEach((item) => {
-      item.checked = true;
+      if (!item.disabled && !item.required) {
+        item.checked = true;
+      }
     });
   } else {
     group.items.forEach((checkItem) => {
-      checkItem.checked = checkItem.value.required ? true : false;
+      if (!checkItem.disabled) {
+        checkItem.checked = checkItem.required ? true : false;
+      }
     });
   }
 }
@@ -79,13 +83,15 @@ watch(group.items, (newValue) => {
         <base-check-box
           flex="~ items-center"
           v-for="item of group.items"
-          :key="item.value.name"
+          :key="item.label"
           v-model="item.checked"
-          :title="`${item.value.name}${item.value.installed ? ' (installed)' : item.value.required ? ' (required)' : ''}`"
-          :disabled="item.value.installed ? false : item.value.required"
+          :title="item.label"
+          :disabled="item.disabled"
+          :label-component="item.labelComponent"
+          :label-component-props="item.labelComponentProps"
           decoration="hover:underline"
           :class="{
-            'decoration-underline': item.selected,
+            'decoration-underline': item.focused,
           }"
           @titleClick="handleItemClick(item)"
         />

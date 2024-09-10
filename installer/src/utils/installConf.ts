@@ -44,7 +44,7 @@ class InstallConf {
           };
         }
 
-        acc[groupName].items.push({ ...item, selected: false });
+        acc[groupName].items.push({ ...item, focused: false });
 
         return acc;
       },
@@ -57,12 +57,19 @@ class InstallConf {
     return this.checkComponents.value
       .filter((i) => i.checked) // 筛选选中组件
       .map((item: CheckItem<Component>) => {
-        const { groupName, isToolchainComponent, desc, ...rest } = item.value;
+        const {
+          groupName,
+          isToolchainComponent,
+          toolInstaller,
+          desc,
+          ...rest
+        } = item.value;
         return {
           ...rest,
           desc: desc.join(''),
           group_name: groupName,
           is_toolchain_component: isToolchainComponent,
+          tool_installer: toolInstaller,
         };
       });
   }
@@ -99,15 +106,24 @@ class InstallConf {
 
       const newComponents: CheckItem<Component>[] = componentList.map(
         (item) => {
-          const { group_name, is_toolchain_component, desc, ...rest } = item;
+          const {
+            group_name,
+            is_toolchain_component,
+            tool_installer,
+            desc,
+            ...rest
+          } = item;
           return {
-            label: item.name,
+            label: `${item.name}${item.installed ? ' (installed)' : item.required ? ' (required)' : ''}`,
             checked: !item.installed && (item.required || !item.optional),
+            required: item.required,
+            disabled: item.installed ? false : item.required,
             value: {
               ...rest,
               desc: item.desc.split('\n'),
               groupName: group_name,
               isToolchainComponent: is_toolchain_component,
+              toolInstaller: tool_installer,
             },
           };
         }

@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, Ref, ref, watch } from 'vue';
 import ScrollBox from '@/components/ScrollBox.vue';
-import { installConf } from '@/utils/index';
+import { managerConf } from '@/utils/index';
 import type {
   CheckGroup,
   CheckGroupItem,
-  CheckItem,
-  Component,
+  ManagerComponent,
 } from '@/utils/index';
 import { useCustomRouter } from '@/router/index';
 import CheckBoxGroup from '@/components/CheckBoxGroup.vue';
@@ -14,7 +13,7 @@ import CheckBoxGroup from '@/components/CheckBoxGroup.vue';
 const { routerPush, routerBack } = useCustomRouter();
 const selectComponentId = ref(0);
 
-const groupComponents: Ref<CheckGroup<Component>[]> = ref([]);
+const groupComponents: Ref<CheckGroup<ManagerComponent>[]> = ref([]);
 const checkedAllBundle = ref(false);
 const checkedAll = computed(() => {
   return groupComponents.value.every((item) =>
@@ -29,7 +28,7 @@ watch(checkedAll, (val) => {
 const curCheckComponent = computed(() => {
   for (const group of groupComponents.value) {
     for (const item of group.items) {
-      if (item.selected) {
+      if (item.focused) {
         return item;
       }
     }
@@ -37,36 +36,30 @@ const curCheckComponent = computed(() => {
   return null;
 });
 
-function updateInstallConf() {
-  installConf.setComponents(
+function updateTargetComponents() {
+  managerConf.setComponents(
     groupComponents.value.reduce((components, group) => {
       components.push(
-        ...group.items.map((item) => {
-          return {
-            label: item.label,
-            checked: item.checked,
-            value: { ...item.value },
-          };
-        })
+        ...group.items.filter((i) => i.checked).map((item) => item.value)
       );
       return components;
-    }, [] as CheckItem<Component>[])
+    }, [] as ManagerComponent[])
   );
 }
 
-function handleComponentsClick(checkItem: CheckGroupItem<Component>) {
+function handleComponentsClick(checkItem: CheckGroupItem<ManagerComponent>) {
   selectComponentId.value = checkItem.value.id;
   groupComponents.value.forEach((group) => {
     group.items.forEach((item) => {
       if (item.value.id === checkItem.value.id) {
-        item.selected = true;
+        item.focused = true;
       } else {
-        item.selected = false;
+        item.focused = false;
       }
     });
   });
 }
-function handleComponentsChange(items: CheckGroupItem<Component>[]) {
+function handleComponentsChange(items: CheckGroupItem<ManagerComponent>[]) {
   groupComponents.value.forEach((group) => {
     group.items.forEach((item) => {
       const findItem = items.find((i) => i.value.id === item.value.id);
@@ -75,7 +68,7 @@ function handleComponentsChange(items: CheckGroupItem<Component>[]) {
       }
     });
   });
-  updateInstallConf();
+  updateTargetComponents();
 }
 
 function handleSelectAll() {
@@ -85,16 +78,23 @@ function handleSelectAll() {
       item.checked = item.value.required ? true : target;
     });
   });
+  updateTargetComponents();
+}
+
+function handleClickNext() {
+  managerConf.setOperation('update');
+  routerPush('/manager/confirm');
 }
 
 onMounted(() => {
-  groupComponents.value = installConf.getGroups();
+  groupComponents.value = managerConf.getGroups();
+  console.log(groupComponents.value);
 });
 </script>
 
 <template>
   <div flex="~ col" w="full" h="full">
-    <h4 ml="12px">安装选项</h4>
+    <h4 ml="12px">组件更改</h4>
     <div flex="1 ~" p="12px" overflow="auto">
       <scroll-box overflow-auto p="4px" grow="1">
         <div p="t-8px l-8px">组件</div>
@@ -127,10 +127,7 @@ onMounted(() => {
       <base-button theme="primary" mr="12px" @click="routerBack()"
         >上一步</base-button
       >
-      <base-button
-        theme="primary"
-        mr="12px"
-        @click="routerPush('/manager/confirm')"
+      <base-button theme="primary" mr="12px" @click="handleClickNext"
         >下一步</base-button
       >
     </div>

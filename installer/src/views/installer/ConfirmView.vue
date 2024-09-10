@@ -47,8 +47,12 @@ function handleNextClick() {
       </div>
     </scroll-box>
     <div h="60px" flex="~ justify-end items-center">
-      <base-button mr="12px" @click="routerBack">上一步</base-button>
-      <base-button mr="12px" @click="handleNextClick">开始安装</base-button>
+      <base-button theme="primary" mr="12px" @click="routerBack"
+        >上一步</base-button
+      >
+      <base-button theme="primary" mr="12px" @click="handleNextClick"
+        >开始安装</base-button
+      >
     </div>
   </div>
 </template>

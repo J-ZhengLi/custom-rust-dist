@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { onMounted, ref } from 'vue';
+import { ref } from 'vue';
 import { useCustomRouter } from '@/router/index';
 import { message } from '@tauri-apps/api/dialog';
 import { installConf } from '@/utils/index';
@@ -30,10 +30,6 @@ function handleInstallClick(custom: boolean) {
     message('请先同意许可协议', { title: '提示' });
   }
 }
-
-onMounted(() => {
-  installConf.loadAll();
-});
 </script>
 
 <template>
@@ -55,6 +51,7 @@ onMounted(() => {
     <div basis="120px" w="full" text="center">
       <div flex="~ items-end justify-center">
         <base-button
+          theme="primary"
           w="12rem"
           mx="8px"
           text="1.2rem"

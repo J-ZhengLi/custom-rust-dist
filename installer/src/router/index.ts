@@ -4,20 +4,21 @@ import {
   useRouter,
   RouteLocationRaw,
 } from 'vue-router';
-import { ref } from 'vue';
+import { Ref, ref } from 'vue';
 
-import TheInstallerLayout from '@/components/TheInstallerLayout.vue';
-import HomeView from '../views/installer/HomeView.vue';
-import FolderView from '../views/installer/FolderView.vue';
-import ComponentsView from '../views/installer/ComponentsView.vue';
-import ConfirmView from '../views/installer/ConfirmView.vue';
-import InstallView from '../views/installer/InstallView.vue';
-import FinishView from '../views/installer/FinishView.vue';
+import TheInstallerLayout from '@/views/installer/components/TheInstallerLayout.vue';
+import HomeView from '@/views/installer/HomeView.vue';
+import FolderView from '@/views/installer/FolderView.vue';
+import ComponentsView from '@/views/installer/ComponentsView.vue';
+import ConfirmView from '@/views/installer/ConfirmView.vue';
+import InstallView from '@/views/installer/InstallView.vue';
+import FinishView from '@/views/installer/FinishView.vue';
 
-import TheManagerLayout from '../components/TheManagerLayout.vue';
-import ManagerView from '../views/manager/ManagerView.vue';
-import ChangeView from '../views/manager/ChangeView.vue';
-import UninstallView from '../views/manager/UninstallView.vue';
+import TheManagerLayout from '@/views/manager/components/TheManagerLayout.vue';
+import ManagerView from '@/views/manager/ManagerView.vue';
+import ManagerComponentsView from '@/views/manager/ComponentsView.vue';
+import ManagerConfirmView from '@/views/manager/ConfirmView.vue';
+import UninstallView from '@/views/manager/UninstallView.vue';
 import ProgressView from '@/views/manager/ProgressView.vue';
 import CompleteView from '@/views/manager/CompleteView.vue';
 
@@ -79,8 +80,14 @@ const routes = [
       {
         name: 'Change',
         path: 'change',
-        component: ChangeView,
+        component: ManagerComponentsView,
         meta: { title: '修改配置', order: 1, required: false },
+      },
+      {
+        name: 'ManagerConfirm',
+        path: 'confirm',
+        component: ManagerConfirmView,
+        meta: { title: '信息确认', order: 2, required: true },
       },
       {
         name: 'Uninstall',
@@ -109,7 +116,7 @@ export const router = createRouter({
   routes,
 });
 
-const isBack = ref();
+const isBack: Ref<boolean | null> = ref(null);
 // 为路由添加前进后退标识
 export function useCustomRouter() {
   const newRouter = useRouter();
@@ -121,7 +128,7 @@ export function useCustomRouter() {
   function routerBack(deep: number = -1) {
     isBack.value = true;
     if (typeof deep === 'number') newRouter.go(deep);
-    else router.back();
+    else newRouter.back();
   }
 
   return { isBack, routerPush, routerBack };

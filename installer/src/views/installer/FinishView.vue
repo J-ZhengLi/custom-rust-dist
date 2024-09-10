@@ -25,7 +25,9 @@ function closeWindow() {
       ></base-check-box>
     </div>
     <div basis="60px" flex="~ items-center justify-end">
-      <base-button mr="12px" @click="closeWindow">完成并关闭</base-button>
+      <base-button theme="primary" mr="12px" @click="closeWindow"
+        >完成并关闭</base-button
+      >
     </div>
   </div>
 </template>

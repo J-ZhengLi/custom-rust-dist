@@ -1,4 +1,8 @@
+import { ref, Ref, shallowRef } from 'vue';
 import { KitItem } from './types/KitItem';
+import { ManagerComponent } from './types/Component';
+import { CheckGroup, CheckGroupItem } from './types/CheckBoxGroup';
+import LabelComponent from '@/views/manager/components/Label.vue';
 
 const kits: KitItem[] = [
   {
@@ -20,6 +24,33 @@ const kits: KitItem[] = [
         optional: false,
         required: true,
         version: '1.70.0',
+        toolInstaller: null,
+      },
+      {
+        desc: ['(windows-msvc only) Requirement for Windows'],
+        groupName: 'Prerequisites',
+        id: 587,
+        installed: true,
+        isToolchainComponent: false,
+        name: 'buildtools',
+        optional: false,
+        required: true,
+        version: '1.70.0',
+        toolInstaller: null,
+      },
+      {
+        desc: [
+          'Prints out the result of macro expansion and #[derive] expansion applied to the current crate.',
+        ],
+        groupName: 'Misc',
+        id: 623,
+        installed: false,
+        isToolchainComponent: false,
+        name: 'cargo-expand',
+        optional: true,
+        required: false,
+        version: '1.70.0',
+        toolInstaller: null,
       },
     ],
   },
@@ -55,25 +86,140 @@ const kits: KitItem[] = [
   },
 ];
 
+type Target = {
+  operation: 'update' | 'uninstall';
+  components: ManagerComponent[];
+};
+
 class ManagerConf {
-  private _kits: KitItem[] = [];
-  private _installed: KitItem | null = null;
-  private _current: KitItem | null = null;
+  private _kits: Ref<KitItem[]> = ref([]);
+  private _installed: Ref<KitItem | null> = ref(null);
+  private _current: Ref<KitItem | null> = ref(null);
+  private _target: Ref<Target> = ref({ operation: 'update', components: [] });
+  private _isUninstallManager: Ref<boolean> = ref(false);
 
   constructor() {}
 
-  public getConf(): KitItem[] {
-    return this._kits;
+  public getUninstallManager() {
+    return this._isUninstallManager.value;
   }
-  public getInstalledGroups() {}
 
-  public setConf(conf: KitItem[]): void {
-    this._kits = conf;
+  public getKits(): KitItem[] {
+    return this._kits.value;
+  }
+
+  public getInstalled() {
+    return this._installed;
+  }
+
+  public getInstalledComponents(): ManagerComponent[] | undefined {
+    return this._installed.value?.components;
+  }
+
+  public getGroups(): CheckGroup<ManagerComponent>[] {
+    const checkItems: CheckGroupItem<ManagerComponent>[] =
+      this._current.value?.components.map((item) => {
+        const installedItem = this._current.value?.components.find(
+          (c) => c.name === item.name
+        );
+
+        let versionStr =
+          installedItem?.version && installedItem?.version === item.version
+            ? `(${installedItem?.version} -> ${item.version})`
+            : ` (${item.version})`;
+
+        return {
+          label: `${item.name}${versionStr}`,
+          checked: item.required || !item.optional,
+          required: item.required,
+          disabled: item.required,
+
+          focused: false,
+          value: item,
+          labelComponent: shallowRef(LabelComponent),
+          labelComponentProps: {
+            label: item.name,
+            ver1: installedItem?.version,
+            ver2: item.version,
+          },
+        };
+      }) || [];
+
+    const groups = checkItems.reduce(
+      (acc, item) => {
+        const groupName = item.value.groupName
+          ? item.value.groupName
+          : 'Others'; // 确保 groupName 不为 null
+
+        if (!acc[groupName]) {
+          acc[groupName] = {
+            label: groupName,
+            items: [],
+          };
+        }
+
+        acc[groupName].items.push({ ...item });
+
+        return acc;
+      },
+      {} as Record<string, CheckGroup<ManagerComponent>>
+    );
+
+    return Object.values(groups);
+  }
+
+  public getCurrent() {
+    return this._current;
+  }
+
+  public getCurrentComponents(): ManagerComponent[] | undefined {
+    return this._current.value?.components;
+  }
+
+  public getOperation() {
+    return this._target.value.operation;
+  }
+
+  public getTargetComponents() {
+    return this._target.value.components;
+  }
+
+  public setUninstallManager(value: boolean) {
+    this._isUninstallManager.value = value;
+  }
+
+  public setKits(kits: KitItem[]): void {
+    this._kits.value.splice(0, this._kits.value.length, ...kits);
+  }
+
+  public setInstalled(installed: KitItem): void {
+    this._installed.value = installed;
+  }
+
+  public setCurrent(current: KitItem): void {
+    this._current.value = current;
+  }
+
+  public setOperation(operation: Target['operation']): void {
+    this._target.value.operation = operation;
+  }
+  public setComponents(components: Target['components']): void {
+    this._target.value.components.splice(
+      0,
+      this._target.value.components.length,
+      ...components
+    );
   }
   public loadConf(): any {
-    this._current = kits[0];
-    this._installed = kits[0];
-    this._kits = kits;
+    this.setCurrent(kits[0]);
+    this.setInstalled(kits[0]);
+    this.setKits(kits);
+    this.setComponents(
+      this.getInstalled().value?.components.filter(
+        (i) => i.installed || i.required
+      ) || []
+    );
+    console.log(kits);
   }
 }
 

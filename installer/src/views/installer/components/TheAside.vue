@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { installConf } from '../utils';
+import { installConf } from '@/utils';
 
 const router = useRouter();
 

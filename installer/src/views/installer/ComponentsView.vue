@@ -29,7 +29,7 @@ watch(checkedAll, (val) => {
 const curCheckComponent = computed(() => {
   for (const group of groupComponents.value) {
     for (const item of group.items) {
-      if (item.selected) {
+      if (item.focused) {
         return item;
       }
     }
@@ -45,6 +45,8 @@ function updateInstallConf() {
           return {
             label: item.label,
             checked: item.checked,
+            disabled: item.disabled,
+            required: item.required,
             value: { ...item.value },
           };
         })
@@ -59,9 +61,9 @@ function handleComponentsClick(checkItem: CheckGroupItem<Component>) {
   groupComponents.value.forEach((group) => {
     group.items.forEach((item) => {
       if (item.value.id === checkItem.value.id) {
-        item.selected = true;
+        item.focused = true;
       } else {
-        item.selected = false;
+        item.focused = false;
       }
     });
   });
@@ -124,8 +126,13 @@ onMounted(() => {
     </div>
 
     <div basis="60px" flex="~ justify-end items-center">
-      <base-button mr="12px" @click="routerBack">上一步</base-button>
-      <base-button mr="12px" @click="routerPush('/installer/confirm')"
+      <base-button theme="primary" mr="12px" @click="routerBack"
+        >上一步</base-button
+      >
+      <base-button
+        theme="primary"
+        mr="12px"
+        @click="routerPush('/installer/confirm')"
         >下一步</base-button
       >
     </div>

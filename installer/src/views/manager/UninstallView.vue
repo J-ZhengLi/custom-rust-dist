@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { useCustomRouter } from '@/router/index';
+import { managerConf } from '@/utils';
+import { ref, watch } from 'vue';
 const { routerBack, routerPush } = useCustomRouter();
+
+const isUninstallManger = ref(false);
+
+watch(isUninstallManger, (val: boolean) => {
+  managerConf.setUninstallManager(val);
+});
 
 function handleUninstall() {
   // TODO: uninstall
@@ -22,7 +30,11 @@ function handleUninstall() {
       </div>
     </scroll-box>
     <div mx="16px">
-      <base-check-box block title="同时卸载此管理工具" />
+      <base-check-box
+        v-model="isUninstallManger"
+        block
+        title="同时卸载此管理工具"
+      />
     </div>
 
     <div basis="60px" flex="~ justify-end items-center">

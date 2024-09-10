@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { KitItem } from '@/utils/index';
+import { KitItem, managerConf } from '@/utils/index';
 import { useCustomRouter } from '@/router/index';
 
 const { routerPush } = useCustomRouter();
@@ -10,16 +10,18 @@ const props = defineProps<{
 }>();
 
 const handleUpdate = () => {
-  console.log('update');
+  managerConf.setOperation('update');
   routerPush('/manager/change');
 };
 
 const handleUninstall = () => {
-  console.log('uninstall');
+  managerConf.setOperation('uninstall');
   routerPush('/manager/uninstall');
 };
 
 const handleInstall = () => {
+  managerConf.setOperation('update');
+  routerPush('/manager/change');
   console.log('install');
 };
 </script>

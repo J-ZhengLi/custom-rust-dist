@@ -3,7 +3,7 @@
 import { ref } from 'vue';
 import MdiClose from './icons/MdiClose.vue';
 
-const { title, width, height } = defineProps({
+const { title, width, height, closeButton } = defineProps({
   title: {
     type: String,
     default: '',
