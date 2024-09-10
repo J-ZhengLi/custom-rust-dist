@@ -1,6 +1,9 @@
 use super::{
     parser::{
-        cargo_config::CargoConfig, fingerprint::FingerPrint, manifest::{ToolInfo, ToolsetManifest}, TomlParser
+        cargo_config::CargoConfig,
+        fingerprint::FingerPrint,
+        manifest::{ToolInfo, ToolsetManifest},
+        TomlParser,
     },
     rustup::Rustup,
     tools::Tool,
@@ -231,6 +234,9 @@ impl InstallConfiguration {
         for (name, tool) in to_install {
             send_and_print(t!("installing_tool_info", name = name), mt_prog)?;
             install_tool(self, name, tool, manifest.proxy.as_ref())?;
+            // Add the tool to the fingerprint.
+            add_tool_fingerprint(&self.install_dir, name, self.cargo_bin().join(name))?;
+
             mt_prog.send_any_progress(sub_progress_delta)?;
         }
 
@@ -248,6 +254,13 @@ impl InstallConfiguration {
         Rustup::init().download_toolchain(self, manifest, optional_components)?;
         add_to_path(self.cargo_bin())?;
         self.cargo_is_installed = true;
+
+        // Add the rust info to the fingerprint.
+        add_rust_fingerprint(
+            &self.install_dir,
+            &manifest.rust_version(),
+            optional_components,
+        )?;
 
         mt_prog.send_progress()
     }
@@ -270,6 +283,10 @@ impl InstallConfiguration {
         for (name, tool) in to_install {
             send_and_print(t!("installing_via_cargo_info", name = name), mt_prog)?;
             install_tool(self, name, tool, None)?;
+
+            // Add the tool to the fingerprint.
+            add_tool_fingerprint(&self.install_dir, name, self.cargo_bin().join(name))?;
+
             mt_prog.send_any_progress(sub_progress_delta)?;
         }
 
@@ -302,40 +319,6 @@ impl InstallConfiguration {
             .prefix(&format!("{prefix}_"))
             .tempdir_in(root)
             .with_context(|| format!("unable to create temp directory under '{}'", root.display()))
-    }
-
-    pub fn create_local_install_info(
-        &self,
-        rust_version: &String,
-        rust_components: &[String],
-        tools: &ToolMap,
-    ) -> Result<()> {
-        let mut install_manifest = FingerPrint::new();
-        install_manifest.record_rust(rust_version.to_string(), rust_components.to_vec());
-        
-        println!("tools: {:?}", tools);
-
-        for tool in tools.iter() {
-            let tool_name = tool.0;
-            let mut tool_path = {
-                self.cargo_bin().join(tool_name)
-            };
-            #[cfg(target_os = "windows")]
-            {
-                tool_path.set_extension("exe");
-            }
-            if tool_path.exists() && tool_path.is_file() {
-                install_manifest.record_tool(tool_name.to_string(), tool_path);
-            }
-        }
-
-        let install_manifest = install_manifest.to_toml()?;
-        if !install_manifest.trim().is_empty() {
-            let install_manifest_path = self.install_dir.join(".fingerprint");
-            utils::write_file(install_manifest_path, &install_manifest, false)?;
-        }
-
-        Ok(())
     }
 }
 
@@ -446,6 +429,45 @@ fn extract_or_copy_to(maybe_file: &Path, dest: &Path) -> Result<PathBuf> {
     }
 }
 
+fn add_rust_fingerprint(
+    install_dir: &PathBuf,
+    rust_version: &String,
+    rust_components: &[String],
+) -> Result<()> {
+    let mut fingerprint = FingerPrint::load_fingerprint(install_dir);
+    fingerprint.record_rust(rust_version.to_string(), rust_components.to_vec());
+
+    let fingerprint_file_path = install_dir.join(".fingerprint");
+    let fingerprint_content = fingerprint.to_toml()?;
+    utils::write_file(fingerprint_file_path, &fingerprint_content, false)?;
+
+    Ok(())
+}
+
+fn add_tool_fingerprint(
+    install_dir: &PathBuf,
+    tool_name: &String,
+    tool_path: PathBuf,
+) -> Result<()> {
+    // Add the tool to the fingerprint.
+    let mut fingerprint = FingerPrint::load_fingerprint(install_dir);
+    let mut tool_path = { tool_path };
+    #[cfg(windows)]
+    {
+        tool_path.set_extension("exe");
+    }
+
+    if tool_path.exists() {
+        fingerprint.record_tool(tool_name.to_string(), tool_path);
+    }
+
+    let fingerprint_file_path = install_dir.join(".fingerprint");
+    let fingerprint_content = fingerprint.to_toml()?;
+    utils::write_file(fingerprint_file_path, &fingerprint_content, false)?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -467,18 +489,18 @@ mod tests {
 
     #[test]
     fn test_create_local_install_info() {
-        let mut install_manifest = FingerPrint::new();
+        let install_dir = PathBuf::from("/path/to");
+        let mut install_manifest = FingerPrint::load_fingerprint(&install_dir);
         let rust_version = "stable";
         let rust_components = vec![String::from("rustfmt"), String::from("cargo")];
 
         install_manifest.record_rust(rust_version.to_string(), rust_components);
 
-        install_manifest.record_tool("aaa".to_string(), PathBuf::from("/path/to/aaa"));
+        install_manifest.record_tool("aaa".to_string(), install_dir.join("aaa"));
 
         let install_manifest = install_manifest.to_toml().unwrap();
-        
-        let v0 = 
-r#"[rust]
+
+        let v0 = r#"[rust]
 version = "stable"
 components = ["rustfmt", "cargo"]
 
@@ -486,6 +508,5 @@ components = ["rustfmt", "cargo"]
 path = "/path/to/aaa"
 "#;
         assert_eq!(v0, install_manifest);
-
     }
 }

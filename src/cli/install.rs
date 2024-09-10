@@ -70,13 +70,6 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
     // install third-party tools via cargo that got installed by rustup
     config.cargo_install_with_progress(&user_opt.toolset, &mut dummy_prog)?;
 
-    // generate local installation info as fingerprint.
-    config.create_local_install_info(
-        &manifest.rust_version(), 
-        &user_opt.toolchain_components, 
-        &user_opt.toolset
-    )?;
-
     println!("\n{}\n", t!("install_finish_info"));
 
     if common::confirm(t!("question_try_demo"), true)? {
@@ -307,20 +300,5 @@ mod tests {
             .unwrap(),
         )
         .unwrap();
-    }
-
-    #[test]
-    fn test_create_local_install_info() {
-        let install_dir = PathBuf::from("D:\\LuuuX\\xuanwu\\temp");
-        let config = InstallConfiguration::init(&install_dir, false).unwrap();
-        let rust_version = "stable";
-        let rust_components = vec![String::from("rustfmt"), String::from("cargo")];
-        let tools = crate::manifest::ToolMap::new();
-
-        let _ = config.create_local_install_info(
-            &rust_version.to_string(),
-            &rust_components, 
-            &tools
-        );
     }
 }
