@@ -152,6 +152,10 @@ impl ToolsetManifest {
         }
         Ok(())
     }
+
+    pub fn rust_version(&self) -> &str {
+        self.rust.version.as_str()
+    }
 }
 
 /// The proxy for download, if not set, the program will fallback to use

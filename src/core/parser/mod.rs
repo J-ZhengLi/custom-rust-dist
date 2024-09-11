@@ -1,4 +1,5 @@
 pub(crate) mod cargo_config;
+pub(crate) mod fingerprint;
 pub mod manifest;
 
 use anyhow::Result;

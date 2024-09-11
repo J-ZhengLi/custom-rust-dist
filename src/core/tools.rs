@@ -109,27 +109,29 @@ impl<'a> Tool<'a> {
         bail!("unable to process tool '{name}' as it is not supported")
     }
 
-    pub(crate) fn install(&self, config: &InstallConfiguration) -> Result<()> {
+    pub(crate) fn install(&self, config: &InstallConfiguration) -> Result<Vec<PathBuf>> {
+        let mut res = Vec::new();
         match self {
             Self::Executables(_, exes) => {
                 for exe in exes {
-                    utils::copy_file_to(exe, config.cargo_bin())?;
+                    res.push(utils::copy_file_to(exe, config.cargo_bin())?);
                 }
             }
             Self::Custom { name, path } => {
-                custom_instructions::install(name, path, config)?;
+                res.push(custom_instructions::install(name, path, config)?);
             }
             Self::DirWithBin { name, bin_dir } => {
-                install_dir_with_bin_(config, name, bin_dir)?;
+                res.push(install_dir_with_bin_(config, name, bin_dir)?);
             }
             Self::Plugin { kind, path, .. } => {
                 // run the installation command.
                 kind.install_plugin(path)?;
                 // we need to "cache" to installer, so that we could uninstall with it.
-                utils::copy_file_to(path, config.tools_dir())?;
+                res.push(utils::copy_file_to(path, config.tools_dir())?)
             }
         }
-        Ok(())
+
+        Ok(res)
     }
 
     pub(crate) fn uninstall(&self) -> Result<()> {
@@ -150,7 +152,11 @@ impl<'a> Tool<'a> {
 /// Installing [`ToolInstaller::DirWithBin`], with a couple steps:
 /// - Move the `tool_dir` to [`tools_dir`](InstallConfiguration::tools_dir).
 /// - Add the `bin_dir` to PATH
-fn install_dir_with_bin_(config: &InstallConfiguration, name: &str, bin_dir: &Path) -> Result<()> {
+fn install_dir_with_bin_(
+    config: &InstallConfiguration,
+    name: &str,
+    bin_dir: &Path,
+) -> Result<PathBuf> {
     let dir = config.tools_dir().join(name);
     // Safe to unwrap, because we already checked the `bin` dir is inside `tool_dir`
     let tool_dir = bin_dir.parent().unwrap();
@@ -158,7 +164,8 @@ fn install_dir_with_bin_(config: &InstallConfiguration, name: &str, bin_dir: &Pa
     utils::move_to(tool_dir, &dir, true)?;
 
     let bin_dir_after_move = dir.join("bin");
-    super::os::add_to_path(&bin_dir_after_move)
+    super::os::add_to_path(&bin_dir_after_move)?;
+    Ok(dir)
 }
 
 /// Uninstalling a tool with bin folder is as simple as removing the directory,
