@@ -409,7 +409,7 @@ fn try_install_from_path(
     config: &InstallConfiguration,
     name: &str,
     path: &Path,
-) -> Result<PathBuf> {
+) -> Result<Vec<PathBuf>> {
     if !path.exists() {
         bail!(
             "unable to install '{name}' because the path to it's installer '{}' does not exist.",
@@ -421,8 +421,8 @@ fn try_install_from_path(
     let tool_installer_path = extract_or_copy_to(path, temp_dir.path())?;
     let tool_installer = Tool::from_path(name, &tool_installer_path)
         .with_context(|| format!("no install method for tool '{name}'"))?;
-    let dest = tool_installer.install(config)?;
-    Ok(dest)
+    let dest_paths = tool_installer.install(config)?;
+    Ok(dest_paths)
 }
 
 /// Perform extraction or copy action base on the given path.
@@ -458,7 +458,7 @@ fn add_tool_fingerprint(
     install_dir: &PathBuf,
     use_cargo: bool,
     tool_name: &str,
-    tool_path: Option<PathBuf>,
+    tool_path: Option<Vec<PathBuf>>,
 ) -> Result<()> {
     // Add the tool to the fingerprint.
     let mut fingerprint = FingerPrint::load_fingerprint(install_dir);
@@ -487,9 +487,9 @@ fn install_and_add_fingerprint_without_cargo(
     name: &str,
     path: &PathBuf,
 ) -> Result<()> {
-    let tool_path = try_install_from_path(config, name, path)?;
+    let tool_paths = try_install_from_path(config, name, path)?;
     // Add the tool to the fingerprint.
-    add_tool_fingerprint(&config.install_dir, false, name, Some(tool_path))?;
+    add_tool_fingerprint(&config.install_dir, false, name, Some(tool_paths))?;
     Ok(())
 }
 
@@ -521,7 +521,11 @@ mod tests {
 
         install_manifest.record_rust(rust_version.to_string(), rust_components);
 
-        install_manifest.record_tool(false, "aaa".to_string(), Some(install_dir.join("aaa")));
+        install_manifest.record_tool(
+            false,
+            "aaa".to_string(),
+            Some(vec![install_dir.join("aaa")]),
+        );
 
         let install_manifest = install_manifest.to_toml().unwrap();
 
@@ -546,7 +550,11 @@ paths = ['D:\path\to\aaa']
 
         install_manifest.record_rust(rust_version.to_string(), rust_components);
 
-        install_manifest.record_tool(false, "aaa".to_string(), Some(install_dir.join("aaa")));
+        install_manifest.record_tool(
+            false,
+            "aaa".to_string(),
+            Some(vec![install_dir.join("aaa")]),
+        );
 
         let install_manifest = install_manifest.to_toml().unwrap();
 

@@ -45,16 +45,18 @@ impl FingerPrint {
         &mut self,
         use_cargo: bool,
         name: String,
-        path: Option<PathBuf>,
+        paths: Option<Vec<PathBuf>>,
     ) -> &mut Self {
         self.tools
             .entry(name)
             .and_modify(|tool| {
                 if use_cargo {
                     tool.paths = Vec::new();
-                } else if let Some(p) = &path {
-                    if !tool.paths.contains(p) {
-                        tool.paths.push(p.to_path_buf());
+                } else if let Some(p) = &paths {
+                    for pp in p.iter() {
+                        if !tool.paths.contains(pp) {
+                            tool.paths.push(pp.to_path_buf());
+                        }
                     }
                 }
             })
@@ -63,8 +65,8 @@ impl FingerPrint {
                 paths: {
                     if use_cargo {
                         Vec::new()
-                    } else if let Some(p) = &path {
-                        vec![p.to_path_buf()]
+                    } else if let Some(pp) = &paths {
+                        pp.to_vec()
                     } else {
                         /// FIXME: should throw error if path is not found.
                         Vec::new()

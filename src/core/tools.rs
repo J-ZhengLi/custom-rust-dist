@@ -109,24 +109,29 @@ impl<'a> Tool<'a> {
         bail!("unable to process tool '{name}' as it is not supported")
     }
 
-    pub(crate) fn install(&self, config: &InstallConfiguration) -> Result<PathBuf> {
+    pub(crate) fn install(&self, config: &InstallConfiguration) -> Result<Vec<PathBuf>> {
+        let mut res = Vec::new();
         match self {
             Self::Executables(_, exes) => {
-                let mut dest = PathBuf::new();
                 for exe in exes {
-                    dest = utils::copy_file_to(exe, config.cargo_bin())?;
+                    res.push(utils::copy_file_to(exe, config.cargo_bin())?);
                 }
-                Ok(dest)
             }
-            Self::Custom { name, path } => custom_instructions::install(name, path, config),
-            Self::DirWithBin { name, bin_dir } => install_dir_with_bin_(config, name, bin_dir),
+            Self::Custom { name, path } => {
+                res.push(custom_instructions::install(name, path, config)?);
+            }
+            Self::DirWithBin { name, bin_dir } => {
+                res.push(install_dir_with_bin_(config, name, bin_dir)?);
+            }
             Self::Plugin { kind, path, .. } => {
                 // run the installation command.
                 kind.install_plugin(path)?;
                 // we need to "cache" to installer, so that we could uninstall with it.
-                utils::copy_file_to(path, config.tools_dir())
+                res.push(utils::copy_file_to(path, config.tools_dir())?)
             }
         }
+
+        Ok(res)
     }
 
     pub(crate) fn uninstall(&self) -> Result<()> {
