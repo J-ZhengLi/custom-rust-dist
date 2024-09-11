@@ -21,13 +21,6 @@
         "all": true
       }
     },
-    "windows": [
-      {
-        "title": "玄武 Rust 安装工具",
-        "minWidth": 640,
-        "minHeight": 480
-      }
-    ],
     "security": {
       "csp": null
     },

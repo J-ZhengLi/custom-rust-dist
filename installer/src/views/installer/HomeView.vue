@@ -1,8 +1,8 @@
 <script lang="ts" setup>
 import { ref } from 'vue';
-import { useCustomRouter } from '../router';
+import { useCustomRouter } from '@/router/index';
 import { message } from '@tauri-apps/api/dialog';
-import { installConf } from '../utils';
+import { installConf } from '@/utils/index';
 
 const { routerPush } = useCustomRouter();
 const isDialogVisible = ref(false);
@@ -25,7 +25,7 @@ function handleDialogOk() {
 function handleInstallClick(custom: boolean) {
   if (isUserAgree.value) {
     installConf.setCustomInstall(custom);
-    routerPush(custom ? '/folder' : '/confirm');
+    routerPush(custom ? '/installer/folder' : '/installer/confirm');
   } else {
     message('请先同意许可协议', { title: '提示' });
   }
@@ -51,6 +51,7 @@ function handleInstallClick(custom: boolean) {
     <div basis="120px" w="full" text="center">
       <div flex="~ items-end justify-center">
         <base-button
+          theme="primary"
           w="12rem"
           mx="8px"
           text="1.2rem"

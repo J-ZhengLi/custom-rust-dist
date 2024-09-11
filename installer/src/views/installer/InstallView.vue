@@ -3,8 +3,8 @@ import type { Ref } from 'vue';
 import { event } from '@tauri-apps/api';
 import { message } from '@tauri-apps/api/dialog';
 import { computed, nextTick, onMounted, ref } from 'vue';
-import { useCustomRouter } from '../router';
-import { invokeCommand } from '../utils';
+import { useCustomRouter } from '@/router/index';
+import { invokeCommand, progressFormat } from '@/utils/index';
 
 const { routerPush } = useCustomRouter();
 const progress = ref(0);
@@ -23,10 +23,6 @@ function toBottom() {
       ).scrollHeight;
     }
   });
-}
-
-function progressFormat(value: number) {
-  return value.toFixed(2).padStart(5, '0') + '%';
 }
 
 onMounted(() => {
@@ -49,7 +45,7 @@ onMounted(() => {
     output.value.push('安装完成');
     toBottom();
     setTimeout(() => {
-      routerPush('/finish');
+      routerPush('/installer/finish');
     }, 1000);
   });
 
@@ -91,7 +87,8 @@ onMounted(() => {
     <div basis="60px" flex="~ justify-end items-center">
       <base-button
         v-show="progress === 100"
-        @click="() => routerPush('/finish')"
+        theme="primary"
+        @click="() => routerPush('/installer/finish')"
         mr="12px"
         >下一步</base-button
       >

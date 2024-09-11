@@ -320,6 +320,7 @@ fn main() -> Result<()> {
             if !cli.no_gui {
                 // TODO: Add manager UI to manage install toolchain/tools, including
                 // update, add, remove, etc...
+                gui_manager()?;
             } else {
                 cli.execute()?;
             }
@@ -351,6 +352,48 @@ fn gui_main() -> Result<()> {
             install_toolchain,
             run_app
         ])
+        .setup(|app| {
+            let version = env!("CARGO_PKG_VERSION");
+            let _installer_window = tauri::WindowBuilder::new(
+                app,
+                "installer_window",
+                tauri::WindowUrl::App("index.html/#/installer".into()),
+            )
+            .title(format!("玄武 Rust 安装工具 v{}", version))
+            .build()
+            .unwrap();
+
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .context("unknown error occurs while running tauri application")?;
+    Ok(())
+}
+
+fn gui_manager() -> Result<()> {
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            close_window,
+            finish,
+            default_install_dir,
+            select_folder,
+            get_component_list,
+            install_toolchain,
+            run_app
+        ])
+        .setup(|app| {
+            let version = env!("CARGO_PKG_VERSION");
+            let _manager_window = tauri::WindowBuilder::new(
+                app,
+                "manager_window",
+                tauri::WindowUrl::App("index.html/#/manager".into()),
+            )
+            .title(format!("玄武 Rust 管理工具 v{}", version))
+            .build()
+            .unwrap();
+
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .context("unknown error occurs while running tauri application")?;
     Ok(())

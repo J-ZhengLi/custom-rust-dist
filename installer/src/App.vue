@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import TheLayout from './components/TheLayout.vue';
 import { installConf } from './utils';
+import { RouterView } from 'vue-router';
 
 onMounted(() => {
   installConf.loadAll();
@@ -9,7 +9,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <the-layout />
+  <RouterView />
 </template>
 
 <style>

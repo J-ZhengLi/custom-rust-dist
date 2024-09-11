@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import MdiCheck from './icons/MdiCheck.vue';
 
-const { title, disabled } = defineProps({
-  title: String,
-  disabled: Boolean,
-});
+const { title, disabled, labelComponent, labelComponentProps } = defineProps<{
+  title?: string;
+  disabled?: boolean;
+  labelComponent?: Object;
+  labelComponentProps?: Object;
+}>();
 
 const emit = defineEmits(['titleClick']);
 
@@ -50,7 +52,12 @@ function titleClick() {
       </slot>
     </span>
     <span ml="4px" @click="titleClick" whitespace-nowrap>
-      <slot>{{ title }}</slot>
+      <slot>
+        <span v-if="labelComponent">
+          <component :is="labelComponent" v-bind="labelComponentProps" />
+        </span>
+        <span v-else>{{ title }}</span>
+      </slot>
     </span>
   </label>
 </template>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { installConf, invokeCommand, TauriComponent } from '../utils';
-import { useCustomRouter } from '../router';
-import ScrollBox from '../components/ScrollBox.vue';
+import { installConf, invokeCommand, TauriComponent } from '@/utils/index';
+import { useCustomRouter } from '@/router/index';
+import ScrollBox from '@/components/ScrollBox.vue';
 import { computed } from 'vue';
 
 const { routerPush, routerBack } = useCustomRouter();
@@ -17,7 +17,7 @@ function handleNextClick() {
   invokeCommand('install_toolchain', {
     components_list: components.value as TauriComponent[],
     install_dir: path.value as string,
-  }).then(() => routerPush('/install'));
+  }).then(() => routerPush('/installer/install'));
 }
 </script>
 
@@ -29,24 +29,24 @@ function handleNextClick() {
       <p mb="4px">单击“安装”以继续。如果需要修改配置请点击“上一步”。</p>
     </div>
     <scroll-box flex="1" mx="12px" overflow="auto">
-      <p mt="0" mb="8px">安装位置：</p>
-      <base-input
-        :value="path"
-        border-color="focus:base"
-        ml="12px"
-        w="90%"
-        readonly
-      />
+      <p m="0">安装位置：</p>
+      <p my="4px">{{ path }}</p>
       <p mb="8px">组件：</p>
       <div ml="12px">
         <p my="4px" v-for="component in components" :key="component.name">
-          {{ `${component.name} ${component.installed ? '(installed, re-installing)' : component.required ? '(required)' : ''} ` }}
+          {{
+            `${component.name} ${component.installed ? '(installed, re-installing)' : component.required ? '(required)' : ''} `
+          }}
         </p>
       </div>
     </scroll-box>
     <div h="60px" flex="~ justify-end items-center">
-      <base-button mr="12px" @click="routerBack">上一步</base-button>
-      <base-button mr="12px" @click="handleNextClick">开始安装</base-button>
+      <base-button theme="primary" mr="12px" @click="routerBack"
+        >上一步</base-button
+      >
+      <base-button theme="primary" mr="12px" @click="handleNextClick"
+        >开始安装</base-button
+      >
     </div>
   </div>
 </template>

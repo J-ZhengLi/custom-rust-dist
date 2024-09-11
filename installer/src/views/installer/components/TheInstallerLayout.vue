@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useCustomRouter } from '../router';
+import { computed, onBeforeMount } from 'vue';
+import { useCustomRouter } from '@/router';
 import { useRoute } from 'vue-router';
 import TheAside from './TheAside.vue';
+import { installConf } from '@/utils';
 
 const route = useRoute();
-const isBack = computed(() => useCustomRouter().isBack);
-const isHome = computed(() => route.path === '/');
+const { isBack } = useCustomRouter();
+const isHome = computed(() => route.name === 'Home');
 
 const transitionName = computed(() => {
-  if (isBack.value.value === true) return 'back';
-  if (isBack.value.value === false) return 'push';
+  if (isBack.value === true) return 'back';
+  if (isBack.value === false) return 'push';
   return '';
 });
+onBeforeMount(() => installConf.loadAll());
 </script>
 
 <template>
@@ -52,7 +54,7 @@ const transitionName = computed(() => {
   </div>
 </template>
 
-<style scoped>
+<style>
 .aside-enter-active,
 .aside-leave-active,
 .push-enter-active,
