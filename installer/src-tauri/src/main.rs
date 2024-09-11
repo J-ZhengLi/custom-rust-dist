@@ -13,10 +13,10 @@ use anyhow::Context;
 use indexmap::IndexMap;
 use tauri::api::dialog::FileDialogBuilder;
 
-use custom_rust::cli::{parse_installer_cli, parse_manager_cli, Installer};
-use custom_rust::manifest::{baked_in_manifest, ToolInfo};
-use custom_rust::utils::MultiThreadProgress;
-use custom_rust::{
+use rim::cli::{parse_installer_cli, parse_manager_cli, Installer};
+use rim::manifest::{baked_in_manifest, ToolInfo};
+use rim::utils::MultiThreadProgress;
+use rim::{
     get_component_list_from_manifest, try_it, utils, Component, EnvConfig, InstallConfiguration,
 };
 use xuanwu_installer::Result;
@@ -42,7 +42,7 @@ fn default_install_dir() -> String {
     CLI_ARGS
         .get()
         .and_then(|opt| opt.install_dir().map(|p| p.to_path_buf()))
-        .unwrap_or_else(custom_rust::default_install_dir)
+        .unwrap_or_else(rim::default_install_dir)
         .to_string_lossy()
         .to_string()
 }

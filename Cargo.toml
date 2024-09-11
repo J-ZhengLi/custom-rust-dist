@@ -1,12 +1,16 @@
 [package]
-name = "custom-rust"
+name = "rim"
 version = "0.1.0-alpha.4"
 edition = "2021"
-description = "Manage Rust toolchain and a set of extra tools with ease"
+description = "An interactive Rust installation manager"
 rust-version = "1.73.0" # Minimal required version to use `zip`
 
 [features]
 gui = []
+
+[[bin]]
+name = "rim-cli"
+path = "src/bin/installer.rs"
 
 [workspace]
 members = ["installer/src-tauri"]

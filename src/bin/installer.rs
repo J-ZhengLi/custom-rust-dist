@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use custom_rust::{cli, utils};
+use rim::{cli, utils};
 
 fn main() -> Result<()> {
     match utils::lowercase_program_name() {
