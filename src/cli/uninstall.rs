@@ -1,6 +1,9 @@
 //! Separated module to handle uninstallation in command line.
 
-use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
+use crate::core::{
+    parser::fingerprint::FingerPrint,
+    uninstall::{UninstallConfiguration, Uninstallation},
+};
 
 use super::{common, GlobalOpt, ManagerSubcommands};
 
@@ -14,7 +17,11 @@ pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Resul
 
     // Ask confirmation
     // TODO: format an installed list instead
-    let installed = "Rust-toolchain";
+
+    let config = UninstallConfiguration;
+    let fingerprint = FingerPrint::load_fingerprint(&config.install_dir()?);
+    let installed = fingerprint.print_installation();
+
     let prompt = if *remove_self {
         t!(
             "uninstall_all_confirmation",
@@ -28,13 +35,12 @@ pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Resul
         return Ok(true);
     }
 
-    let config = UninstallConfiguration;
-    config.remove_rustup_env_vars()?;
-    config.remove_tools()?;
+    config.remove_tools(fingerprint)?;
     // TODO: remove rust toolchain
     if *remove_self {
         config.remove_self()?;
     }
+    config.remove_rustup_env_vars()?;
 
     Ok(true)
 }

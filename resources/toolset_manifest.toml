@@ -6,13 +6,13 @@ version = "stable"
 group = "Rust"
 components = ["clippy", "rustfmt", "rust-src", "rust-docs"]
 optional-components = ["llvm-tools-preview", "rust-analysis"]
-offline-dist-server = "packages/" # Must contain a folder named "dist"
+# offline-dist-server = "packages/" # Must contain a folder named "dist"
 
-[rust.rustup]
-x86_64-pc-windows-msvc = "packages/x86_64-pc-windows-msvc/rustup-init.exe"
-x86_64-pc-windows-gnu = "packages/x86_64-pc-windows-msvc/rustup-init.exe"
-x86_64-unknown-linux-gnu = "packages/x86_64-unknown-linux-gnu/rustup-init"
-aarch64-apple-darwin = "packages/aarch64-apple-darwin/rustup-init"
+# [rust.rustup]
+# x86_64-pc-windows-msvc = "packages/x86_64-pc-windows-msvc/rustup-init.exe"
+# x86_64-pc-windows-gnu = "packages/x86_64-pc-windows-msvc/rustup-init.exe"
+# x86_64-unknown-linux-gnu = "packages/x86_64-unknown-linux-gnu/rustup-init"
+# aarch64-apple-darwin = "packages/aarch64-apple-darwin/rustup-init"
 
 [rust.profile]
 name = "minimal"

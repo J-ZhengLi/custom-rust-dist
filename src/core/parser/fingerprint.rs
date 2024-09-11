@@ -11,7 +11,7 @@ use super::TomlParser;
 /// Only covers a small range of options we need to configurate.
 /// Fwiw, the full set of configuration options can be found
 /// in the [Cargo Configuration Book](https://doc.rust-lang.org/cargo/reference/config.html).
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub(crate) struct FingerPrint {
     rust: RustInstallInfo,
     tools: IndexMap<String, ToolDetailInfo>,
@@ -21,6 +21,14 @@ impl TomlParser for FingerPrint {}
 
 #[allow(unused)]
 impl FingerPrint {
+    pub(crate) fn rust(&self) -> RustInstallInfo {
+        self.rust.clone()
+    }
+
+    pub(crate) fn tools(&self) -> IndexMap<String, ToolDetailInfo> {
+        self.tools.clone()
+    }
+
     pub(crate) fn load_fingerprint(install_dir: &PathBuf) -> Self {
         let fp_path = install_dir.join(".fingerprint");
         if fp_path.exists() {
@@ -76,9 +84,18 @@ impl FingerPrint {
 
         self
     }
+
+    pub(crate) fn print_installation(&self) -> String {
+        let mut installed = String::new();
+        installed.push_str(&self.rust.print_rust_info());
+        for tool in self.tools.iter() {
+            installed.push_str(&format!("tools: {:?} \n", tool.0));
+        }
+        installed
+    }
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct RustInstallInfo {
     version: String,
@@ -86,9 +103,28 @@ pub(crate) struct RustInstallInfo {
     pub(crate) components: Vec<String>,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+impl RustInstallInfo {
+    pub(crate) fn print_rust_info(&self) -> String {
+        format!(
+            "rust-version: {}\ncomponents: {:?}\n",
+            self.version, self.components
+        )
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct ToolDetailInfo {
     use_cargo: bool,
     paths: Vec<PathBuf>,
+}
+
+impl ToolDetailInfo {
+    pub(crate) fn use_cargo(&self) -> bool {
+        self.use_cargo
+    }
+
+    pub(crate) fn paths(&self) -> &Vec<PathBuf> {
+        &self.paths
+    }
 }

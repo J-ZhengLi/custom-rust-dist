@@ -6,6 +6,7 @@ use url::Url;
 
 use super::install::InstallConfiguration;
 use super::parser::manifest::ToolsetManifest;
+use super::uninstall::UninstallConfiguration;
 use super::RUSTUP_DIST_SERVER;
 use crate::manifest::Proxy;
 use crate::utils::execute_with_env;
@@ -118,6 +119,18 @@ impl Rustup {
             r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Rustup",
         )?;
 
+        Ok(())
+    }
+
+    // Rustup self uninstall all the components and toolchains.
+    pub(crate) fn _remove_self(&self, config: &UninstallConfiguration) -> Result<()> {
+        let rustup = config
+            .install_dir()?
+            .join(".cargo")
+            .join("bin")
+            .join(RUSTUP);
+        let args = vec!["self", "uninstall", "-y"];
+        execute(rustup, &args)?;
         Ok(())
     }
 }
