@@ -74,7 +74,7 @@ function menuItemActive(order: number) {
       </div>
     </div>
     <div mb="8px" text="center">
-      <img src="/logo.svg" alt="Xuanwu logo" w="90%" />
+      <img src="/logo.svg" alt="logo" w="90%" />
     </div>
   </div>
 </template>

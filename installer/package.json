@@ -1,7 +1,5 @@
 {
-  "name": "xuanwu-installer",
   "private": true,
-  "version": "0.1.0-alpha.4",
   "type": "module",
   "scripts": {
     "dev": "vite",

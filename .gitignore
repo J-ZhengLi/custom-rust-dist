@@ -11,3 +11,6 @@ example_project/
 
 # Local stored packages that are too big
 resources/packages/*
+
+# Release artifacts
+dist/
