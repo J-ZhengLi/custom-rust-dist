@@ -49,5 +49,8 @@
     "invalid_input": "Invalid input '%{actual}', expecting %{expect}, please try again",
     "current_install_option": "Current installation options:",
     "install_dir": "installation path",
-    "selected_components": "selected components"
+    "selected_components": "selected components",
+
+    "uninstall_confirmation": "Are you sure you want to uninstall the following components: \n\n%{list}\n",
+    "uninstall_all_confirmation": "Are you sure you want to uninstall %{vendor}-manager and the following components: \n\n%{list}\n"
 }

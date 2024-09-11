@@ -1,9 +1,12 @@
 //! Contains all the definition of command line arguments.
 
 mod common;
+mod component;
 mod install;
+mod list;
 mod tryit;
 mod uninstall;
+mod update;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand, ValueHint};
@@ -18,13 +21,13 @@ use url::Url;
 pub struct Installer {
     /// Enable verbose output
     #[arg(short, long, conflicts_with = "quiet")]
-    pub verbose: bool,
+    verbose: bool,
     /// Suppress non-critical messages
     #[arg(short, long, conflicts_with = "verbose")]
-    pub quiet: bool,
+    quiet: bool,
     /// Disable interaction and answer 'yes' to all prompts
     #[arg(short, long = "yes")]
-    pub yes_to_all: bool,
+    yes_to_all: bool,
     #[cfg(feature = "gui")]
     /// Don't show GUI when running the program.
     #[arg(long)]
@@ -32,19 +35,19 @@ pub struct Installer {
 
     /// Set another path to install Rust.
     #[arg(long, value_name = "PATH", value_hint = ValueHint::DirPath)]
-    pub prefix: Option<PathBuf>,
+    prefix: Option<PathBuf>,
     /// Specify another cargo registry url to replace `crates.io`, could be `sparse+URL`.
     #[arg(hide = true, long)]
-    pub registry_url: Option<String>,
+    registry_url: Option<String>,
     /// Specify another cargo registry name to replace `crates.io`.
     #[arg(hide = true, long, default_value = "mirror")]
-    pub registry_name: String,
+    registry_name: String,
     /// Specify another server to download Rust toolchain.
     #[arg(hide = true, long, value_name = "URL", value_hint = ValueHint::Url)]
-    pub rustup_dist_server: Option<Url>,
+    rustup_dist_server: Option<Url>,
     /// Specify another server to download rustup.
     #[arg(hide = true, long, value_name = "URL", value_hint = ValueHint::Url)]
-    pub rustup_update_root: Option<Url>,
+    rustup_update_root: Option<Url>,
 }
 
 /// Manage Rust installation, mostly used for uninstalling.
@@ -56,19 +59,19 @@ pub struct Installer {
 pub struct Manager {
     /// Enable verbose output
     #[arg(short, long, conflicts_with = "quiet")]
-    pub verbose: bool,
+    verbose: bool,
     /// Suppress non-critical messages
     #[arg(short, long, conflicts_with = "verbose")]
-    pub quiet: bool,
+    quiet: bool,
     /// Disable interaction and answer 'yes' to all prompts
     #[arg(short, long = "yes")]
-    pub yes_to_all: bool,
+    yes_to_all: bool,
     #[cfg(feature = "gui")]
     /// Don't show GUI when running the program.
     #[arg(long)]
     pub no_gui: bool,
     #[command(subcommand)]
-    pub command: Option<ManagerSubcommands>,
+    command: Option<ManagerSubcommands>,
 }
 
 impl Installer {
@@ -100,12 +103,36 @@ impl Manager {
 #[allow(clippy::large_enum_variant)]
 #[derive(Subcommand, Debug)]
 #[command(arg_required_else_help = true)]
-pub enum ManagerSubcommands {
-    // TODO: Add install command to install **individual** components.
+enum ManagerSubcommands {
+    /// Install a specific dist version
+    Install {
+        #[arg(value_name = "VERSION")]
+        version: String,
+    },
+    /// Update the current installed dist suite to the newest version
+    Update {
+        /// Exclude this manager tool when performing updates
+        #[arg(long)]
+        no_self_update: bool,
+    },
+    /// Show a list of available dist version or components
+    List {
+        /// Prints the current installed dist version
+        #[arg(long)]
+        installed: bool,
+        #[command(subcommand)]
+        command: Option<list::ListCommand>,
+    },
+    /// Install or uninstall components
+    Component {
+        #[command(subcommand)]
+        command: Option<component::ComponentCommand>,
+    },
     /// Uninstall individual components or everything.
     Uninstall {
-        #[command(subcommand)]
-        commands: Option<UninstallCommand>,
+        /// Remove this manager tool as well
+        #[arg(long)]
+        remove_self: bool,
     },
     /// A subcommand to create a new Rust project template and let you start coding with it.
     TryIt {
@@ -115,34 +142,39 @@ pub enum ManagerSubcommands {
     },
 }
 
-impl ManagerSubcommands {
-    pub(crate) fn execute(&self, opt: GlobalOpt) -> Result<()> {
-        uninstall::execute(self, opt)?;
-        tryit::execute(self, opt)?;
-        Ok(())
-    }
+macro_rules! return_if_executed {
+    ($($fn:expr),+) => {
+        $(
+            if $fn {
+                return Ok(());
+            }
+        )*
+    };
 }
 
-#[derive(Subcommand, Debug)]
-#[command(arg_required_else_help = true)]
-pub enum UninstallCommand {
-    /// Uninstall everything.
-    All,
-    /// Uninstall a list of individual tools, separated by space.
-    Tool {
-        #[arg(value_name = "TOOLS")]
-        names: Vec<String>,
-    },
+impl ManagerSubcommands {
+    pub(crate) fn execute(&self, opt: GlobalOpt) -> Result<()> {
+        return_if_executed! {
+            install::execute_manager(self, opt)?,
+            update::execute(self, opt)?,
+            list::execute(self, opt)?,
+            component::execute(self, opt)?,
+            uninstall::execute(self, opt)?,
+            tryit::execute(self, opt)?
+        }
+        Ok(())
+    }
 }
 
 /// Contain options that are accessed globally.
 ///
 /// Such as `--verbose`, `--quiet`, `--yes`.
+#[allow(unused)]
 #[derive(Debug, Clone, Copy, Default)]
-pub struct GlobalOpt {
-    pub verbose: bool,
-    pub quiet: bool,
-    pub yes: bool,
+struct GlobalOpt {
+    verbose: bool,
+    quiet: bool,
+    yes: bool,
 }
 
 pub fn parse_installer_cli() -> Installer {

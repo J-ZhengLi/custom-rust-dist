@@ -65,3 +65,7 @@ features = [
   "Win32_System_WindowsProgramming",
 ]
 version = "0.52.0"
+
+[[test]]
+name = "manager_mode"
+harness = false
