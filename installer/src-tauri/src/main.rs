@@ -359,7 +359,7 @@ fn gui_main() -> Result<()> {
                 "installer_window",
                 tauri::WindowUrl::App("index.html/#/installer".into()),
             )
-            .title(&format!("玄武 Rust 安装工具 v{}", version))
+            .title(format!("玄武 Rust 安装工具 v{}", version))
             .build()
             .unwrap();
 
@@ -388,7 +388,7 @@ fn gui_manager() -> Result<()> {
                 "manager_window",
                 tauri::WindowUrl::App("index.html/#/manager".into()),
             )
-            .title(&format!("玄武 Rust 管理工具 v{}", version))
+            .title(format!("玄武 Rust 管理工具 v{}", version))
             .build()
             .unwrap();
 
