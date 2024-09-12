@@ -1,0 +1,9 @@
+[package]
+name = "rim_dev"
+version = "0.1.0"
+description = "Helper crate for RIM"
+edition = "2021"
+
+[dependencies]
+anyhow.workspace = true
+rust-i18n.workspace = true

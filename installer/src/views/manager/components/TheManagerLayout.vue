@@ -29,7 +29,7 @@ onBeforeMount(() => managerConf.loadConf());
       </transition>
     </router-view>
     <footer absolute bottom="0" right="2rem" c="regular">
-      管理工具版本 0.0.0
+      管理工具版本 0.1.0-alpha.4
     </footer>
   </main>
 </template>

@@ -38,8 +38,7 @@ function handleInstallClick(custom: boolean) {
       <a href="https://xuanwu.beta.atomgit.com/" target="_blank">
         <img
           src="/logo.svg"
-          class="logo xuanwu"
-          alt="Xuanwu logo"
+          alt="logo"
           w="200px"
           mt="50%"
         />

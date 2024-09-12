@@ -1,4 +1,4 @@
-# Custom Rust Distro
+# R.I.M (Rust Installation Manager)
 
 Manage Rust toolchain and a set of extra tools with ease.
 

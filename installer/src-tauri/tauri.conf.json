@@ -6,10 +6,6 @@
     "distDir": "../dist",
     "withGlobalTauri": true
   },
-  "package": {
-    "productName": "xuanwu-installer",
-    "version": "0.0.0"
-  },
   "tauri": {
     "allowlist": {
       "all": false,
@@ -27,7 +23,7 @@
     "bundle": {
       "active": true,
       "targets": "all",
-      "identifier": "org.xuanwu.rust",
+      "identifier": "com.xuanwu.rust",
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",

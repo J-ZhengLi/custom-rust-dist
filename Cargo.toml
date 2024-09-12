@@ -1,15 +1,19 @@
 [package]
-name = "custom-rust"
+name = "rim"
 version = "0.1.0-alpha.4"
 edition = "2021"
-description = "Manage Rust toolchain and a set of extra tools with ease"
+description = "An interactive Rust installation manager"
 rust-version = "1.73.0" # Minimal required version to use `zip`
 
 [features]
 gui = []
 
+[[bin]]
+name = "rim-cli"
+path = "src/bin/installer.rs"
+
 [workspace]
-members = ["installer/src-tauri"]
+members = ["installer/src-tauri", "rim_dev"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -65,7 +69,3 @@ features = [
   "Win32_System_WindowsProgramming",
 ]
 version = "0.52.0"
-
-[[test]]
-name = "manager_mode"
-harness = false

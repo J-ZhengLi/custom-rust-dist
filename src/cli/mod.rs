@@ -55,7 +55,6 @@ pub struct Installer {
 // this struct, make sure the README doc is updated as well,
 #[derive(Parser, Default, Debug)]
 #[command(version, about)]
-#[command(arg_required_else_help = true)]
 pub struct Manager {
     /// Enable verbose output
     #[arg(short, long, conflicts_with = "quiet")]
@@ -102,7 +101,6 @@ impl Manager {
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Subcommand, Debug)]
-#[command(arg_required_else_help = true)]
 enum ManagerSubcommands {
     /// Install a specific dist version
     Install {

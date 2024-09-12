@@ -13,15 +13,15 @@ use anyhow::Context;
 use indexmap::IndexMap;
 use tauri::api::dialog::FileDialogBuilder;
 
-use custom_rust::cli::{parse_installer_cli, parse_manager_cli, Installer};
-use custom_rust::manifest::{baked_in_manifest, ToolInfo};
-use custom_rust::utils::MultiThreadProgress;
-use custom_rust::{
+use rim::cli::{parse_installer_cli, parse_manager_cli, Installer, Manager};
+use rim::manifest::{baked_in_manifest, ToolInfo};
+use rim::utils::MultiThreadProgress;
+use rim::{
     get_component_list_from_manifest, try_it, utils, Component, EnvConfig, InstallConfiguration,
 };
-use xuanwu_installer::Result;
+use rim_gui::Result;
 
-static CLI_ARGS: OnceLock<Installer> = OnceLock::new();
+static INSTALL_DIR: OnceLock<PathBuf> = OnceLock::new();
 static LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
 
 i18n!("../../locales", fallback = "en");
@@ -39,10 +39,10 @@ fn close_window(window: tauri::Window) {
 
 #[tauri::command]
 fn default_install_dir() -> String {
-    CLI_ARGS
+    INSTALL_DIR
         .get()
-        .and_then(|opt| opt.install_dir().map(|p| p.to_path_buf()))
-        .unwrap_or_else(custom_rust::default_install_dir)
+        .cloned()
+        .unwrap_or_else(rim::default_install_dir)
         .to_string_lossy()
         .to_string()
 }
@@ -313,30 +313,48 @@ fn component_list_to_map(list: Vec<&Component>) -> IndexMap<String, ToolInfo> {
     map
 }
 
-fn main() -> Result<()> {
-    match utils::lowercase_program_name() {
-        Some(s) if s.contains("-manager") => {
-            let cli = parse_manager_cli();
-            if !cli.no_gui {
-                // TODO: Add manager UI to manage install toolchain/tools, including
-                // update, add, remove, etc...
-                gui_manager()?;
-            } else {
-                cli.execute()?;
-            }
-        }
-        _ => {
-            // fallback to installer mode
+enum Mode {
+    Manager(Box<Manager>),
+    Installer(Box<Installer>),
+}
+
+impl Mode {
+    /// Determine which mode to run
+    fn detect() -> Self {
+        let manager_mode = || Mode::Manager(Box::new(parse_manager_cli()));
+        let installer_mode = || {
             let cli = parse_installer_cli();
-            if !cli.no_gui {
-                gui_main()?;
-            } else {
-                cli.execute()?;
+            if let Some(dir) = cli.install_dir() {
+                _ = INSTALL_DIR.set(dir.to_path_buf());
             }
+            Mode::Installer(Box::new(cli))
+        };
+
+        match env::var("MODE").as_deref() {
+            Ok("manager") => manager_mode(),
+            // fallback to installer mode
+            Ok(_) => installer_mode(),
+            Err(_) => match utils::lowercase_program_name() {
+                Some(s) if s.contains("manager") => manager_mode(),
+                // fallback to installer mode
+                _ => installer_mode(),
+            },
         }
     }
 
-    Ok(())
+    fn run(&self) -> Result<()> {
+        match self {
+            Mode::Manager(cli) if cli.no_gui => cli.execute()?,
+            Mode::Manager(_) => gui_manager()?,
+            Mode::Installer(cli) if cli.no_gui => cli.execute()?,
+            Mode::Installer(_) => gui_main()?,
+        }
+        Ok(())
+    }
+}
+
+fn main() -> Result<()> {
+    Mode::detect().run()
 }
 
 fn gui_main() -> Result<()> {

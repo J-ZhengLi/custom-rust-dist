@@ -1,2 +1,2 @@
 [alias]
-run-manager = "test --test manager_mode --"
+dev = "run -p rim_dev --"
