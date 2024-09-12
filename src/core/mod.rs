@@ -5,7 +5,7 @@
 pub(crate) mod components;
 mod custom_instructions;
 pub mod install;
-mod os;
+pub(crate) mod os;
 pub(crate) mod parser;
 pub(crate) mod rustup;
 pub(crate) mod tools;

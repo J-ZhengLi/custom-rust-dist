@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 use crate::utils;
+use anyhow::Result;
 
 use super::TomlParser;
 
@@ -34,10 +35,9 @@ impl FingerPrint {
         if fp_path.exists() {
             FingerPrint::load(fp_path).expect("Failed to find fingerprint file")
         } else {
-            let mut fingerprint = Self::default();
-            let fingerprint_content = fingerprint.to_toml().expect("Init new fingerprint content");
-            utils::write_file(fp_path, fingerprint_content.as_str(), false);
-            fingerprint
+            // Refresh the fingerprint
+            Self::refresh_fingerprint(fp_path, Self::default(), false);
+            Self::default()
         }
     }
 
@@ -92,6 +92,33 @@ impl FingerPrint {
             installed.push_str(&format!("tools: {:?} \n", tool.0));
         }
         installed
+    }
+
+    fn refresh_fingerprint(fp_path: PathBuf, fingerprint: FingerPrint, append: bool) {
+        let fingerprint_content = fingerprint.to_toml().expect("Init new fingerprint content");
+        utils::write_file(fp_path, fingerprint_content.as_str(), append);
+    }
+
+    pub fn remove_rust_fingerprint(install_dir: &PathBuf) -> Result<()> {
+        let fp_path = install_dir.join(".fingerprint");
+        let mut fingerprint = FingerPrint::load(&fp_path).expect("Failed to find fingerprint file");
+        // TODO: remove single component.
+        fingerprint.rust.version = String::new();
+        fingerprint.rust.components = Vec::new();
+        // Refresh the fingerprint
+        FingerPrint::refresh_fingerprint(fp_path, fingerprint, false);
+
+        Ok(())
+    }
+
+    pub fn remove_tools_fingerprint(install_dir: &PathBuf, tool_name: &str) -> Result<()> {
+        let fp_path = install_dir.join(".fingerprint");
+        let mut fingerprint = FingerPrint::load(&fp_path).expect("Failed to find fingerprint file");
+        fingerprint.tools.retain(|k, _| k != tool_name);
+        // Refresh the fingerprint
+        FingerPrint::refresh_fingerprint(fp_path, fingerprint, false);
+
+        Ok(())
     }
 }
 

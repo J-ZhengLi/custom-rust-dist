@@ -1,6 +1,6 @@
+use std::path::PathBuf;
 use std::process::Command;
 
-use super::install_dir_from_exe_path;
 use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
 use crate::manifest::ToolsetManifest;
@@ -22,9 +22,9 @@ impl EnvConfig for InstallConfiguration {
 }
 
 impl Uninstallation for UninstallConfiguration {
-    fn remove_rustup_env_vars(&self) -> Result<()> {
+    fn remove_rustup_env_vars(&self, install_dir: &PathBuf) -> Result<()> {
         // Remove the `<InstallDir>/.cargo/bin` which is added by rustup
-        let mut cargo_bin_dir = install_dir_from_exe_path()?;
+        let mut cargo_bin_dir = install_dir.clone();
         cargo_bin_dir.push(".cargo");
         cargo_bin_dir.push("bin");
         remove_from_path(&cargo_bin_dir)?;
@@ -38,13 +38,13 @@ impl Uninstallation for UninstallConfiguration {
         Ok(())
     }
 
-    fn remove_self(&self) -> Result<()> {
+    fn remove_self(&self, install_dir: &PathBuf) -> Result<()> {
         // On windows, we cannot delete an executable that is currently running.
         // Therefore, we are spawning a child process that runs `rmdir` and hope for the best.
         // `rustup` did something like this, it creates a "self-destructable" clone called `rustup-gc`,
         // and it is far more safe than this primitive way of hack, if this method has problem,
         // use the rustup way.
-        remove_self_()?;
+        remove_self_(install_dir)?;
         Ok(())
     }
 }
@@ -52,18 +52,15 @@ impl Uninstallation for UninstallConfiguration {
 /// Remove the installation directory, including the binary of this program.
 // FIXME: This is such a mess, but it works. However, when uninstall from `control panel`,
 // a window flashs, the env vars are removed but nothing has been removed.
-fn remove_self_() -> Result<()> {
+fn remove_self_(install_dir: &PathBuf) -> Result<()> {
     /// Execute a command then heads out.
     fn yolo(cmd: &mut Command) -> ! {
         let _yolo = cmd.spawn();
         std::process::exit(0)
     }
 
-    let installed_dir = install_dir_from_exe_path()?;
     let mut rmdir_cmd = Command::new("cmd.exe");
-    let cmd = rmdir_cmd
-        .args(["/C", "rmdir", "/s", "/q"])
-        .arg(&installed_dir);
+    let cmd = rmdir_cmd.args(["/C", "rmdir", "/s", "/q"]).arg(install_dir);
 
     do_remove_from_programs(uninstall_entry())?;
 

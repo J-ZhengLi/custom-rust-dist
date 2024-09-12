@@ -131,8 +131,10 @@ impl InstallConfiguration {
                 // promote this installer to manager
                 let manager_name = format!("{}-manager{}", t!("vendor_en"), utils::EXE_EXT);
 
-                let manager_exe = this.cargo_bin().join(manager_name);
+                // Add this manager to the `PATH` environment
+                let manager_exe = folder.join(manager_name);
                 utils::copy_as(self_exe, &manager_exe)?;
+                add_to_path(folder)?;
 
                 #[cfg(windows)]
                 // Create registry entry to add this program into "installed programs".

@@ -12,10 +12,10 @@ pub(crate) trait Uninstallation {
     ///
     /// This will remove persistent environment variables including
     /// `RUSTUP_DIST_SERVER`, `RUSTUP_UPDATE_ROOT`, `CARGO_HOME`, `RUSTUP_HOME`.
-    fn remove_rustup_env_vars(&self) -> Result<()>;
+    fn remove_rustup_env_vars(&self, install_dir: &PathBuf) -> Result<()>;
     /// The last step of uninstallation, this will remove the binary itself, along with
     /// the folder it's in.
-    fn remove_self(&self) -> Result<()>;
+    fn remove_self(&self, install_dir: &PathBuf) -> Result<()>;
 }
 
 /// Configurations to use when installing.
@@ -35,7 +35,11 @@ impl UninstallConfiguration {
     }
 
     /// Uninstall any tools that may or may not installed with custom instructions.
-    pub(crate) fn remove_tools(&self, fingerprint: FingerPrint) -> Result<()> {
+    pub(crate) fn remove_tools(
+        &self,
+        fingerprint: FingerPrint,
+        install_dir: &PathBuf,
+    ) -> Result<()> {
         // remove tools by cargo or uninstall api.
         let tools = fingerprint.tools();
         // we need to remove plugins first, so add an extra sort array.
@@ -48,6 +52,8 @@ impl UninstallConfiguration {
                     // remove the tool by cargo
                     let args = &["uninstall", tool_name];
                     utils::execute("cargo", args)?;
+                    // Refresh the fingerprint
+                    FingerPrint::remove_tools_fingerprint(install_dir, tool_name)?;
                 }
                 false => {
                     // remove the tool by using tool's uninstall api.
@@ -71,11 +77,12 @@ impl UninstallConfiguration {
         for tool in tools_without_cargo {
             println!("{}", t!("uninstalling_tool_info", name = tool.name()));
             tool.uninstall()?;
+            // Refresh the fingerprint
+            FingerPrint::remove_tools_fingerprint(install_dir, tool.name())?;
         }
 
-        // TODO: Remove manager to other directories.
         // Remove rust toolchain via rustup.
-        // Rustup::init().remove_self(self)?;
+        Rustup::init().remove_self(install_dir)?;
 
         Ok(())
     }

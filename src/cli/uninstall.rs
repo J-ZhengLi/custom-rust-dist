@@ -35,14 +35,18 @@ pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Resul
         return Ok(true);
     }
 
+    // We need to check if the installation directory exists and legal while fisrt use it.
+    let install_dir = config.install_dir()?;
     // remove all tools.
-    config.remove_tools(fingerprint)?;
+    config.remove_tools(fingerprint, &install_dir)?;
     // remove all the environments.
-    config.remove_rustup_env_vars()?;
-
+    config.remove_rustup_env_vars(&install_dir)?;
     // TODO: remove manager.
     if *remove_self {
-        config.remove_self()?;
+        config.remove_self(&install_dir)?;
+        // TODO: fix core::os::unix::remove_from_path()
+        // Rmove the `<InstallDir>` which is added for manager.
+        crate::core::os::remove_from_path(&install_dir)?;
     }
 
     Ok(true)

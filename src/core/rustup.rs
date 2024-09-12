@@ -5,8 +5,8 @@ use anyhow::{Context, Result};
 use url::Url;
 
 use super::install::InstallConfiguration;
+use super::parser::fingerprint::FingerPrint;
 use super::parser::manifest::ToolsetManifest;
-use super::uninstall::UninstallConfiguration;
 use super::RUSTUP_DIST_SERVER;
 use crate::manifest::Proxy;
 use crate::utils::execute_with_env;
@@ -123,14 +123,12 @@ impl Rustup {
     }
 
     // Rustup self uninstall all the components and toolchains.
-    pub(crate) fn remove_self(&self, config: &UninstallConfiguration) -> Result<()> {
-        let rustup = config
-            .install_dir()?
-            .join(".cargo")
-            .join("bin")
-            .join(RUSTUP);
+    pub(crate) fn remove_self(&self, install_dir: &PathBuf) -> Result<()> {
+        let rustup = install_dir.join(".cargo").join("bin").join(RUSTUP);
         let args = vec!["self", "uninstall", "-y"];
         execute(rustup, &args)?;
+        // Refresh the fingerprint
+        FingerPrint::remove_rust_fingerprint(install_dir)?;
         Ok(())
     }
 }
