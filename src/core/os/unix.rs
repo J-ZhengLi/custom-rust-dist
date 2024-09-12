@@ -1,6 +1,6 @@
+use std::path::PathBuf;
 use std::{env, path::Path};
 
-use super::install_dir_from_exe_path;
 use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
 use crate::manifest::ToolsetManifest;
@@ -53,14 +53,13 @@ impl EnvConfig for InstallConfiguration {
 
 impl Uninstallation for UninstallConfiguration {
     // This is basically removing the section marked with `rustup config section` in shell profiles.
-    fn remove_rustup_env_vars(&self) -> Result<()> {
+    fn remove_rustup_env_vars(&self, _install_dir: &PathBuf) -> Result<()> {
         remove_shell_profile_content()
     }
 
-    fn remove_self(&self) -> Result<()> {
+    fn remove_self(&self, install_dir: &PathBuf) -> Result<()> {
         // Remove the installer dir.
-        let installed_dir = install_dir_from_exe_path()?;
-        std::fs::remove_dir_all(installed_dir)?;
+        std::fs::remove_dir_all(install_dir)?;
         Ok(())
     }
 }

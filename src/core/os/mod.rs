@@ -28,7 +28,7 @@ pub(crate) fn install_dir_from_exe_path() -> Result<PathBuf> {
     let comp_count = exe_path.components().count();
     let maybe_install_dir: PathBuf = exe_path
         .components()
-        .take(comp_count.saturating_sub(3))
+        .take(comp_count.saturating_sub(1))
         .collect();
 
     if maybe_install_dir.parent().is_none() {
