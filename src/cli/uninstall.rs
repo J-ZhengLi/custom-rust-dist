@@ -35,12 +35,15 @@ pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Resul
         return Ok(true);
     }
 
+    // remove all tools.
     config.remove_tools(fingerprint)?;
-    // TODO: remove rust toolchain
+    // remove all the environments.
+    config.remove_rustup_env_vars()?;
+
+    // TODO: remove manager.
     if *remove_self {
         config.remove_self()?;
     }
-    config.remove_rustup_env_vars()?;
 
     Ok(true)
 }

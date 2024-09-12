@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use crate::{core::tools::Tool, utils};
 
-use super::{os::install_dir_from_exe_path, parser::fingerprint::FingerPrint};
+use super::{os::install_dir_from_exe_path, parser::fingerprint::FingerPrint, rustup::Rustup};
 
 /// Contains definition of uninstallation steps.
 pub(crate) trait Uninstallation {
@@ -72,6 +72,10 @@ impl UninstallConfiguration {
             println!("{}", t!("uninstalling_tool_info", name = tool.name()));
             tool.uninstall()?;
         }
+
+        // TODO: Remove manager to other directories.
+        // Remove rust toolchain via rustup.
+        // Rustup::init().remove_self(self)?;
 
         Ok(())
     }

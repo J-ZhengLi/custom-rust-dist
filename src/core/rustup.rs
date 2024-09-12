@@ -123,7 +123,7 @@ impl Rustup {
     }
 
     // Rustup self uninstall all the components and toolchains.
-    pub(crate) fn _remove_self(&self, config: &UninstallConfiguration) -> Result<()> {
+    pub(crate) fn remove_self(&self, config: &UninstallConfiguration) -> Result<()> {
         let rustup = config
             .install_dir()?
             .join(".cargo")
