@@ -9,17 +9,10 @@ use anyhow::{bail, Result};
 use super::{parser::fingerprint::ToolRecord, uninstall::UninstallConfiguration, CARGO_HOME};
 use crate::{core::custom_instructions, utils, InstallConfiguration};
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
 /// Representing the structure of an (extracted) tool's directory.
 // NB: Mind the order of the variants, they are crucial to installation/uninstallation.
 pub(crate) enum Tool<'a> {
-    /// Pre-built executable files.
-    /// i.e.:
-    /// ```text
-    /// ├─── some_binary.exe
-    /// ├─── cargo-some_binary.exe
-    /// ```
-    Executables(String, Vec<PathBuf>),
     /// Directory containing `bin` subfolder:
     /// ```text
     /// tool/
@@ -27,6 +20,13 @@ pub(crate) enum Tool<'a> {
     /// ├─── ...
     /// ```
     DirWithBin { name: String, path: &'a Path },
+    /// Pre-built executable files.
+    /// i.e.:
+    /// ```text
+    /// ├─── some_binary.exe
+    /// ├─── cargo-some_binary.exe
+    /// ```
+    Executables(String, Vec<PathBuf>),
     /// We have a custom "script" for how to deal with such directory.
     Custom { name: String, path: &'a Path },
     /// Plugin file, such as `.vsix` files for Visual Studio.
@@ -44,6 +44,16 @@ pub(crate) enum Tool<'a> {
 }
 
 impl<'a> Tool<'a> {
+    pub(crate) fn name(&self) -> &str {
+        match self {
+            Self::DirWithBin { name, .. }
+            | Self::Executables(name, _)
+            | Self::Plugin { name, .. }
+            | Self::Custom { name, .. }
+            | Self::CargoTool { name, .. } => name,
+        }
+    }
+
     pub(crate) fn from_path(name: &str, path: &'a Path) -> Result<Self> {
         if !path.exists() {
             bail!(
@@ -220,7 +230,7 @@ fn uninstall_dir_with_bin_(tool_path: &Path) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 #[non_exhaustive]
 pub(crate) enum PluginType {
     Vsix,
@@ -289,5 +299,82 @@ impl PluginType {
 
     fn uninstall_plugin(&self, plugin_path: &Path) -> Result<()> {
         self.install_or_uninstall_(plugin_path, true)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tools_order() {
+        let mut tools = vec![];
+
+        tools.push(Tool::Executables("".into(), vec![]));
+        tools.push(Tool::CargoTool {
+            name: "".into(),
+            args: None,
+        });
+        tools.push(Tool::Custom {
+            name: "".into(),
+            path: Path::new(""),
+        });
+        tools.push(Tool::Plugin {
+            name: "".into(),
+            kind: PluginType::Vsix,
+            path: Path::new(""),
+        });
+        tools.push(Tool::DirWithBin {
+            name: "".into(),
+            path: Path::new(""),
+        });
+        tools.push(Tool::Executables("".into(), vec![]));
+
+        tools.sort();
+
+        let mut tools_iter = tools.iter();
+        assert!(matches!(tools_iter.next(), Some(Tool::DirWithBin { .. })));
+        assert!(matches!(tools_iter.next(), Some(Tool::Executables(..))));
+        assert!(matches!(tools_iter.next(), Some(Tool::Executables(..))));
+        assert!(matches!(tools_iter.next(), Some(Tool::Custom { .. })));
+        assert!(matches!(tools_iter.next(), Some(Tool::Plugin { .. })));
+        assert!(matches!(tools_iter.next(), Some(Tool::CargoTool { .. })));
+        assert!(matches!(tools_iter.next(), None));
+    }
+
+    #[test]
+    fn tools_order_reversed() {
+        let mut tools = vec![];
+
+        tools.push(Tool::Executables("".into(), vec![]));
+        tools.push(Tool::CargoTool {
+            name: "".into(),
+            args: None,
+        });
+        tools.push(Tool::Custom {
+            name: "".into(),
+            path: Path::new(""),
+        });
+        tools.push(Tool::Plugin {
+            name: "".into(),
+            kind: PluginType::Vsix,
+            path: Path::new(""),
+        });
+        tools.push(Tool::DirWithBin {
+            name: "".into(),
+            path: Path::new(""),
+        });
+        tools.push(Tool::Executables("".into(), vec![]));
+
+        tools.sort_by(|a, b| b.cmp(a));
+
+        let mut tools_iter = tools.iter();
+        assert!(matches!(tools_iter.next(), Some(Tool::CargoTool { .. })));
+        assert!(matches!(tools_iter.next(), Some(Tool::Plugin { .. })));
+        assert!(matches!(tools_iter.next(), Some(Tool::Custom { .. })));
+        assert!(matches!(tools_iter.next(), Some(Tool::Executables(..))));
+        assert!(matches!(tools_iter.next(), Some(Tool::Executables(..))));
+        assert!(matches!(tools_iter.next(), Some(Tool::DirWithBin { .. })));
+        assert!(matches!(tools_iter.next(), None));
     }
 }

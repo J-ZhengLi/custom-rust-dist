@@ -166,9 +166,15 @@ mod tests {
         fp.add_rust_record("stable", &rust_components);
         fp.add_tool_record("aaa", ToolRecord::with_paths(vec![install_dir.join("aaa")]));
 
+        // there is an inconsistency between OSs when serialize paths
+        #[cfg(not(windows))]
+        let quote = "\"";
+        #[cfg(windows)]
+        let quote = "'";
+
         let v0 = format!(
             "\
-root = \"{}\"
+root = {quote}{}{quote}
 
 [rust]
 version = \"stable\"
@@ -176,7 +182,7 @@ components = [\"rustfmt\", \"cargo\"]
 
 [tools.aaa]
 use-cargo = false
-paths = [\"{}\"]
+paths = [{quote}{}{quote}]
 ",
             install_dir.display(),
             install_dir.join("aaa").display()

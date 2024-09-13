@@ -75,6 +75,7 @@ impl UninstallConfiguration {
 
     /// Uninstall all tools
     fn remove_tools(&mut self, tools: IndexMap<String, ToolRecord>) -> Result<()> {
+        let mut tools_to_uninstall = vec![];
         for (name, tool_detail) in &tools {
             let tool = if tool_detail.use_cargo {
                 Tool::cargo_tool(name, None)
@@ -84,13 +85,18 @@ impl UninstallConfiguration {
                 Tool::Executables(name.into(), tool_detail.paths.clone())
             } else {
                 println!("{}", t!("uninstall_unknown_tool_warn", tool = name));
-                return Ok(());
+                continue;
             };
+            tools_to_uninstall.push(tool);
+        }
 
+        tools_to_uninstall.sort_by(|a, b| b.cmp(a));
+
+        for tool in tools_to_uninstall {
             if tool.uninstall(self).is_err() {
                 println!("{}", t!("uninstall_tool_failed_warn"));
             } else {
-                self.install_record.remove_tool_record(name);
+                self.install_record.remove_tool_record(tool.name());
             }
         }
 

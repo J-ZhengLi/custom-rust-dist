@@ -55,7 +55,7 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<Vec<
     Ok(vec![installer_dir])
 }
 
-pub(super) fn uninstall() -> Result<()> {
+pub(super) fn uninstall(_config: &crate::core::uninstall::UninstallConfiguration) -> Result<()> {
     // TODO: Navigate to the vs_buildtools exe that we copied when installing, then execute it with:
     // .\vs_BuildTools.exe uninstall --productId Microsoft.VisualStudio.Product.BuildTools --channelId VisualStudio.17.Release --wait
     // But we need to ask the user if they want to uninstall this or not.
