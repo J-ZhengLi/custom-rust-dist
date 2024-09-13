@@ -114,22 +114,19 @@ impl InstallConfiguration {
         utils::ensure_dir(install_dir)?;
 
         if !lite {
-            // TODO: remove this condition check after the uninstallation implementation is finished.
-            if env!("PROFILE") == "debug" {
-                // Create a copy of this binary to CARGO_HOME/bin
-                let self_exe = std::env::current_exe()?;
-                // promote this installer to manager
-                let manager_name = format!("{}-manager{}", t!("vendor_en"), utils::EXE_EXT);
+            // Create a copy of this binary to CARGO_HOME/bin
+            let self_exe = std::env::current_exe()?;
+            // promote this installer to manager
+            let manager_name = format!("{}-manager{}", t!("vendor_en"), utils::EXE_EXT);
 
-                // Add this manager to the `PATH` environment
-                let manager_exe = install_dir.join(manager_name);
-                utils::copy_as(self_exe, &manager_exe)?;
-                add_to_path(install_dir)?;
+            // Add this manager to the `PATH` environment
+            let manager_exe = install_dir.join(manager_name);
+            utils::copy_as(self_exe, &manager_exe)?;
+            add_to_path(install_dir)?;
 
-                #[cfg(windows)]
-                // Create registry entry to add this program into "installed programs".
-                super::os::windows::do_add_to_programs(&manager_exe)?;
-            }
+            #[cfg(windows)]
+            // Create registry entry to add this program into "installed programs".
+            super::os::windows::do_add_to_programs(&manager_exe)?;
         }
 
         Ok(Self {

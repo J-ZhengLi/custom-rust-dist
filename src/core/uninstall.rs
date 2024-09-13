@@ -1,12 +1,11 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use indexmap::IndexMap;
 
 use super::{
-    os::install_dir_from_exe_path,
     parser::{
-        fingerprint::{installed_tools_fresh, InstallationRecord, ToolRecord},
+        fingerprint::{self, installed_tools_fresh, InstallationRecord, ToolRecord},
         TomlParser,
     },
     rustup::ToolchainInstaller,
@@ -35,8 +34,7 @@ pub(crate) struct UninstallConfiguration {
 
 impl UninstallConfiguration {
     pub(crate) fn init() -> Result<Self> {
-        let install_dir = install_dir_from_exe_path()?;
-        let install_record = InstallationRecord::load(&install_dir)?;
+        let (install_dir, install_record) = get_install_dir_and_record()?;
         Ok(Self {
             install_dir,
             install_record,
@@ -98,4 +96,49 @@ impl UninstallConfiguration {
 
         Ok(())
     }
+}
+
+macro_rules! bail_uninstallation {
+    ($reason:literal) => {
+        anyhow::bail!(concat!("error: unable to uninstall because ", $reason))
+    };
+}
+
+/// Try getting the installation root judging be current executable path.
+///
+/// This program should be installed directly under `install_dir`,
+/// but in case someone accidentally put this binary into some other locations such as
+/// the root, we should definitely NOT remove the parent dir after installation.
+/// Therefor we need some checks:
+///
+/// 1. Make sure the parent directory is not root.
+/// 2. Make sure there is a `.fingerprint` file alongside current binary.
+/// 3. Make sure the parent directory matches the recorded `root` path in the fingerprint file.
+///
+/// If any of this failed, we raise error and abort uninstallation.
+pub(crate) fn get_install_dir_and_record() -> Result<(PathBuf, InstallationRecord)> {
+    let exe_path = std::env::current_exe().context("unable to locate current executable")?;
+    let maybe_install_dir = exe_path
+        .parent()
+        .unwrap_or_else(|| unreachable!("executable should always have a parent directory"));
+
+    // TODO (?): maybe try not removing the parent directory instead?
+    if maybe_install_dir.parent().is_none() {
+        bail_uninstallation!(
+            "it appears that this program was mistakenly installed in root directory"
+        );
+    }
+    // Make sure the `.fingerprint` file is present and can be loaded
+    if !maybe_install_dir.join(fingerprint::FILENAME).is_file() {
+        bail_uninstallation!("'.fingerprint' file cannot be found");
+    }
+    // If the fingerprint file is present, try load it to see if the path matches
+    let Ok(fp) = InstallationRecord::load(maybe_install_dir) else {
+        bail_uninstallation!("'.fingerprint' file exists but cannot be loaded");
+    };
+    if fp.root != maybe_install_dir {
+        bail_uninstallation!("installation root in fingerprint file does not match");
+    }
+
+    Ok((maybe_install_dir.to_path_buf(), fp))
 }

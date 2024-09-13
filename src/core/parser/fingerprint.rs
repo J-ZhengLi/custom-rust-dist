@@ -7,7 +7,7 @@ use crate::utils;
 
 use super::TomlParser;
 
-const FILENAME: &str = ".fingerprint";
+pub(crate) const FILENAME: &str = ".fingerprint";
 
 /// Re-load fingerprint file just to get the list of installed tools,
 /// therefore we can use this list to uninstall, while avoiding race condition.
@@ -20,7 +20,7 @@ pub(crate) fn installed_tools_fresh(root: &Path) -> Result<IndexMap<String, Tool
 /// This tracks what tools/components we have installed, and where they are installed.
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct InstallationRecord {
-    root: PathBuf,
+    pub(crate) root: PathBuf,
     rust: Option<RustRecord>,
     #[serde(default)]
     pub(crate) tools: IndexMap<String, ToolRecord>,
