@@ -62,3 +62,12 @@ Options:
 ```bash
 ./manager try-it -p /path/to/create/project
 ```
+
+## Known problems
+
+1. There's a bug related to the WebKitGTK on some linux distro, which causing the GUI program showing blank upon starting.
+  This issue can be bypassed after setting the environment variable `WEBKIT_DISABLE_COMPOSITING_MODE` to `1`:
+
+    ```bash
+    export WEBKIT_DISABLE_COMPOSITING_MODE=1
+    ```

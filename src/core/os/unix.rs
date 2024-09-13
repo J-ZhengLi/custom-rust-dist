@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{env, path::Path};
 
@@ -15,25 +16,18 @@ impl EnvConfig for InstallConfiguration {
     // Which is not ideal for env vars such as `RUSTUP_DIST_SERVER`.
     fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()> {
         let vars_raw = self.env_vars(manifest)?;
+        let backup_dir = self.install_dir.join("backup");
+        utils::ensure_dir(&backup_dir)?;
         for sh in shell::get_available_shells() {
-            // Shell commands to set env var, such as `export KEY='val'`
-            let vars_shell_lines = vars_raw
-                .iter()
-                .map(|(k, v)| sh.to_env_var_string(k, &format!("'{v}'")))
-                .collect::<Vec<_>>()
-                .join("\n");
             // This string will be wrapped in a certain identifier comments.
-            let vars_shell_string = sh.script_content(&vars_shell_lines);
             for rc in sh.update_rcs() {
-                let vars_to_write = match utils::read_to_string(&rc) {
-                    // Assume env configuration exist if the section label presents.
-                    Ok(content) if content.contains(shell::RC_FILE_SECTION_END) => continue,
-                    Ok(content) if !content.ends_with('\n') => &format!("\n{}", &vars_shell_string),
-                    _ => &vars_shell_string,
-                };
+                // Do NOT fail installation if backup fails
+                _ = create_backup_for_rc(&rc, &backup_dir);
 
-                // Ok to append env config section now
-                utils::write_file(&rc, vars_to_write, true).with_context(|| {
+                let old_content = utils::read_to_string("rc", &rc).unwrap_or_default();
+                let new_content = rc_content_with_env_vars(sh.as_ref(), &old_content, &vars_raw);
+
+                utils::write_file(&rc, &new_content, false).with_context(|| {
                     format!(
                         "failed to append environment vars to shell profile: '{}'",
                         rc.display()
@@ -51,10 +45,27 @@ impl EnvConfig for InstallConfiguration {
     }
 }
 
+/// In case we mess up the user environment
+fn create_backup_for_rc(path: &Path, backup_dir: &Path) -> Result<()> {
+    // Safe to unwrap as long as the path is one of the `sh.update_rcs()`
+    let rc_filename = path.file_name().unwrap();
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or_default();
+    let mut backup_filename = rc_filename.to_os_string();
+    backup_filename.push("_");
+    backup_filename.push(timestamp.to_string());
+    backup_filename.push(".bak");
+    let backup_path = backup_dir.join(backup_filename);
+
+    utils::copy_as(path, backup_path)
+}
+
 impl Uninstallation for UninstallConfiguration {
     // This is basically removing the section marked with `rustup config section` in shell profiles.
     fn remove_rustup_env_vars(&self, _install_dir: &PathBuf) -> Result<()> {
-        remove_shell_profile_content()
+        remove_all_config_section()
     }
 
     fn remove_self(&self, install_dir: &PathBuf) -> Result<()> {
@@ -68,7 +79,7 @@ fn remove_section_or_warn_<F>(path: &Path, to_remove_sum: &str, operation: F) ->
 where
     F: FnOnce(String) -> Option<String>,
 {
-    let content = utils::read_to_string(path)?;
+    let content = utils::read_to_string("rc", path)?;
     if operation(content)
         .and_then(|s| utils::write_file(path, &s, false).ok())
         .is_none()
@@ -85,7 +96,7 @@ where
     Ok(())
 }
 
-fn remove_shell_profile_content() -> Result<()> {
+fn remove_all_config_section() -> Result<()> {
     // Remove the profiles content wrapped between `RC_FILE_SECTION_START` to `RC_FILE_SECTION_END`,
     // which is our dedicated configuration sections.
     let start = shell::RC_FILE_SECTION_START;
@@ -115,7 +126,9 @@ fn remove_sub_string_between(input: String, start: &str, end: &str) -> Option<St
         .take(start_pos)
         .chain(input.lines().skip(end_pos + 1))
         .collect::<Vec<_>>()
-        .join("\n");
+        .join("\n")
+        .trim_end()
+        .to_string();
     Some(result)
 }
 
@@ -149,10 +162,8 @@ pub(super) fn add_to_path(path: &Path) -> Result<()> {
     // Add the new path to bash profiles
     for sh in shell::get_available_shells() {
         for rc in sh.update_rcs() {
-            let rc_content = utils::read_to_string(&rc)?;
-            let Some(new_content) =
-                config_section_with_updated_path(sh.as_ref(), path_str, &rc_content)
-            else {
+            let rc_content = utils::read_to_string("rc", &rc)?;
+            let Some(new_content) = rc_content_with_path(sh.as_ref(), path_str, &rc_content) else {
                 println!(
                     "{}",
                     t!(
@@ -180,9 +191,44 @@ pub(super) fn add_to_path(path: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Attempt to return a new config section with updated path string.
-/// Return `None` if it doesn't need to be updated or it cannot be updated.
-fn config_section_with_updated_path(
+fn rc_content_with_env_vars(
+    sh: &dyn shell::UnixShell,
+    old_content: &str,
+    vars: &HashMap<&'static str, String>,
+) -> String {
+    // converts env vars such as [(KEY, value), (KEY2, value2)] to ["export KEY='value'"", "export KEY2='value2'"]
+    let vars_as_exports = vars.iter().map(|(k, v)| sh.to_env_var_string(k, v));
+
+    if let Some(existing_configs) = get_sub_string_between(
+        old_content,
+        shell::RC_FILE_SECTION_START,
+        shell::RC_FILE_SECTION_END,
+    ) {
+        // Remove the old env var config
+        let mut new_configs = existing_configs
+            .lines()
+            .filter(|line| !vars.keys().any(|key| line.contains(key)))
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>();
+        // push new env var config, even though they have the same value
+        new_configs.extend(vars_as_exports);
+        old_content.replace(&existing_configs, &new_configs.join("\n"))
+    } else {
+        let new_config_section = sh.config_section(&vars_as_exports.collect::<Vec<_>>().join("\n"));
+        format!("{old_content}\n{new_config_section}")
+    }
+}
+
+/// Attempt to add path `path_str` to config section, return None if nothing needs to be done.
+///
+/// i.e.:
+///
+/// - If there was no config section, create one with `export PATH="{path_str};$PATH"`.
+/// - If there was a config section but no `export PATH` line,
+///     insert `export PATH="{path_str};$PATH"` at the end of the config section.
+/// - If there was a config section and an `export PATH` line with it,
+///     push the `path_str` at the start of the `PATH` value, such as `export PATH="{path_str};/old/value;$PATH"`
+fn rc_content_with_path(
     sh: &dyn shell::UnixShell,
     path_str: &str,
     old_content: &str,
@@ -214,9 +260,9 @@ fn config_section_with_updated_path(
 
         Some(old_content.replace(&existing_configs, &new_configs))
     } else {
-        // No previous configuration (this might never happed tho)
         let path_configs = sh.command_to_update_path(None, path_str, false)?;
-        Some(sh.script_content(&path_configs))
+        let new_config_section = sh.config_section(&path_configs);
+        Some(format!("{old_content}\n{new_config_section}"))
     }
 }
 
@@ -264,7 +310,7 @@ mod shell {
         /// Wraps given content between a pair of identifiers.
         ///
         /// Such identifiers are comments defined as [`RC_FILE_SECTION_START`] and [`RC_FILE_SECTION_END`].
-        fn script_content(&self, raw_content: &str) -> String {
+        fn config_section(&self, raw_content: &str) -> String {
             format!(
                 "{RC_FILE_SECTION_START}\n\
                 {raw_content}\n\
@@ -470,7 +516,7 @@ mod tests {
     use std::path::PathBuf;
 
     use super::{
-        config_section_with_updated_path,
+        rc_content_with_path,
         shell::{self, UnixShell},
     };
 
@@ -531,8 +577,7 @@ export RUSTUP_HOME='/home/.rustup'
             new,
             r#"
 alias autoremove='sudo pacman -Rcns $(pacman -Qdtq)'
-. "$HOME/.cargo/env"
-"#
+. "$HOME/.cargo/env""#
         );
     }
 
@@ -698,8 +743,7 @@ export PATH=/some/user/defined/bin:$PATH
 
         let path_to_add = "/path/to/rust/bin";
         let shell = shell::Bash;
-        let new_content =
-            config_section_with_updated_path(&shell, path_to_add, existing_rc).unwrap();
+        let new_content = rc_content_with_path(&shell, path_to_add, existing_rc).unwrap();
 
         assert_eq!(
             new_content,
@@ -736,10 +780,8 @@ export PATH=/some/user/defined/bin:$PATH
         let path_to_add = "/path/to/python/bin";
         let another_path_to_add = "/path/to/ruby/bin";
         let shell = shell::Bash;
-        let new_content =
-            config_section_with_updated_path(&shell, path_to_add, existing_rc).unwrap();
-        let new_content =
-            config_section_with_updated_path(&shell, another_path_to_add, &new_content).unwrap();
+        let new_content = rc_content_with_path(&shell, path_to_add, existing_rc).unwrap();
+        let new_content = rc_content_with_path(&shell, another_path_to_add, &new_content).unwrap();
 
         assert_eq!(
             new_content,

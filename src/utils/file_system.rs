@@ -18,9 +18,13 @@ pub fn home_dir() -> PathBuf {
 }
 
 /// Wrapper to [`std::fs::read_to_string`] but with additional error context.
-pub fn read_to_string<P: AsRef<Path>>(path: P) -> Result<String> {
-    fs::read_to_string(path.as_ref())
-        .with_context(|| format!("failed to read '{}'", path.as_ref().display()))
+pub fn read_to_string<P: AsRef<Path>>(name: &str, path: P) -> Result<String> {
+    fs::read_to_string(path.as_ref()).with_context(|| {
+        format!(
+            "failed to read {name} file at given location: '{}'",
+            path.as_ref().display()
+        )
+    })
 }
 
 pub fn stringify_path<P: AsRef<Path>>(path: P) -> Result<String> {

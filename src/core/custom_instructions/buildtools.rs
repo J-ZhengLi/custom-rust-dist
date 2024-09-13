@@ -3,7 +3,7 @@ use anyhow::Result;
 use cc::windows_registry;
 use crate::core::install::InstallConfiguration;
 
-pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<PathBuf> {
+pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<Vec<PathBuf>> {
     use std::path::PathBuf;
     use crate::utils;
     use anyhow::anyhow;
@@ -44,17 +44,18 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<Path
     match exit_code {
         VSExitCode::Success => {
             println!("info: {}", exit_code);
-            Ok(installer_dir)
         }
         VSExitCode::RebootRequired | VSExitCode::RebootInitiated => {
             println!("warn: {}", exit_code);
-            Ok(installer_dir)
         }
-        _ => Err(anyhow!("unable to install VS buildtools: {}", exit_code))
+        _ => {
+            return Err(anyhow!("unable to install VS buildtools: {}", exit_code));
+        }
     }
+    Ok(vec![installer_dir])
 }
 
-pub(super) fn uninstall() -> Result<()> {
+pub(super) fn uninstall(_config: &crate::core::uninstall::UninstallConfiguration) -> Result<()> {
     // TODO: Navigate to the vs_buildtools exe that we copied when installing, then execute it with:
     // .\vs_BuildTools.exe uninstall --productId Microsoft.VisualStudio.Product.BuildTools --channelId VisualStudio.17.Release --wait
     // But we need to ask the user if they want to uninstall this or not.

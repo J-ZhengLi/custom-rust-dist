@@ -32,7 +32,7 @@ pub(crate) trait TomlParser {
     where
         Self: Sized + DeserializeOwned,
     {
-        let raw = utils::read_to_string(path)?;
+        let raw = utils::read_to_string("toml", path)?;
         Self::from_str(&raw)
     }
 }
