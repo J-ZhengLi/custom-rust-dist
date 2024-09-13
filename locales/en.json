@@ -52,5 +52,7 @@
     "selected_components": "selected components",
 
     "uninstall_confirmation": "Are you sure you want to uninstall the following components: \n\n%{list}\n",
-    "uninstall_all_confirmation": "Are you sure you want to uninstall %{vendor}-manager and the following components: \n\n%{list}\n"
+    "uninstall_all_confirmation": "Are you sure you want to uninstall %{vendor}-manager and the following components: \n\n%{list}\n",
+    "uninstall_unknown_tool_warn": "warn: no suitable method for uninstalling tool '%{tool}', skipping",
+    "uninstall_tool_failed_warn": "warn: unable to uninstall tool '%{tool}', maybe it was already uninstalled, skipping"
 }

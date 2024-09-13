@@ -1,10 +1,17 @@
-use std::{cmp::Ordering, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
+use indexmap::IndexMap;
 
-use crate::{core::tools::Tool, utils};
-
-use super::{os::install_dir_from_exe_path, parser::fingerprint::FingerPrint, rustup::Rustup};
+use super::{
+    os::install_dir_from_exe_path,
+    parser::{
+        fingerprint::{installed_tools_fresh, InstallationRecord, ToolRecord},
+        TomlParser,
+    },
+    rustup::ToolchainInstaller,
+};
+use crate::core::tools::Tool;
 
 /// Contains definition of uninstallation steps.
 pub(crate) trait Uninstallation {
@@ -19,83 +26,76 @@ pub(crate) trait Uninstallation {
 }
 
 /// Configurations to use when installing.
-// NB: Currently, there's no uninstall configurations, this struct is only
-// used for abstract purpose.
-pub(crate) struct UninstallConfiguration;
+pub(crate) struct UninstallConfiguration {
+    /// The installation directory that holds every tools, configuration files,
+    /// including the manager binary.
+    pub(crate) install_dir: PathBuf,
+    pub(crate) install_record: InstallationRecord,
+}
 
 impl UninstallConfiguration {
-    pub(crate) fn install_dir(&self) -> Result<PathBuf> {
-        install_dir_from_exe_path()
+    pub(crate) fn init() -> Result<Self> {
+        let install_dir = install_dir_from_exe_path()?;
+        let install_record = InstallationRecord::load(&install_dir)?;
+        Ok(Self {
+            install_dir,
+            install_record,
+        })
     }
 
-    #[allow(unused)]
-    pub(crate) fn tools_dir(&self) -> Result<PathBuf> {
-        self.install_dir()
-            .map(|install_dir| install_dir.join("tools"))
+    pub(crate) fn tools_dir(&self) -> PathBuf {
+        self.install_dir.join("tools")
     }
 
-    /// Uninstall any tools that may or may not installed with custom instructions.
-    pub(crate) fn remove_tools(
-        &self,
-        fingerprint: FingerPrint,
-        install_dir: &PathBuf,
-    ) -> Result<()> {
-        // remove tools by cargo or uninstall api.
-        let tools = fingerprint.tools();
-        // we need to remove plugins first, so add an extra sort array.
-        let mut tools_without_cargo = Vec::new();
-        for tool in tools.iter() {
-            let tool_name = tool.0;
-            let tool_detail = tool.1;
-            match tool_detail.use_cargo() {
-                true => {
-                    // remove the tool by cargo
-                    let args = &["uninstall", tool_name];
-                    utils::execute("cargo", args)?;
-                    // Refresh the fingerprint
-                    FingerPrint::remove_tools_fingerprint(install_dir, tool_name)?;
-                }
-                false => {
-                    // remove the tool by using tool's uninstall api.
-                    let tools_to_remove = tool_detail
-                        .paths()
-                        .iter()
-                        .filter_map(tool_from_path)
-                        .collect::<Vec<_>>();
-                    tools_without_cargo.extend(tools_to_remove);
-                }
-            }
-        }
+    pub(crate) fn cargo_home(&self) -> PathBuf {
+        self.install_dir.join(".cargo")
+    }
 
-        tools_without_cargo.sort_by(|a, b| match (a, b) {
-            (Tool::Plugin { .. }, Tool::Plugin { .. }) => Ordering::Equal,
-            (Tool::Plugin { .. }, _) => Ordering::Less,
-            (_, Tool::Plugin { .. }) => Ordering::Greater,
-            _ => Ordering::Equal,
-        });
-
-        for tool in tools_without_cargo {
-            println!("{}", t!("uninstalling_tool_info", name = tool.name()));
-            tool.uninstall()?;
-            // Refresh the fingerprint
-            FingerPrint::remove_tools_fingerprint(install_dir, tool.name())?;
-        }
+    pub(crate) fn uninstall(mut self, remove_self: bool) -> Result<()> {
+        let install_dir = self.install_dir.clone();
+        // remove all tools.
+        self.remove_tools(installed_tools_fresh(&install_dir)?)?;
 
         // Remove rust toolchain via rustup.
-        Rustup::init().remove_self(install_dir)?;
+        ToolchainInstaller::init().remove_self(&install_dir)?;
+        self.install_record.remove_rust_record();
+
+        // remove all the environments.
+        self.remove_rustup_env_vars(&install_dir)?;
+
+        if remove_self {
+            self.remove_self(&install_dir)?;
+            // TODO: fix core::os::unix::remove_from_path()
+            // Rmove the `<InstallDir>` which is added for manager.
+            crate::core::os::remove_from_path(&install_dir)?;
+        } else {
+            self.install_record.write()?;
+        }
 
         Ok(())
     }
-}
 
-fn tool_from_path(path: &PathBuf) -> Option<Tool> {
-    // TODO: This name should be read from manifest anyway, but right now we get the name
-    // by the `folder`'s name, which technically does the same thing, but for those tools
-    // that were installed without folder, things could get a little bit ugly.
-    let name = path
-        .with_extension("")
-        .file_name()
-        .and_then(|n| n.to_str())?
-        .to_string();
-    Tool::from_path(&name, path).ok()
+    /// Uninstall all tools
+    fn remove_tools(&mut self, tools: IndexMap<String, ToolRecord>) -> Result<()> {
+        for (name, tool_detail) in &tools {
+            let tool = if tool_detail.use_cargo {
+                Tool::cargo_tool(name, None)
+            } else if let [path] = tool_detail.paths.as_slice() {
+                Tool::from_path(name, path)?
+            } else if !tool_detail.paths.is_empty() {
+                Tool::Executables(name.into(), tool_detail.paths.clone())
+            } else {
+                println!("{}", t!("uninstall_unknown_tool_warn", tool = name));
+                return Ok(());
+            };
+
+            if tool.uninstall(self).is_err() {
+                println!("{}", t!("uninstall_tool_failed_warn"));
+            } else {
+                self.install_record.remove_tool_record(name);
+            }
+        }
+
+        Ok(())
+    }
 }

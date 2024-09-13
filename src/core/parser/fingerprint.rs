@@ -1,136 +1,124 @@
+use anyhow::{anyhow, Context, Result};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::utils;
-use anyhow::Result;
 
 use super::TomlParser;
 
-/// A simple struct representing the fields in `config.toml`.
-///
-/// Only covers a small range of options we need to configurate.
-/// Fwiw, the full set of configuration options can be found
-/// in the [Cargo Configuration Book](https://doc.rust-lang.org/cargo/reference/config.html).
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub(crate) struct FingerPrint {
-    rust: RustInstallInfo,
-    tools: IndexMap<String, ToolDetailInfo>,
+const FILENAME: &str = ".fingerprint";
+
+/// Re-load fingerprint file just to get the list of installed tools,
+/// therefore we can use this list to uninstall, while avoiding race condition.
+pub(crate) fn installed_tools_fresh(root: &Path) -> Result<IndexMap<String, ToolRecord>> {
+    Ok(InstallationRecord::load(root)?.tools)
 }
 
-impl TomlParser for FingerPrint {}
+/// Holds Installation record.
+///
+/// This tracks what tools/components we have installed, and where they are installed.
+#[derive(Debug, Deserialize, Serialize)]
+pub(crate) struct InstallationRecord {
+    root: PathBuf,
+    rust: Option<RustRecord>,
+    #[serde(default)]
+    pub(crate) tools: IndexMap<String, ToolRecord>,
+}
 
-#[allow(unused)]
-impl FingerPrint {
-    pub(crate) fn rust(&self) -> RustInstallInfo {
-        self.rust.clone()
-    }
+impl TomlParser for InstallationRecord {
+    /// Load fingerprint from a given root.
+    ///
+    /// Note that the fingerprint filename is fixed, as defined as [`FILENAME`],
+    /// hense why the parameter of this function is a root directory rather than dest path.
+    fn load<P: AsRef<Path>>(root: P) -> Result<InstallationRecord>
+    where
+        Self: Sized + serde::de::DeserializeOwned,
+    {
+        assert!(root.as_ref().is_dir());
 
-    pub(crate) fn tools(&self) -> IndexMap<String, ToolDetailInfo> {
-        self.tools.clone()
-    }
-
-    pub(crate) fn load_fingerprint(install_dir: &PathBuf) -> Self {
-        let fp_path = install_dir.join(".fingerprint");
-        if fp_path.exists() {
-            FingerPrint::load(fp_path).expect("Failed to find fingerprint file")
+        let fp_path = root.as_ref().join(FILENAME);
+        if fp_path.is_file() {
+            let raw = utils::read_to_string("installation fingerprint", &fp_path)?;
+            Self::from_str(&raw)
         } else {
-            // Refresh the fingerprint
-            Self::refresh_fingerprint(fp_path, Self::default(), false);
-            Self::default()
+            let default = InstallationRecord {
+                root: root.as_ref().to_path_buf(),
+                rust: None,
+                tools: IndexMap::default(),
+            };
+            default.write()?;
+            Ok(default)
         }
     }
+}
 
-    pub(crate) fn record_rust(&mut self, version: String, components: Vec<String>) -> &mut Self {
-        self.rust = RustInstallInfo {
-            version,
-            components,
-        };
-        self
+impl InstallationRecord {
+    pub(crate) fn write(&self) -> Result<()> {
+        let path = self.root.join(FILENAME);
+        let content = self
+            .to_toml()
+            .context("unable to serialize installation fingerprint")?;
+        utils::write_bytes(&path, content.as_bytes(), false).with_context(|| {
+            anyhow!(
+                "unable to write fingerprint file to the given location: '{}'",
+                path.display()
+            )
+        })
     }
 
-    pub(crate) fn record_tool(
-        &mut self,
-        use_cargo: bool,
-        name: String,
-        paths: Option<Vec<PathBuf>>,
-    ) -> &mut Self {
-        self.tools
-            .entry(name)
-            .and_modify(|tool| {
-                if use_cargo {
-                    tool.paths = Vec::new();
-                } else if let Some(p) = &paths {
-                    for pp in p.iter() {
-                        if !tool.paths.contains(pp) {
-                            tool.paths.push(pp.to_path_buf());
-                        }
-                    }
-                }
-            })
-            .or_insert(ToolDetailInfo {
-                use_cargo,
-                paths: {
-                    if use_cargo {
-                        Vec::new()
-                    } else if let Some(pp) = &paths {
-                        pp.to_vec()
-                    } else {
-                        /// FIXME: should throw error if path is not found.
-                        Vec::new()
-                    }
-                },
-            });
+    pub(crate) fn add_rust_record(&mut self, version: &str, components: &[String]) {
+        self.rust = Some(RustRecord {
+            version: version.to_string(),
+            components: components.to_vec(),
+        });
+    }
 
-        self
+    pub(crate) fn add_tool_record(&mut self, name: &str, record: ToolRecord) {
+        self.tools.insert(name.into(), record);
+    }
+
+    pub fn remove_rust_record(&mut self) {
+        self.rust = None;
+    }
+
+    #[allow(unused)]
+    pub fn remove_component_record(&mut self, component: &str) {
+        let Some(rust) = self.rust.as_mut() else {
+            return;
+        };
+        let Some(target_idx) = rust.components.iter().position(|c| c == component) else {
+            // Nothing to remove
+            return;
+        };
+        rust.components.swap_remove(target_idx);
+    }
+
+    pub fn remove_tool_record(&mut self, tool_name: &str) {
+        self.tools.shift_remove(tool_name);
     }
 
     pub(crate) fn print_installation(&self) -> String {
         let mut installed = String::new();
-        installed.push_str(&self.rust.print_rust_info());
+        if let Some(rust) = &self.rust {
+            installed.push_str(&rust.print_rust_info());
+        }
         for tool in self.tools.iter() {
             installed.push_str(&format!("tools: {:?} \n", tool.0));
         }
         installed
     }
-
-    fn refresh_fingerprint(fp_path: PathBuf, fingerprint: FingerPrint, append: bool) {
-        let fingerprint_content = fingerprint.to_toml().expect("Init new fingerprint content");
-        utils::write_file(fp_path, fingerprint_content.as_str(), append);
-    }
-
-    pub fn remove_rust_fingerprint(install_dir: &PathBuf) -> Result<()> {
-        let fp_path = install_dir.join(".fingerprint");
-        let mut fingerprint = FingerPrint::load(&fp_path).expect("Failed to find fingerprint file");
-        // TODO: remove single component.
-        fingerprint.rust.version = String::new();
-        fingerprint.rust.components = Vec::new();
-        // Refresh the fingerprint
-        FingerPrint::refresh_fingerprint(fp_path, fingerprint, false);
-
-        Ok(())
-    }
-
-    pub fn remove_tools_fingerprint(install_dir: &PathBuf, tool_name: &str) -> Result<()> {
-        let fp_path = install_dir.join(".fingerprint");
-        let mut fingerprint = FingerPrint::load(&fp_path).expect("Failed to find fingerprint file");
-        fingerprint.tools.retain(|k, _| k != tool_name);
-        // Refresh the fingerprint
-        FingerPrint::refresh_fingerprint(fp_path, fingerprint, false);
-
-        Ok(())
-    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct RustInstallInfo {
+pub(crate) struct RustRecord {
     version: String,
     #[serde(default)]
     pub(crate) components: Vec<String>,
 }
 
-impl RustInstallInfo {
+impl RustRecord {
     pub(crate) fn print_rust_info(&self) -> String {
         format!(
             "rust-version: {}\ncomponents: {:?}\n",
@@ -139,19 +127,60 @@ impl RustInstallInfo {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct ToolDetailInfo {
-    use_cargo: bool,
-    paths: Vec<PathBuf>,
+pub(crate) struct ToolRecord {
+    #[serde(default)]
+    pub(crate) use_cargo: bool,
+    #[serde(default)]
+    pub(crate) paths: Vec<PathBuf>,
+    // version: String,
 }
 
-impl ToolDetailInfo {
-    pub(crate) fn use_cargo(&self) -> bool {
-        self.use_cargo
+impl ToolRecord {
+    pub(crate) fn cargo_tool() -> Self {
+        ToolRecord {
+            use_cargo: true,
+            paths: vec![],
+        }
     }
 
-    pub(crate) fn paths(&self) -> &Vec<PathBuf> {
-        &self.paths
+    pub(crate) fn with_paths(paths: Vec<PathBuf>) -> Self {
+        ToolRecord {
+            use_cargo: false,
+            paths,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn create_local_install_info() {
+        let install_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
+        let mut fp = InstallationRecord::load(&install_dir).unwrap();
+        let rust_components = vec![String::from("rustfmt"), String::from("cargo")];
+
+        fp.add_rust_record("stable", &rust_components);
+        fp.add_tool_record("aaa", ToolRecord::with_paths(vec![install_dir.join("aaa")]));
+
+        let v0 = format!(
+            "\
+root = \"{}\"
+
+[rust]
+version = \"stable\"
+components = [\"rustfmt\", \"cargo\"]
+
+[tools.aaa]
+use-cargo = false
+paths = [\"{}\"]
+",
+            install_dir.display(),
+            install_dir.join("aaa").display()
+        );
+        assert_eq!(v0, fp.to_toml().unwrap());
     }
 }

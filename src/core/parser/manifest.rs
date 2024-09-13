@@ -29,7 +29,7 @@ pub struct ToolsetManifest {
 
 impl TomlParser for ToolsetManifest {
     fn load<P: AsRef<std::path::Path>>(path: P) -> anyhow::Result<Self> {
-        let raw = utils::read_to_string(&path)?;
+        let raw = utils::read_to_string("manifest", &path)?;
         let mut temp_manifest = Self::from_str(&raw)?;
         temp_manifest.path = Some(path.as_ref().to_path_buf());
         Ok(temp_manifest)

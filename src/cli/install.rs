@@ -286,13 +286,11 @@ pub(super) fn execute_manager(manager: &ManagerSubcommands, _opt: GlobalOpt) -> 
 
 #[cfg(test)]
 mod tests {
+    use super::InstallConfiguration;
     use std::path::PathBuf;
 
-    use super::InstallConfiguration;
-    use crate::{core::parser::TomlParser, manifest::ToolsetManifest, utils};
-
     #[test]
-    fn dry_run() {
+    fn init_install_config() {
         let mut cache_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         cache_dir.push("tests");
         cache_dir.push("cache");
@@ -301,12 +299,7 @@ mod tests {
 
         let install_root = tempfile::Builder::new().tempdir_in(&cache_dir).unwrap();
         let _config = InstallConfiguration::init(install_root.path(), true).unwrap();
-        let _manifest = ToolsetManifest::from_str(
-            &utils::read_to_string(
-                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/data/toolset_manifest.toml"),
-            )
-            .unwrap(),
-        )
-        .unwrap();
+
+        assert!(install_root.path().join(".fingerprint").is_file());
     }
 }

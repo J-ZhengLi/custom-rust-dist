@@ -3,7 +3,7 @@ use anyhow::Result;
 use cc::windows_registry;
 use crate::core::install::InstallConfiguration;
 
-pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<PathBuf> {
+pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<Vec<PathBuf>> {
     use std::path::PathBuf;
     use crate::utils;
     use anyhow::anyhow;
@@ -44,14 +44,15 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<Path
     match exit_code {
         VSExitCode::Success => {
             println!("info: {}", exit_code);
-            Ok(installer_dir)
         }
         VSExitCode::RebootRequired | VSExitCode::RebootInitiated => {
             println!("warn: {}", exit_code);
-            Ok(installer_dir)
         }
-        _ => Err(anyhow!("unable to install VS buildtools: {}", exit_code))
+        _ => {
+            return Err(anyhow!("unable to install VS buildtools: {}", exit_code));
+        }
     }
+    Ok(vec![installer_dir])
 }
 
 pub(super) fn uninstall() -> Result<()> {

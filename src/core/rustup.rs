@@ -5,7 +5,6 @@ use anyhow::{Context, Result};
 use url::Url;
 
 use super::install::InstallConfiguration;
-use super::parser::fingerprint::FingerPrint;
 use super::parser::manifest::ToolsetManifest;
 use super::RUSTUP_DIST_SERVER;
 use crate::manifest::Proxy;
@@ -22,9 +21,9 @@ const RUSTUP: &str = "rustup.exe";
 #[cfg(not(windows))]
 const RUSTUP: &str = "rustup";
 
-pub struct Rustup;
+pub struct ToolchainInstaller;
 
-impl Rustup {
+impl ToolchainInstaller {
     pub(crate) fn init() -> Self {
         std::env::remove_var("RUSTUP_TOOLCHAIN");
         Self
@@ -73,7 +72,7 @@ impl Rustup {
         }
     }
 
-    pub(crate) fn download_toolchain(
+    pub(crate) fn install(
         &self,
         config: &InstallConfiguration,
         manifest: &ToolsetManifest,
@@ -127,8 +126,6 @@ impl Rustup {
         let rustup = install_dir.join(".cargo").join("bin").join(RUSTUP);
         let args = vec!["self", "uninstall", "-y"];
         execute(rustup, &args)?;
-        // Refresh the fingerprint
-        FingerPrint::remove_rust_fingerprint(install_dir)?;
         Ok(())
     }
 }
