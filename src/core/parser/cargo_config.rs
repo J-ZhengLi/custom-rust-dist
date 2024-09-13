@@ -126,11 +126,7 @@ mod tests {
         let config = CargoConfig::new()
             .git_fetch_with_cli(true)
             .check_revoke(false)
-            .add_source(
-                "mirror",
-                "https://example.com/registry".try_into().unwrap(),
-                true,
-            )
+            .add_source("mirror", "https://example.com/registry", true)
             .to_toml()
             .unwrap();
 

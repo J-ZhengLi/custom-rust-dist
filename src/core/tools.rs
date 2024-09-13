@@ -35,6 +35,8 @@ pub(crate) enum Tool<'a> {
         kind: PluginType,
         path: &'a Path,
     },
+    // `Cargo` just don't make any sense
+    #[allow(clippy::enum_variant_names)]
     CargoTool {
         name: String,
         args: Option<Vec<&'a str>>,
@@ -89,7 +91,7 @@ impl<'a> Tool<'a> {
             let entries = utils::walk_dir(path, false)?;
             // Check if there is any folder that looks like `bin`
             // Then assuming this is `UsrDirs` type installer.
-            if entries.iter().find(|path| path.ends_with("bin")).is_some() {
+            if entries.iter().any(|path| path.ends_with("bin")) {
                 return Ok(Self::DirWithBin { name, path });
             }
             // If no sub folder exists, and there are binaries lays directly in the folder
@@ -123,7 +125,7 @@ impl<'a> Tool<'a> {
 
                 cargo_install_or_uninstall(
                     "install",
-                    args.as_deref().unwrap_or(&[&name]),
+                    args.as_deref().unwrap_or(&[name]),
                     config.cargo_home(),
                 )?;
                 Ok(ToolRecord::cargo_tool())

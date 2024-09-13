@@ -21,7 +21,8 @@ impl EnvConfig for InstallConfiguration {
         for sh in shell::get_available_shells() {
             // This string will be wrapped in a certain identifier comments.
             for rc in sh.update_rcs() {
-                _ = create_backup_for_rc(&rc, &backup_dir)?;
+                // Do NOT fail installation if backup fails
+                _ = create_backup_for_rc(&rc, &backup_dir);
 
                 let old_content = utils::read_to_string("rc", &rc).unwrap_or_default();
                 let new_content = rc_content_with_env_vars(sh.as_ref(), &old_content, &vars_raw);
@@ -52,7 +53,7 @@ fn create_backup_for_rc(path: &Path, backup_dir: &Path) -> Result<()> {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or_default();
-    let mut backup_filename =  rc_filename.to_os_string();
+    let mut backup_filename = rc_filename.to_os_string();
     backup_filename.push("_");
     backup_filename.push(timestamp.to_string());
     backup_filename.push(".bak");
@@ -224,9 +225,9 @@ fn rc_content_with_env_vars(
 ///
 /// - If there was no config section, create one with `export PATH="{path_str};$PATH"`.
 /// - If there was a config section but no `export PATH` line,
-/// insert `export PATH="{path_str};$PATH"` at the end of the config section.
+///     insert `export PATH="{path_str};$PATH"` at the end of the config section.
 /// - If there was a config section and an `export PATH` line with it,
-/// push the `path_str` at the start of the `PATH` value, such as `export PATH="{path_str};/old/value;$PATH"`
+///     push the `path_str` at the start of the `PATH` value, such as `export PATH="{path_str};/old/value;$PATH"`
 fn rc_content_with_path(
     sh: &dyn shell::UnixShell,
     path_str: &str,
@@ -576,8 +577,7 @@ export RUSTUP_HOME='/home/.rustup'
             new,
             r#"
 alias autoremove='sudo pacman -Rcns $(pacman -Qdtq)'
-. "$HOME/.cargo/env"
-"#
+. "$HOME/.cargo/env""#
         );
     }
 
