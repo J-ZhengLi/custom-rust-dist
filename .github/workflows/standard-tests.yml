@@ -1,0 +1,42 @@
+name: Standard Tests
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  quality-control:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'ubuntu-latest'
+            args: ''
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: install rustup & toolchain
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: formatting check
+      run: cargo fmt --all --check
+    - name: build
+      run: cargo build --workspace --exclude rim-gui --verbose
+    - name: clippy check
+      run: cargo clippy --no-deps --workspace --exclude rim-gui -- -D warnings
+    - name: run tests
+      run: cargo test --workspace --exclude rim-gui --verbose
