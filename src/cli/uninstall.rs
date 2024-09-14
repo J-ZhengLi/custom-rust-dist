@@ -19,7 +19,7 @@ pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Resul
     let prompt = if *remove_self {
         t!(
             "uninstall_all_confirmation",
-            vendor = t!("vendor"),
+            vendor = t!("vendor_en"),
             list = installed
         )
     } else {

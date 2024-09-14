@@ -1,6 +1,6 @@
-pub type Result<T> = core::result::Result<T, InstallerError>;
-
 use std::fmt::{Debug, Display};
+
+pub type Result<T> = core::result::Result<T, InstallerError>;
 
 pub enum InstallerError {
     Anyhow(anyhow::Error),

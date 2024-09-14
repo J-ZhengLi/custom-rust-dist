@@ -283,23 +283,3 @@ pub(super) fn execute_manager(manager: &ManagerSubcommands, _opt: GlobalOpt) -> 
 
     todo!("install dist with version '{version}'");
 }
-
-#[cfg(test)]
-mod tests {
-    use super::InstallConfiguration;
-    use std::path::PathBuf;
-
-    #[test]
-    fn init_install_config() {
-        let mut cache_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        cache_dir.push("tests");
-        cache_dir.push("cache");
-
-        std::fs::create_dir_all(&cache_dir).unwrap();
-
-        let install_root = tempfile::Builder::new().tempdir_in(&cache_dir).unwrap();
-        let _config = InstallConfiguration::init(install_root.path(), true).unwrap();
-
-        assert!(install_root.path().join(".fingerprint").is_file());
-    }
-}

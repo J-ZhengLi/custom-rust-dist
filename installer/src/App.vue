@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { onMounted } from 'vue';
-import { installConf } from './utils';
+// import { installConf } from './utils';
 import { RouterView } from 'vue-router';
 
 onMounted(() => {
-  installConf.loadAll();
+  // FIXME: need to test if this actually affects anything
+  // installConf.loadAll();
 });
 </script>
 

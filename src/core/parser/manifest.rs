@@ -17,6 +17,7 @@ pub type ToolMap = IndexMap<String, ToolInfo>;
 #[derive(Debug, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToolsetManifest {
+    product_name: Option<String>,
     pub(crate) rust: RustToolchain,
     #[serde(default)]
     pub(crate) tools: Tools,
@@ -960,5 +961,16 @@ x86_64-unknown-linux-gnu = "packages/x86_64-unknown-linux-gnu/rustup-init"
         }
 
         assert_eq!(expected.rustup_bin().unwrap().unwrap(), path);
+    }
+
+    #[test]
+    fn with_product_name() {
+        let input = r#"
+product-name = "my toolkit"
+[rust]
+version = "1.0.0"
+"#;
+        let expected = ToolsetManifest::from_str(input).unwrap();
+        assert_eq!(expected.product_name.unwrap(), "my toolkit");
     }
 }

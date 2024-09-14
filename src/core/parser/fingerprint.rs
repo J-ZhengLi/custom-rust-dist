@@ -19,11 +19,13 @@ pub(crate) fn installed_tools_fresh(root: &Path) -> Result<IndexMap<String, Tool
 ///
 /// This tracks what tools/components we have installed, and where they are installed.
 #[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct InstallationRecord {
-    pub(crate) root: PathBuf,
-    rust: Option<RustRecord>,
+#[serde(rename_all = "kebab-case")]
+pub struct InstallationRecord {
+    pub root: PathBuf,
+    pub rust: Option<RustRecord>,
     #[serde(default)]
-    pub(crate) tools: IndexMap<String, ToolRecord>,
+    pub tools: IndexMap<String, ToolRecord>,
+    pub product_name: Option<String>,
 }
 
 impl TomlParser for InstallationRecord {
@@ -46,6 +48,7 @@ impl TomlParser for InstallationRecord {
                 root: root.as_ref().to_path_buf(),
                 rust: None,
                 tools: IndexMap::default(),
+                product_name: None,
             };
             default.write()?;
             Ok(default)

@@ -406,4 +406,19 @@ mod tests {
             "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
         );
     }
+
+    #[test]
+    fn init_install_config() {
+        let mut cache_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        cache_dir.push("tests");
+        cache_dir.push("cache");
+
+        std::fs::create_dir_all(&cache_dir).unwrap();
+
+        let install_root = tempfile::Builder::new().tempdir_in(&cache_dir).unwrap();
+        let config = InstallConfiguration::init(install_root.path(), true).unwrap();
+
+        assert!(config.install_record.product_name.is_none());
+        assert!(install_root.path().join(".fingerprint").is_file());
+    }
 }
