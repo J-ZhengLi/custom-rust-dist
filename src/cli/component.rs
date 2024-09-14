@@ -35,11 +35,7 @@ pub(super) fn execute(cmd: &ManagerSubcommands, opt: GlobalOpt) -> Result<bool> 
         return Ok(false);
     };
 
-    if let Some(list_cmd) = command {
-        list_cmd.execute(opt)?;
-    } else {
-        todo!("implement list command to show available dist version")
-    }
+    command.execute(opt)?;
 
     Ok(true)
 }

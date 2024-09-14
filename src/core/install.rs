@@ -38,17 +38,10 @@ macro_rules! declare_unfallible_url {
     };
 }
 
-macro_rules! declare_install_paths {
-    ($($path_ident:ident),+) => {
-        $(
-            static $path_ident: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
-        )*
-    };
-}
-
-/// Get the once-locked path under install_dir, and create that directory if it does not exists.
+/// Declare a statically allocated `OnceLock` path, and create that directory if it does not exists.
 macro_rules! get_path_and_create {
     ($path_ident:ident, $init:expr) => {{
+        static $path_ident: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
         let __path__ = $path_ident.get_or_init(|| $init);
         $crate::utils::ensure_dir(__path__)
             .expect("unable to create one of the directory under installation folder");
@@ -59,14 +52,6 @@ macro_rules! get_path_and_create {
 declare_unfallible_url!(
     default_rustup_dist_server(DEFAULT_RUSTUP_DIST_SERVER) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup";
     default_rustup_update_root(DEFAULT_RUSTUP_UPDATE_ROOT) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
-);
-
-declare_install_paths!(
-    CARGO_HOME_DIR,
-    CARGO_BIN_DIR,
-    RUSTUP_HOME_DIR,
-    TEMP_DIR,
-    TOOLS_DIR
 );
 
 /// Contains definition of installation steps, including pre-install configs.
@@ -81,8 +66,6 @@ pub trait EnvConfig {
     fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()>;
 }
 
-// If you change any public fields in this struct,
-// make sure to change `installer/src/utils/types/InstallConfiguration.ts` as well.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct InstallConfiguration {
     pub cargo_registry: Option<(String, String)>,

@@ -7,6 +7,7 @@ use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
 use crate::manifest::ToolsetManifest;
 use crate::utils;
 use anyhow::{Context, Result};
+use indexmap::IndexSet;
 
 impl EnvConfig for InstallConfiguration {
     // On linux, persistent env vars needs to be written in `.profile`, `.bash_profile`, etc.
@@ -149,43 +150,51 @@ fn get_sub_string_between(input: &str, start: &str, end: &str) -> Option<String>
     Some(result)
 }
 
-pub(super) fn add_to_path(path: &Path) -> Result<()> {
-    let old_path = env::var_os("PATH").unwrap_or_default();
-    let pathbuf = path.to_path_buf();
+fn modify_path(path: &Path, remove: bool) -> Result<()> {
     let path_str = utils::path_to_str(path)?;
 
-    let splited = env::split_paths(&old_path).collect::<Vec<_>>();
-    let should_update_current_env = !splited.contains(&pathbuf);
-    let mut new_path = splited;
-    new_path.insert(0, pathbuf);
+    // Apply the new path to current process
+    let old_path = env::var_os("PATH").unwrap_or_default();
+    let mut splited = env::split_paths(&old_path).collect::<IndexSet<_>>();
+    let should_update_current_env = if remove {
+        splited.shift_remove(path)
+    } else {
+        splited.shift_insert(0, path.to_path_buf())
+    };
+    if should_update_current_env {
+        env::set_var("PATH", env::join_paths(splited)?);
+    }
 
     // Add the new path to bash profiles
     for sh in shell::get_available_shells() {
-        for rc in sh.update_rcs() {
-            let rc_content = utils::read_to_string("rc", &rc)?;
-            let Some(new_content) = rc_content_with_path(sh.as_ref(), path_str, &rc_content) else {
-                println!(
-                    "{}",
+        for rc in sh.update_rcs().iter().filter(|rc| rc.is_file()) {
+            let rc_content = utils::read_to_string("rc", rc)?;
+            let Some(new_content) =
+                rc_content_with_path(sh.as_ref(), path_str, &rc_content, remove)
+            else {
+                let warn = if remove {
+                    t!(
+                        "unix_remove_path_fail_warn",
+                        val = path.display(),
+                        rc_path = rc.display()
+                    )
+                } else {
                     t!(
                         "unix_add_path_fail_warn",
                         val = path.display(),
                         rc_path = rc.display()
                     )
-                );
+                };
+                println!("{warn}");
                 continue;
             };
-            utils::write_file(&rc, &new_content, false).with_context(|| {
+            utils::write_file(rc, &new_content, false).with_context(|| {
                 format!(
                     "failed to append PATH variable to shell profile: '{}'",
                     rc.display()
                 )
             })?;
         }
-    }
-
-    // Apply the new path to current process
-    if should_update_current_env {
-        env::set_var("PATH", env::join_paths(new_path)?);
     }
 
     Ok(())
@@ -232,6 +241,7 @@ fn rc_content_with_path(
     sh: &dyn shell::UnixShell,
     path_str: &str,
     old_content: &str,
+    remove: bool,
 ) -> Option<String> {
     if let Some(existing_configs) = get_sub_string_between(
         old_content,
@@ -243,12 +253,12 @@ fn rc_content_with_path(
 
         // Check if the path was already exported.
         if let Some(path_export) = maybe_setting_path {
-            if path_export.contains(path_str) {
+            if path_export.contains(path_str) && !remove {
                 return None;
             }
         }
 
-        let new_content = sh.command_to_update_path(maybe_setting_path, path_str, false)?;
+        let new_content = sh.command_to_update_path(maybe_setting_path, path_str, remove)?;
 
         let mut new_configs = existing_configs.clone();
         if let Some(setting_path) = maybe_setting_path {
@@ -266,11 +276,12 @@ fn rc_content_with_path(
     }
 }
 
-pub(super) fn remove_from_path(_path: &Path) -> Result<()> {
-    // FIXME: Remove the given `path` from those rc files we added in `add_to_path`.
-    // This is currently not needed because we don't have the functionality to uninstall
-    // individual tool yet.
-    Ok(())
+pub(super) fn add_to_path(path: &Path) -> Result<()> {
+    modify_path(path, false)
+}
+
+pub(super) fn remove_from_path(path: &Path) -> Result<()> {
+    modify_path(path, true)
 }
 
 /// Unix shell module, contains methods that are dedicated in configuring rustup env vars.
@@ -684,6 +695,62 @@ export PATH="/path/to/bin:$PATH""#
     }
 
     #[test]
+    fn remove_path_with_existing_config_section() {
+        let existing_rc = r#"\
+alias autoremove='sudo pacman -Rcns $(pacman -Qdtq)'
+. "$HOME/.cargo/env"
+
+# ===== rustup config section START =====
+export CARGO_HOME='/path/to/cargo'
+export RUSTUP_HOME='/path/to/rustup'
+export PATH=/path/to/other/bin:/path/to/bin:$PATH # Only modify this line
+# ===== rustup config section END =====
+
+export PATH=/some/user/defined/bin:$PATH
+"#;
+        let shell = shell::Bash;
+        let path_str = "/path/to/bin";
+        let new_rc = rc_content_with_path(&shell, path_str, existing_rc, true);
+
+        assert_eq!(
+            new_rc.unwrap(),
+            r#"\
+alias autoremove='sudo pacman -Rcns $(pacman -Qdtq)'
+. "$HOME/.cargo/env"
+
+# ===== rustup config section START =====
+export CARGO_HOME='/path/to/cargo'
+export RUSTUP_HOME='/path/to/rustup'
+export PATH=/path/to/other/bin:$PATH # Only modify this line
+# ===== rustup config section END =====
+
+export PATH=/some/user/defined/bin:$PATH
+"#
+        );
+    }
+
+    #[test]
+    fn remove_non_exist_path_with_existing_config_section() {
+        let existing_rc = r#"\
+alias autoremove='sudo pacman -Rcns $(pacman -Qdtq)'
+. "$HOME/.cargo/env"
+
+# ===== rustup config section START =====
+export CARGO_HOME='/path/to/cargo'
+export RUSTUP_HOME='/path/to/rustup'
+export PATH=/path/to/bin:$PATH # Only modify this line
+# ===== rustup config section END =====
+
+export PATH=/path/to/bin:$PATH
+"#;
+        let shell = shell::Bash;
+        let path_str = "/path/to/nonexist/bin";
+        let new_rc = rc_content_with_path(&shell, path_str, existing_rc, true);
+
+        assert_eq!(new_rc.unwrap(), existing_rc,);
+    }
+
+    #[test]
     fn insert_path_fish() {
         let shell = shell::Fish;
         let path_str = "/path/to/bin";
@@ -743,7 +810,7 @@ export PATH=/some/user/defined/bin:$PATH
 
         let path_to_add = "/path/to/rust/bin";
         let shell = shell::Bash;
-        let new_content = rc_content_with_path(&shell, path_to_add, existing_rc).unwrap();
+        let new_content = rc_content_with_path(&shell, path_to_add, existing_rc, false).unwrap();
 
         assert_eq!(
             new_content,
@@ -780,8 +847,9 @@ export PATH=/some/user/defined/bin:$PATH
         let path_to_add = "/path/to/python/bin";
         let another_path_to_add = "/path/to/ruby/bin";
         let shell = shell::Bash;
-        let new_content = rc_content_with_path(&shell, path_to_add, existing_rc).unwrap();
-        let new_content = rc_content_with_path(&shell, another_path_to_add, &new_content).unwrap();
+        let new_content = rc_content_with_path(&shell, path_to_add, existing_rc, false).unwrap();
+        let new_content =
+            rc_content_with_path(&shell, another_path_to_add, &new_content, false).unwrap();
 
         assert_eq!(
             new_content,

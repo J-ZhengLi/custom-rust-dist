@@ -12,12 +12,10 @@ pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Resul
         return Ok(false);
     };
 
-    // Ask confirmation
-    // TODO: format an installed list instead
-
     let config = UninstallConfiguration::init()?;
     let installed = config.install_record.print_installation();
 
+    // Ask confirmation
     let prompt = if *remove_self {
         t!(
             "uninstall_all_confirmation",

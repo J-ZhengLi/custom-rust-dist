@@ -63,7 +63,6 @@ impl UninstallConfiguration {
 
         if remove_self {
             self.remove_self(&install_dir)?;
-            // TODO: fix core::os::unix::remove_from_path()
             // Rmove the `<InstallDir>` which is added for manager.
             crate::core::os::remove_from_path(&install_dir)?;
         } else {

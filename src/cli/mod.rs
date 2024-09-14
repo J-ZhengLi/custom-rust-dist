@@ -53,8 +53,9 @@ pub struct Installer {
 /// Manage Rust installation, mostly used for uninstalling.
 // NOTE: If you changed anything in this struct, or any other child types that related to
 // this struct, make sure the README doc is updated as well,
-#[derive(Parser, Default, Debug)]
+#[derive(Parser, Debug)]
 #[command(version, about)]
+#[cfg_attr(not(feature = "gui"), command(arg_required_else_help(true)))]
 pub struct Manager {
     /// Enable verbose output
     #[arg(short, long, conflicts_with = "quiet")]
@@ -91,11 +92,10 @@ impl Manager {
             yes: self.yes_to_all,
         };
 
-        if let Some(subcommand) = &self.command {
-            subcommand.execute(global_opt)
-        } else {
-            Ok(())
-        }
+        let Some(subcmd) = &self.command else {
+            return Ok(());
+        };
+        subcmd.execute(global_opt)
     }
 }
 
@@ -124,7 +124,7 @@ enum ManagerSubcommands {
     /// Install or uninstall components
     Component {
         #[command(subcommand)]
-        command: Option<component::ComponentCommand>,
+        command: component::ComponentCommand,
     },
     /// Uninstall individual components or everything.
     Uninstall {

@@ -212,8 +212,10 @@ fn main() -> Result<ExitCode> {
             },
         },
         s => {
-            writeln!(&mut stdout, "invalid argument '{s}'")?;
-            writeln!(&mut stdout, "{HELP}")?;
+            writeln!(
+                &mut stdout,
+                "invalid argument '{s}', check 'cargo dev --help' for available options"
+            )?;
             return Ok(ExitCode::FAILURE);
         }
     };

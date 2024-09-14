@@ -21,7 +21,7 @@ anyhow = "1"
 url = { version = "2", features = ["serde"] }
 toml = "0.8.15"
 tempfile = "3"
-indexmap = { version = "2", features = ["serde"] }
+indexmap = { version = "2.5", features = ["serde"] }
 rust-i18n = "3"
 
 [dependencies]
