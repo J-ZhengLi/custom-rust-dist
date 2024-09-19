@@ -18,14 +18,15 @@ pub(crate) fn installed_tools_fresh(root: &Path) -> Result<IndexMap<String, Tool
 /// Holds Installation record.
 ///
 /// This tracks what tools/components we have installed, and where they are installed.
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Debug, Default, Deserialize, Serialize)]
 pub struct InstallationRecord {
+    /// Name of the bundle, such as `my-rust-stable`
+    pub name: Option<String>,
+    pub version: Option<String>,
     pub root: PathBuf,
     pub rust: Option<RustRecord>,
     #[serde(default)]
     pub tools: IndexMap<String, ToolRecord>,
-    pub product_name: Option<String>,
 }
 
 impl TomlParser for InstallationRecord {
@@ -46,9 +47,7 @@ impl TomlParser for InstallationRecord {
         } else {
             let default = InstallationRecord {
                 root: root.as_ref().to_path_buf(),
-                rust: None,
-                tools: IndexMap::default(),
-                product_name: None,
+                ..Default::default()
             };
             default.write()?;
             Ok(default)
@@ -137,7 +136,6 @@ pub(crate) struct ToolRecord {
     pub(crate) use_cargo: bool,
     #[serde(default)]
     pub(crate) paths: Vec<PathBuf>,
-    // version: String,
 }
 
 impl ToolRecord {
@@ -160,6 +158,12 @@ impl ToolRecord {
 mod tests {
     use super::*;
 
+    // there is an inconsistency between OSs when serialize paths
+    #[cfg(not(windows))]
+    const QUOTE: &str = "\"";
+    #[cfg(windows)]
+    const QUOTE: &str = "'";
+
     #[test]
     fn create_local_install_info() {
         let install_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
@@ -169,15 +173,9 @@ mod tests {
         fp.add_rust_record("stable", &rust_components);
         fp.add_tool_record("aaa", ToolRecord::with_paths(vec![install_dir.join("aaa")]));
 
-        // there is an inconsistency between OSs when serialize paths
-        #[cfg(not(windows))]
-        let quote = "\"";
-        #[cfg(windows)]
-        let quote = "'";
-
         let v0 = format!(
             "\
-root = {quote}{}{quote}
+root = {QUOTE}{}{QUOTE}
 
 [rust]
 version = \"stable\"
@@ -185,11 +183,24 @@ components = [\"rustfmt\", \"cargo\"]
 
 [tools.aaa]
 use-cargo = false
-paths = [{quote}{}{quote}]
+paths = [{QUOTE}{}{QUOTE}]
 ",
             install_dir.display(),
             install_dir.join("aaa").display()
         );
         assert_eq!(v0, fp.to_toml().unwrap());
+    }
+
+    #[test]
+    fn with_name_and_ver() {
+        let input = r#"
+name = "rust bundle (experimental)"
+version = "0.1"
+root = '/path/to/something'"#;
+
+        let expected = InstallationRecord::from_str(input).unwrap();
+        assert_eq!(expected.name.unwrap(), "rust bundle (experimental)");
+        assert_eq!(expected.version.unwrap(), "0.1");
+        assert_eq!(expected.root, PathBuf::from("/path/to/something"));
     }
 }

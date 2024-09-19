@@ -6,8 +6,11 @@ use url::Url;
 
 use super::install::InstallConfiguration;
 use super::parser::manifest::ToolsetManifest;
+use super::CARGO_HOME;
 use super::RUSTUP_DIST_SERVER;
+use super::RUSTUP_HOME;
 use crate::manifest::Proxy;
+use crate::utils;
 use crate::utils::execute_with_env;
 use crate::utils::{download, execute, force_url_join, set_exec_permission};
 
@@ -122,10 +125,18 @@ impl ToolchainInstaller {
     }
 
     // Rustup self uninstall all the components and toolchains.
-    pub(crate) fn remove_self(&self, install_dir: &PathBuf) -> Result<()> {
-        let rustup = install_dir.join(".cargo").join("bin").join(RUSTUP);
+    pub(crate) fn remove_self(&self, cargo_home: &PathBuf) -> Result<()> {
+        let rustup_home = cargo_home.with_file_name(".rustup");
+        let rustup = cargo_home.join("bin").join(RUSTUP);
         let args = vec!["self", "uninstall", "-y"];
-        execute(rustup, &args)?;
+        execute_with_env(
+            rustup,
+            &args,
+            [
+                (CARGO_HOME, utils::path_to_str(cargo_home)?),
+                (RUSTUP_HOME, utils::path_to_str(&rustup_home)?),
+            ],
+        )?;
         Ok(())
     }
 }

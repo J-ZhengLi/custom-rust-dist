@@ -291,8 +291,14 @@ fn get_new_log_content(old_content: &mut String, file: &mut File) -> Option<Stri
         let new_stuff = new_content[old_content.len()..].to_string();
         *old_content = new_content;
         // TODO: We need some advance rule to filter irrelevant infomation instead.
-        if new_stuff.trim().starts_with("info") {
-            return Some(new_stuff);
+        let headers = ["info", "warn", "error"];
+        let filtered = new_stuff
+            .lines()
+            .filter(|line| headers.iter().any(|h| line.starts_with(h)))
+            .collect::<Vec<_>>()
+            .join("\n");
+        if !filtered.is_empty() {
+            return Some(filtered);
         }
     }
 

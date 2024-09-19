@@ -18,10 +18,10 @@ pub(crate) trait Uninstallation {
     ///
     /// This will remove persistent environment variables including
     /// `RUSTUP_DIST_SERVER`, `RUSTUP_UPDATE_ROOT`, `CARGO_HOME`, `RUSTUP_HOME`.
-    fn remove_rustup_env_vars(&self, install_dir: &PathBuf) -> Result<()>;
+    fn remove_rustup_env_vars(&self) -> Result<()>;
     /// The last step of uninstallation, this will remove the binary itself, along with
     /// the folder it's in.
-    fn remove_self(&self, install_dir: &PathBuf) -> Result<()>;
+    fn remove_self(&self) -> Result<()>;
 }
 
 /// Configurations to use when installing.
@@ -50,21 +50,18 @@ impl UninstallConfiguration {
     }
 
     pub(crate) fn uninstall(mut self, remove_self: bool) -> Result<()> {
-        let install_dir = self.install_dir.clone();
         // remove all tools.
-        self.remove_tools(installed_tools_fresh(&install_dir)?)?;
+        self.remove_tools(installed_tools_fresh(&self.install_dir)?)?;
 
         // Remove rust toolchain via rustup.
-        ToolchainInstaller::init().remove_self(&install_dir)?;
+        ToolchainInstaller::init().remove_self(&self.cargo_home())?;
         self.install_record.remove_rust_record();
 
         // remove all the environments.
-        self.remove_rustup_env_vars(&install_dir)?;
+        self.remove_rustup_env_vars()?;
 
         if remove_self {
-            self.remove_self(&install_dir)?;
-            // Rmove the `<InstallDir>` which is added for manager.
-            crate::core::os::remove_from_path(&install_dir)?;
+            self.remove_self()?;
         } else {
             self.install_record.write()?;
         }
@@ -93,7 +90,7 @@ impl UninstallConfiguration {
 
         for tool in tools_to_uninstall {
             if tool.uninstall(self).is_err() {
-                println!("{}", t!("uninstall_tool_failed_warn"));
+                println!("{}", t!("uninstall_tool_failed_warn", tool = tool.name()));
             } else {
                 self.install_record.remove_tool_record(tool.name());
             }

@@ -1,6 +1,6 @@
 {
     "vendor": "XuanWu",
-    "vendor_en": "xuanwu",
+    "vendor_en": "xuanwu-rust",
 
     "install_init": "Initalizing & Creating directory '%{dir}'...",
     "install_env_config": "Configuring environment variables...",

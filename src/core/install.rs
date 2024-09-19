@@ -54,6 +54,10 @@ declare_unfallible_url!(
     default_rustup_update_root(DEFAULT_RUSTUP_UPDATE_ROOT) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
 );
 
+pub(crate) fn default_cargo_registry() -> Option<(String, String)> {
+    Some(("rsproxy".into(), "sparse+https://rsproxy.cn/index/".into()))
+}
+
 /// Contains definition of installation steps, including pre-install configs.
 ///
 /// Make sure to always call `init()` as it creates essential folders to
@@ -115,7 +119,7 @@ impl InstallConfiguration {
         Ok(Self {
             install_dir: install_dir.to_path_buf(),
             install_record: InstallationRecord::load(install_dir)?,
-            cargo_registry: None,
+            cargo_registry: default_cargo_registry(),
             rustup_dist_server: default_rustup_dist_server().clone(),
             rustup_update_root: default_rustup_update_root().clone(),
             cargo_is_installed: false,
@@ -211,7 +215,7 @@ impl InstallConfiguration {
         };
 
         for (name, tool) in to_install {
-            send_and_print(t!("installing_tool_info", name = name), mt_prog)?;
+            println!("{}", t!("installing_tool_info", name = name));
             self.install_tool(name, tool, manifest.proxy.as_ref())?;
 
             mt_prog.send_any_progress(sub_progress_delta)?;
@@ -228,7 +232,7 @@ impl InstallConfiguration {
         optional_components: &[String],
         mt_prog: &mut MultiThreadProgress,
     ) -> Result<()> {
-        send_and_print(t!("installing_toolchain_info"), mt_prog)?;
+        println!("{}", t!("installing_toolchain_info"));
 
         ToolchainInstaller::init().install(self, manifest, optional_components)?;
         add_to_path(self.cargo_bin())?;
@@ -259,7 +263,7 @@ impl InstallConfiguration {
         };
 
         for (name, tool) in to_install {
-            send_and_print(t!("installing_via_cargo_info", name = name), mt_prog)?;
+            println!("{}", t!("installing_via_cargo_info", name = name));
             self.install_tool(name, tool, None)?;
 
             mt_prog.send_any_progress(sub_progress_delta)?;
@@ -365,14 +369,8 @@ impl InstallConfiguration {
     }
 }
 
-fn send_and_print<S: std::fmt::Display>(msg: S, sender: &mut MultiThreadProgress) -> Result<()> {
-    println!("{msg}");
-    sender.send_msg(msg.to_string())?;
-    Ok(())
-}
-
 pub fn default_install_dir() -> PathBuf {
-    utils::home_dir().join(format!("{}-rust", t!("vendor_en")))
+    utils::home_dir().join(&*t!("vendor_en"))
 }
 
 /// Perform extraction or copy action base on the given path.
@@ -418,7 +416,7 @@ mod tests {
         let install_root = tempfile::Builder::new().tempdir_in(&cache_dir).unwrap();
         let config = InstallConfiguration::init(install_root.path(), true).unwrap();
 
-        assert!(config.install_record.product_name.is_none());
+        assert!(config.install_record.name.is_none());
         assert!(install_root.path().join(".fingerprint").is_file());
     }
 }

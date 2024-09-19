@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::{env, path::Path};
 
 use crate::core::install::{EnvConfig, InstallConfiguration};
@@ -65,13 +64,13 @@ fn create_backup_for_rc(path: &Path, backup_dir: &Path) -> Result<()> {
 
 impl Uninstallation for UninstallConfiguration {
     // This is basically removing the section marked with `rustup config section` in shell profiles.
-    fn remove_rustup_env_vars(&self, _install_dir: &PathBuf) -> Result<()> {
+    fn remove_rustup_env_vars(&self) -> Result<()> {
         remove_all_config_section()
     }
 
-    fn remove_self(&self, install_dir: &PathBuf) -> Result<()> {
+    fn remove_self(&self) -> Result<()> {
         // Remove the installer dir.
-        std::fs::remove_dir_all(install_dir)?;
+        std::fs::remove_dir_all(&self.install_dir)?;
         Ok(())
     }
 }
