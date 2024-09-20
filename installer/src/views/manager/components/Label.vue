@@ -12,12 +12,10 @@ const showNewVersion = computed(() => (ver1 && !ver2) || (!ver1 && ver2));
 </script>
 
 <template>
-  <span>
-    <slot
-      ><span mr="1rem">{{ label }}</span>
-      <span v-if="showVersionChange"> {{ ver1 }} → {{ ver2 }}</span>
-      <span v-else-if="showSameVersion"> {{ ver1 }} → {{ ver2 }}</span>
-      <span v-else-if="showNewVersion"> {{ ver1 ? ver1 : ver2 }}</span></slot
-    >
-  </span>
+    <slot>
+      <span mr="1rem">{{ label }}</span>
+        <span v-if="showVersionChange"> {{ ver1 }} → {{ ver2 }}</span>
+        <span v-else-if="showSameVersion"> {{ ver1 }} → {{ ver2 }}</span>
+        <span v-else-if="showNewVersion"> {{ ver1 ? ver1 : ver2 }}</span>
+    </slot>
 </template>

@@ -163,7 +163,6 @@ class ManagerConf {
   //
   // but we'll need to download `DistManifest` from server fot it at first.
   async loadAvailableKit() {
-
   }
 }
 

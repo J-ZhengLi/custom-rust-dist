@@ -1,8 +1,5 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import MdiMenuRight from './icons/MdiMenuRight.vue';
-import MdiCheck from './icons/MdiCheck.vue';
-import MdiMinus from './icons/MdiMinus.vue';
 import { CheckGroup, CheckGroupItem } from '@/utils';
 
 type Props<T> = {
@@ -54,7 +51,8 @@ watch(group.items, (newValue) => {
 <template>
   <div>
     <div flex="~ items-center">
-      <mdi-menu-right
+      <i
+        class="i-mdi:menu-right"
         w="1.5rem"
         h="1.5rem"
         transition="all"
@@ -72,8 +70,12 @@ watch(group.items, (newValue) => {
             h="full"
             @click="handleCheckAllClick"
           >
-            <mdi-check v-show="isCheckedAll" c="active" />
-            <mdi-minus v-show="!isCheckedAll && !isCheckedNull" c="active" />
+            <i class="i-mdi:check" v-show="isCheckedAll" c="active" />
+            <i
+              class="i-mdi:minus"
+              v-show="!isCheckedAll && !isCheckedNull"
+              c="active"
+            />
           </span>
         </template>
       </base-check-box>

@@ -52,7 +52,9 @@ export default defineConfig({
   presets: [
     presetUno(),
     presetAttributify(),
-    presetIcons(),
+    presetIcons({
+      extraProperties: { display: 'inline-block', verticalAlign: 'middle' },
+    }),
     presetTypography(),
     presetWebFonts({
       fonts: {

@@ -1,4 +1,3 @@
-// BaseRadio.vue
 <template>
   <div flex="~ items-center">
     <input
