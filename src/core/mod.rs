@@ -2,8 +2,9 @@
 //!
 //! Including configuration, toolchain, toolset management.
 
-pub(crate) mod components;
+pub mod components;
 mod custom_instructions;
+pub(crate) mod directories;
 pub mod install;
 pub(crate) mod os;
 pub(crate) mod parser;

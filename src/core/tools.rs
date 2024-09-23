@@ -6,7 +6,10 @@ use std::{
 
 use anyhow::{bail, Result};
 
-use super::{parser::fingerprint::ToolRecord, uninstall::UninstallConfiguration, CARGO_HOME};
+use super::{
+    directories::RimDir, parser::fingerprint::ToolRecord, uninstall::UninstallConfiguration,
+    CARGO_HOME,
+};
 use crate::{core::custom_instructions, utils, InstallConfiguration};
 
 #[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
@@ -126,7 +129,11 @@ impl<'a> Tool<'a> {
         }
     }
 
-    pub(crate) fn install(&self, config: &InstallConfiguration) -> Result<ToolRecord> {
+    pub(crate) fn install(
+        &self,
+        config: &InstallConfiguration,
+        mt_prog: &mut utils::MultiThreadProgress,
+    ) -> Result<ToolRecord> {
         match self {
             Self::CargoTool { name, args } => {
                 if !config.cargo_is_installed {
@@ -158,7 +165,7 @@ impl<'a> Tool<'a> {
             }
             Self::Plugin { kind, path, .. } => {
                 // run the installation command.
-                kind.install_plugin(path)?;
+                kind.install_plugin(path, mt_prog)?;
                 // we need to "cache" to installer, so that we could uninstall with it.
                 let plugin_backup = utils::copy_file_to(path, config.tools_dir())?;
                 Ok(ToolRecord::with_paths(vec![plugin_backup]))
@@ -166,13 +173,17 @@ impl<'a> Tool<'a> {
         }
     }
 
-    pub(crate) fn uninstall(&self, config: &UninstallConfiguration) -> Result<()> {
+    pub(crate) fn uninstall(
+        &self,
+        config: &UninstallConfiguration,
+        mt_prog: &mut utils::MultiThreadProgress,
+    ) -> Result<()> {
         match self {
             Self::CargoTool { name, args } => {
                 cargo_install_or_uninstall(
                     "uninstall",
                     args.as_deref().unwrap_or(&[name]),
-                    &config.cargo_home(),
+                    config.cargo_home(),
                 )?;
             }
             Self::Executables(_, binaries) => {
@@ -182,7 +193,7 @@ impl<'a> Tool<'a> {
             }
             Self::Custom { name, .. } => custom_instructions::uninstall(name, config)?,
             Self::DirWithBin { path, .. } => uninstall_dir_with_bin_(path)?,
-            Self::Plugin { kind, path, .. } => kind.uninstall_plugin(path)?,
+            Self::Plugin { kind, path, .. } => kind.uninstall_plugin(path, mt_prog)?,
         }
         Ok(())
     }
@@ -251,22 +262,24 @@ impl FromStr for PluginType {
 }
 
 impl PluginType {
-    fn install_or_uninstall_(&self, plugin_path: &Path, uninstall: bool) -> Result<()> {
+    fn install_or_uninstall_(
+        &self,
+        plugin_path: &Path,
+        uninstall: bool,
+        mt_prog: &mut utils::MultiThreadProgress,
+    ) -> Result<()> {
         match self {
             PluginType::Vsix => {
                 for program in VSCODE_FAMILY {
                     if utils::cmd_exist(program) {
                         let op = if uninstall { "uninstall" } else { "install" };
                         let arg_opt = format!("--{op}-extension");
-                        println!(
-                            "{}",
-                            t!(
-                                "handling_extension_info",
-                                op = op,
-                                ext = plugin_path.display(),
-                                program = program
-                            )
-                        );
+                        mt_prog.send_msg_and_print(t!(
+                            "handling_extension_info",
+                            op = op,
+                            ext = plugin_path.display(),
+                            program = program
+                        ))?;
                         match utils::execute(
                             program,
                             &[arg_opt.as_str(), utils::path_to_str(plugin_path)?],
@@ -274,14 +287,11 @@ impl PluginType {
                             Ok(()) => continue,
                             // Ignore error when uninstalling.
                             Err(_) if uninstall => {
-                                println!(
-                                    "{}",
-                                    t!(
-                                        "skip_extension_uninstall_warn",
-                                        ext = plugin_path.display(),
-                                        program = program
-                                    )
-                                );
+                                mt_prog.send_msg_and_print(t!(
+                                    "skip_extension_uninstall_warn",
+                                    ext = plugin_path.display(),
+                                    program = program
+                                ))?;
                                 continue;
                             }
                             Err(e) => return Err(e),
@@ -293,12 +303,20 @@ impl PluginType {
         Ok(())
     }
 
-    fn install_plugin(&self, plugin_path: &Path) -> Result<()> {
-        self.install_or_uninstall_(plugin_path, false)
+    fn install_plugin(
+        &self,
+        plugin_path: &Path,
+        mt_prog: &mut utils::MultiThreadProgress,
+    ) -> Result<()> {
+        self.install_or_uninstall_(plugin_path, false, mt_prog)
     }
 
-    fn uninstall_plugin(&self, plugin_path: &Path) -> Result<()> {
-        self.install_or_uninstall_(plugin_path, true)
+    fn uninstall_plugin(
+        &self,
+        plugin_path: &Path,
+        mt_prog: &mut utils::MultiThreadProgress,
+    ) -> Result<()> {
+        self.install_or_uninstall_(plugin_path, true, mt_prog)
     }
 }
 

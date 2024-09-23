@@ -6,6 +6,7 @@
 //! there's currently no suitable solution other than execute some commands to hack it.
 
 use std::path::{Path, PathBuf};
+use crate::core::directories::RimDir;
 use crate::core::install::InstallConfiguration;
 use crate::core::uninstall::UninstallConfiguration;
 use crate::{core::os::add_to_path, utils};
@@ -119,7 +120,7 @@ Keywords=vscode;
         use crate::core::os::remove_from_path;
 
         // We've added a path for VSCode at `<InstallDir>/tools/vscode/bin`, try removing it from `PATH`.
-        let mut vscode_path = config.tools_dir();
+        let mut vscode_path = config.tools_dir().to_path_buf();
         vscode_path.push(self.tool_name);
         vscode_path.push("bin");
         remove_from_path(&vscode_path)?;

@@ -4,13 +4,14 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::cli::common::{self, Confirm};
+use crate::components::Component;
 use crate::core::install::{
     default_cargo_registry, default_rustup_dist_server, default_rustup_update_root, EnvConfig,
     InstallConfiguration,
 };
 use crate::core::try_it;
-use crate::manifest::{baked_in_manifest, ToolMap};
-use crate::{default_install_dir, get_component_list_from_manifest, utils, Component};
+use crate::toolset_manifest::{baked_in_manifest, ToolMap};
+use crate::{components, default_install_dir, utils};
 
 use super::{GlobalOpt, Installer, ManagerSubcommands};
 
@@ -34,7 +35,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
     let mut manifest = baked_in_manifest()?;
     manifest.adjust_paths()?;
 
-    let component_list = get_component_list_from_manifest(&manifest)?;
+    let component_list = components::get_component_list_from_manifest(&manifest, false)?;
     let user_opt = CustomInstallOpt::collect_from_user(
         prefix.as_deref().unwrap_or(&default_install_dir()),
         component_list,

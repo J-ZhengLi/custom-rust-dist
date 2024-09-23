@@ -4,6 +4,7 @@ extern crate rust_i18n;
 mod error;
 mod installer_mode;
 mod manager_mode;
+mod toolkit;
 
 use std::env;
 use std::path::PathBuf;

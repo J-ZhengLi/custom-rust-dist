@@ -7,7 +7,7 @@ use crate::utils;
 
 use super::TomlParser;
 
-pub(crate) const FILENAME: &str = ".fingerprint";
+pub(crate) const FILENAME: &str = ".fingerprint.toml";
 
 /// Re-load fingerprint file just to get the list of installed tools,
 /// therefore we can use this list to uninstall, while avoiding race condition.
@@ -38,7 +38,10 @@ impl TomlParser for InstallationRecord {
     where
         Self: Sized + serde::de::DeserializeOwned,
     {
-        assert!(root.as_ref().is_dir());
+        assert!(
+            root.as_ref().is_dir(),
+            "install record needs to be loaded from a directory"
+        );
 
         let fp_path = root.as_ref().join(FILENAME);
         if fp_path.is_file() {
@@ -56,6 +59,26 @@ impl TomlParser for InstallationRecord {
 }
 
 impl InstallationRecord {
+    /// Used to detect whether a fingerprint file exists in parent directory.
+    ///
+    /// This is useful when you want to know it without causing
+    /// the program to panic using [`get_installed_dir`](super::get_installed_dir).
+    pub fn exists() -> Result<bool> {
+        let parent_dir = utils::parent_dir_of_cur_exe()?;
+        Ok(parent_dir.join(FILENAME).is_file())
+    }
+
+    /// Load installation record from a presumed install directory,
+    /// which is typically the parent directory of the current executable.
+    ///
+    /// # Note
+    /// Use this instead of [`InstallationRecord::load`] in **manager** mod.
+    // TODO: Cache the result using a `Cell` or `RwLock` or combined.
+    pub fn load_from_install_dir() -> Result<Self> {
+        let root = super::get_installed_dir();
+        Self::load(root)
+    }
+
     pub(crate) fn write(&self) -> Result<()> {
         let path = self.root.join(FILENAME);
         let content = self
@@ -100,6 +123,17 @@ impl InstallationRecord {
         self.tools.shift_remove(tool_name);
     }
 
+    pub fn installed_tools(&self) -> Vec<&str> {
+        self.tools.keys().map(|k| k.as_str()).collect()
+    }
+
+    pub fn installed_components(&self) -> Vec<&str> {
+        self.rust
+            .as_ref()
+            .map(|r| r.components.iter().map(|c| c.as_str()).collect::<Vec<_>>())
+            .unwrap_or_default()
+    }
+
     pub(crate) fn print_installation(&self) -> String {
         let mut installed = String::new();
         if let Some(rust) = &self.rust {
@@ -114,7 +148,7 @@ impl InstallationRecord {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct RustRecord {
+pub struct RustRecord {
     version: String,
     #[serde(default)]
     pub(crate) components: Vec<String>,
@@ -131,7 +165,7 @@ impl RustRecord {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct ToolRecord {
+pub struct ToolRecord {
     #[serde(default)]
     pub(crate) use_cargo: bool,
     #[serde(default)]

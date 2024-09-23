@@ -2,7 +2,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use crate::manifest::{ToolInfo, ToolsetManifest};
+use crate::toolset_manifest::{ToolInfo, ToolsetManifest};
 
 static COMPONENTS_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -63,7 +63,10 @@ impl Component {
     setter!(tool_installer(self, installer: &ToolInfo) { Some(installer.clone()) });
 }
 
-pub fn get_component_list_from_manifest(manifest: &ToolsetManifest) -> Result<Vec<Component>> {
+pub fn get_component_list_from_manifest(
+    manifest: &ToolsetManifest,
+    ignore_installed: bool,
+) -> Result<Vec<Component>> {
     let profile = manifest.toolchain_profile().cloned().unwrap_or_default();
     let profile_name = profile.verbose_name.as_deref().unwrap_or(&profile.name);
     // Add a component that represents rust toolchain
@@ -87,7 +90,11 @@ pub fn get_component_list_from_manifest(manifest: &ToolsetManifest) -> Result<Ve
         );
     }
 
-    let already_installed_tools = manifest.already_installed_tools();
+    let already_installed_tools = if !ignore_installed {
+        manifest.already_installed_tools()
+    } else {
+        vec![]
+    };
     if let Some(tools) = manifest.current_target_tools() {
         for (tool_name, tool_info) in tools {
             components.push(

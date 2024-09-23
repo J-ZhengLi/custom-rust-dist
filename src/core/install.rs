@@ -1,8 +1,9 @@
 use super::{
+    directories::RimDir,
     parser::{
         cargo_config::CargoConfig,
         fingerprint::{InstallationRecord, ToolRecord},
-        manifest::{ToolInfo, ToolsetManifest},
+        toolset_manifest::{ToolInfo, ToolsetManifest},
         TomlParser,
     },
     rustup::ToolchainInstaller,
@@ -11,7 +12,7 @@ use super::{
 };
 use crate::{
     core::os::add_to_path,
-    manifest::{Proxy, ToolMap},
+    toolset_manifest::{Proxy, ToolMap},
     utils::{self, Extractable, MultiThreadProgress},
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -36,17 +37,6 @@ macro_rules! declare_unfallible_url {
             }
         )*
     };
-}
-
-/// Declare a statically allocated `OnceLock` path, and create that directory if it does not exists.
-macro_rules! get_path_and_create {
-    ($path_ident:ident, $init:expr) => {{
-        static $path_ident: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
-        let __path__ = $path_ident.get_or_init(|| $init);
-        $crate::utils::ensure_dir(__path__)
-            .expect("unable to create one of the directory under installation folder");
-        __path__
-    }};
 }
 
 declare_unfallible_url!(
@@ -88,6 +78,12 @@ pub struct InstallConfiguration {
     install_record: InstallationRecord,
 }
 
+impl RimDir for InstallConfiguration {
+    fn install_dir(&self) -> &Path {
+        self.install_dir.as_path()
+    }
+}
+
 impl InstallConfiguration {
     /// Creating install diretory and other preperations related to filesystem.
     ///
@@ -101,7 +97,7 @@ impl InstallConfiguration {
         utils::ensure_dir(install_dir)?;
 
         if !lite {
-            // Create a copy of this binary to CARGO_HOME/bin
+            // Create a copy of this binary
             let self_exe = std::env::current_exe()?;
             // promote this installer to manager
             let manager_name = format!("{}-manager{}", t!("vendor_en"), utils::EXE_EXT);
@@ -110,6 +106,11 @@ impl InstallConfiguration {
             let manager_exe = install_dir.join(manager_name);
             utils::copy_as(self_exe, &manager_exe)?;
             add_to_path(install_dir)?;
+
+            // Create a copy of the baked manifest which is later used for component management.
+            let manifest_out_path = install_dir.join("toolset-manifest.toml");
+            let baked_manfest = include_str!("../../resources/toolset_manifest.toml");
+            utils::write_file(manifest_out_path, baked_manfest, false)?;
 
             #[cfg(windows)]
             // Create registry entry to add this program into "installed programs".
@@ -139,26 +140,6 @@ impl InstallConfiguration {
     pub fn rustup_update_root(mut self, url: Url) -> Self {
         self.rustup_update_root = url;
         self
-    }
-
-    pub(crate) fn cargo_home(&self) -> &Path {
-        get_path_and_create!(CARGO_HOME_DIR, self.install_dir.join(".cargo"))
-    }
-
-    pub(crate) fn cargo_bin(&self) -> &Path {
-        get_path_and_create!(CARGO_BIN_DIR, self.cargo_home().join("bin"))
-    }
-
-    pub(crate) fn rustup_home(&self) -> &Path {
-        get_path_and_create!(RUSTUP_HOME_DIR, self.install_dir.join(".rustup"))
-    }
-
-    pub(crate) fn temp_root(&self) -> &Path {
-        get_path_and_create!(TEMP_DIR, self.install_dir.join("temp"))
-    }
-
-    pub(crate) fn tools_dir(&self) -> &Path {
-        get_path_and_create!(TOOLS_DIR, self.install_dir.join("tools"))
     }
 
     pub(crate) fn env_vars(
@@ -216,7 +197,7 @@ impl InstallConfiguration {
 
         for (name, tool) in to_install {
             println!("{}", t!("installing_tool_info", name = name));
-            self.install_tool(name, tool, manifest.proxy.as_ref())?;
+            self.install_tool(name, tool, manifest.proxy.as_ref(), mt_prog)?;
 
             mt_prog.send_any_progress(sub_progress_delta)?;
         }
@@ -264,7 +245,7 @@ impl InstallConfiguration {
 
         for (name, tool) in to_install {
             println!("{}", t!("installing_via_cargo_info", name = name));
-            self.install_tool(name, tool, None)?;
+            self.install_tool(name, tool, None, mt_prog)?;
 
             mt_prog.send_any_progress(sub_progress_delta)?;
         }
@@ -276,10 +257,17 @@ impl InstallConfiguration {
 
     // TODO: Write version info after installing each tool,
     // which is later used for updating.
-    fn install_tool(&mut self, name: &str, tool: &ToolInfo, proxy: Option<&Proxy>) -> Result<()> {
+    fn install_tool(
+        &mut self,
+        name: &str,
+        tool: &ToolInfo,
+        proxy: Option<&Proxy>,
+        mt_prog: &mut MultiThreadProgress,
+    ) -> Result<()> {
         let record = match tool {
             ToolInfo::PlainVersion(version) | ToolInfo::DetailedVersion { ver: version, .. } => {
-                Tool::cargo_tool(name, Some(vec![name, "--version", version])).install(self)?
+                Tool::cargo_tool(name, Some(vec![name, "--version", version]))
+                    .install(self, mt_prog)?
             }
             ToolInfo::Git {
                 git,
@@ -299,9 +287,9 @@ impl InstallConfiguration {
                     args.extend(["--rev", s]);
                 }
 
-                Tool::cargo_tool(name, Some(args)).install(self)?
+                Tool::cargo_tool(name, Some(args)).install(self, mt_prog)?
             }
-            ToolInfo::Path { path, .. } => self.try_install_from_path(name, path)?,
+            ToolInfo::Path { path, .. } => self.try_install_from_path(name, path, mt_prog)?,
             // TODO: Have a dedicated download folder, do not use temp dir to store downloaded artifacts,
             // so then we can have the `resume download` feature.
             ToolInfo::Url { url, .. } => {
@@ -316,7 +304,7 @@ impl InstallConfiguration {
                 let dest = temp_dir.path().join(downloaded_file_name);
                 utils::download(name, url, &dest, proxy)?;
 
-                self.try_install_from_path(name, &dest)?
+                self.try_install_from_path(name, &dest, mt_prog)?
             }
         };
 
@@ -325,7 +313,12 @@ impl InstallConfiguration {
         Ok(())
     }
 
-    fn try_install_from_path(&self, name: &str, path: &Path) -> Result<ToolRecord> {
+    fn try_install_from_path(
+        &self,
+        name: &str,
+        path: &Path,
+        mt_prog: &mut MultiThreadProgress,
+    ) -> Result<ToolRecord> {
         if !path.exists() {
             bail!(
                 "unable to install '{name}' because the path to it's installer '{}' does not exist.",
@@ -337,7 +330,7 @@ impl InstallConfiguration {
         let tool_installer_path = extract_or_copy_to(path, temp_dir.path())?;
         let tool_installer = Tool::from_path(name, &tool_installer_path)
             .with_context(|| format!("no install method for tool '{name}'"))?;
-        tool_installer.install(self)
+        tool_installer.install(self, mt_prog)
     }
 
     /// Configuration options for `cargo`.
@@ -389,6 +382,7 @@ fn extract_or_copy_to(maybe_file: &Path, dest: &Path) -> Result<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fingerprint;
 
     #[test]
     fn declare_unfallible_url_macro() {
@@ -417,6 +411,6 @@ mod tests {
         let config = InstallConfiguration::init(install_root.path(), true).unwrap();
 
         assert!(config.install_record.name.is_none());
-        assert!(install_root.path().join(".fingerprint").is_file());
+        assert!(install_root.path().join(fingerprint::FILENAME).is_file());
     }
 }

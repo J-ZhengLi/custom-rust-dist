@@ -1,6 +1,6 @@
 //! Progress bar indicator for commandline user interface.
 
-use std::sync::mpsc::Sender;
+use std::{io::Write, sync::mpsc::Sender};
 
 use anyhow::Result;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
@@ -32,6 +32,11 @@ impl<'a> MultiThreadProgress<'a> {
             sender.send(msg)?;
         }
         Ok(())
+    }
+    pub fn send_msg_and_print<S: std::fmt::Display>(&self, msg: S) -> Result<()> {
+        let mut stdout = std::io::stdout();
+        writeln!(&mut stdout, "{}", msg)?;
+        self.send_msg(msg.to_string())
     }
     pub fn send_progress(&mut self) -> Result<()> {
         if let Some(sender) = self.prog_sender {

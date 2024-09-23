@@ -8,7 +8,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use reqwest::blocking::{Client, ClientBuilder};
 use url::Url;
 
-use crate::manifest::Proxy;
+use crate::toolset_manifest::Proxy;
 
 use super::progress_bar::{ProgressIndicator, Style};
 

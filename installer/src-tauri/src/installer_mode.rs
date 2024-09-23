@@ -12,11 +12,10 @@ use tauri::api::dialog::FileDialogBuilder;
 
 use super::INSTALL_DIR;
 use crate::error::Result;
-use rim::manifest::{baked_in_manifest, ToolInfo};
+use rim::components::{get_component_list_from_manifest, Component};
+use rim::toolset_manifest::{baked_in_manifest, ToolInfo};
 use rim::utils::MultiThreadProgress;
-use rim::{
-    get_component_list_from_manifest, try_it, utils, Component, EnvConfig, InstallConfiguration,
-};
+use rim::{try_it, utils, EnvConfig, InstallConfiguration};
 
 static LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
 
@@ -92,7 +91,7 @@ fn get_component_list() -> Result<Vec<Component>> {
     let mut manifest = baked_in_manifest()?;
     manifest.adjust_paths()?;
 
-    Ok(get_component_list_from_manifest(&manifest)?)
+    Ok(get_component_list_from_manifest(&manifest, false)?)
 }
 
 macro_rules! steps_counter {
@@ -270,7 +269,7 @@ fn install_toolchain(
                 };
             }
 
-            thread::sleep(Duration::from_millis(500));
+            thread::sleep(Duration::from_millis(50));
         }
     });
 

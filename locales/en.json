@@ -55,5 +55,12 @@
     "uninstall_confirmation": "Are you sure you want to uninstall the following components: \n\n%{list}\n",
     "uninstall_all_confirmation": "Are you sure you want to uninstall %{vendor}-manager and the following components: \n\n%{list}\n",
     "uninstall_unknown_tool_warn": "warn: no suitable method for uninstalling tool '%{tool}', skipping",
-    "uninstall_tool_failed_warn": "warn: unable to uninstall tool '%{tool}', maybe it was already uninstalled, skipping"
+    "uninstalling_third_party_tools": "Uninstalling third-party tools",
+    "uninstalling_for": "Uninstalling '%{name}'",
+    "uninstalling_rust_toolchain": "Uninstalling Rust toolchain",
+    "uninstall_env_config": "Removing environment variables...",
+    "uninstall_self": "Removing self & wrapping up",
+    "uninstall_tool_failed_warn": "warn: unable to uninstall tool '%{tool}', maybe it was already uninstalled, skipping",
+
+    "unknown_toolkit": "Unknown Toolkit"
 }

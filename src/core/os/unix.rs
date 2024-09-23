@@ -3,7 +3,7 @@ use std::{env, path::Path};
 
 use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
-use crate::manifest::ToolsetManifest;
+use crate::toolset_manifest::ToolsetManifest;
 use crate::utils;
 use anyhow::{Context, Result};
 use indexmap::IndexSet;

@@ -3,88 +3,7 @@ import { KitItem } from './types/KitItem';
 import { ManagerComponent } from './types/Component';
 import { CheckGroup, CheckGroupItem } from './types/CheckBoxGroup';
 import LabelComponent from '@/views/manager/components/Label.vue';
-
-const kits: KitItem[] = [
-  {
-    name: '玄武 Rust 安装工具',
-    version: '1.70.0',
-    desc: '稳定版适用于大多数用户，具有稳定的性能和兼容性。',
-    date: '2023-01-01',
-    type: 'stable',
-    notes: '更新日志',
-    manifestURL: 'https://example.com/manifest.json',
-    components: [
-      {
-        desc: ['基础组件，包含核心功能。'],
-        groupName: 'Rust',
-        id: 1,
-        installed: false,
-        isToolchainComponent: true,
-        name: 'Basic',
-        optional: false,
-        required: true,
-        version: '1.70.0',
-        toolInstaller: null,
-      },
-      {
-        desc: ['(windows-msvc only) Requirement for Windows'],
-        groupName: 'Prerequisites',
-        id: 587,
-        installed: true,
-        isToolchainComponent: false,
-        name: 'buildtools',
-        optional: false,
-        required: true,
-        version: '1.70.0',
-        toolInstaller: null,
-      },
-      {
-        desc: [
-          'Prints out the result of macro expansion and #[derive] expansion applied to the current crate.',
-        ],
-        groupName: 'Misc',
-        id: 623,
-        installed: false,
-        isToolchainComponent: false,
-        name: 'cargo-expand',
-        optional: true,
-        required: false,
-        version: '1.70.0',
-        toolInstaller: null,
-      },
-    ],
-  },
-  {
-    name: '玄武 Rust 安装工具',
-    version: '1.71.0',
-    desc: '测试版适用于喜欢尝鲜的用户，可能包含新功能和改进。',
-    date: '2023-01-02',
-    type: 'beta',
-    notes: '更新日志',
-    manifestURL: 'https://example.com/manifest.json',
-    components: [],
-  },
-  {
-    name: '玄武 Rust 安装工具',
-    version: '1.72.0',
-    desc: '开发版适用于开发者，可能包含不稳定的功能和改进。',
-    date: '2023-01-03',
-    type: 'alpha',
-    notes: '更新日志',
-    manifestURL: 'https://example.com/manifest.json',
-    components: [],
-  },
-  {
-    name: '玄武 Rust 安装工具',
-    version: '1.73.0',
-    desc: '开发版适用于开发者，可能包含不稳定的功能和改进。',
-    date: '2023-01-03',
-    type: 'alpha',
-    notes: '更新日志',
-    manifestURL: 'https://example.com/manifest.json',
-    components: [],
-  },
-];
+import { invokeCommand } from './invokeCommand';
 
 type Target = {
   operation: 'update' | 'uninstall';
@@ -92,6 +11,7 @@ type Target = {
 };
 
 class ManagerConf {
+  path: Ref<string> = ref('');
   private _kits: Ref<KitItem[]> = ref([]);
   private _installed: Ref<KitItem | null> = ref(null);
   private _current: Ref<KitItem | null> = ref(null);
@@ -130,7 +50,7 @@ class ManagerConf {
 
         return {
           label: `${item.name}${versionStr}`,
-          checked: item.required || !item.optional,
+          checked: item.installed || item.required,
           required: item.required,
           disabled: item.required,
 
@@ -210,15 +130,40 @@ class ManagerConf {
       ...components
     );
   }
-  public loadConf(): any {
-    this.setCurrent(kits[0]);
-    this.setInstalled(kits[0]);
-    this.setKits(kits);
-    this.setComponents(
-      this.getInstalled().value?.components.filter(
-        (i) => i.installed || i.required
-      ) || []
-    );
+  
+  async loadConf() {
+    let dir = await invokeCommand('get_install_dir');
+    if (typeof dir === 'string' && dir.trim() !== '') {
+      this.path.value = dir;
+    }
+
+    await this.loadInstalledKit();
+    await this.loadAvailableKit();
+  }
+
+  async loadInstalledKit() {
+    const installedKit = (await invokeCommand(
+      'get_installed_kit'
+    )) as KitItem | undefined;
+    if (installedKit) {
+      this.setKits([installedKit]);
+      this.setInstalled(installedKit);
+      this.setCurrent(installedKit);
+    }
+  }
+
+  // TODO: Separate `installed` and `available` toolkit list.
+  // something like:
+  //
+  // Installed
+  //   - xxx
+  // Available
+  //   - xxxx
+  //   - xxxxx
+  //
+  // but we'll need to download `DistManifest` from server fot it at first.
+  async loadAvailableKit() {
+
   }
 }
 
