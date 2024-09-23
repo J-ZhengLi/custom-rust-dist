@@ -9,15 +9,22 @@ import type {
 } from '@/utils/index';
 import { useCustomRouter } from '@/router/index';
 import CheckBoxGroup from '@/components/CheckBoxGroup.vue';
+import { message } from '@tauri-apps/api/dialog';
 
 const { routerPush, routerBack } = useCustomRouter();
 const selectComponentId = ref(0);
 
 const groupComponents: Ref<CheckGroup<ManagerComponent>[]> = ref([]);
 const checkedAllBundle = ref(false);
+
 const checkedAll = computed(() => {
   return groupComponents.value.every((item) =>
     item.items.every((i) => i.checked)
+  );
+});
+const checkedEmpty = computed(() => {
+  return groupComponents.value.every((item) =>
+    item.items.every((i) => !i.checked)
   );
 });
 
@@ -72,23 +79,27 @@ function handleComponentsChange(items: CheckGroupItem<ManagerComponent>[]) {
 }
 
 function handleSelectAll() {
-  const target = !checkedAll.value;
+  const target = checkedEmpty.value;
   groupComponents.value.forEach((group) => {
     group.items.forEach((item) => {
-      item.checked = item.value.required ? true : target;
+      if (item.disabled) return;
+      item.checked = target;
     });
   });
   updateTargetComponents();
 }
 
 function handleClickNext() {
+  if (managerConf.getTargetComponents().length === 0) {
+    message('请选择至少一个组件', { type: 'error' });
+    return;
+  }
   managerConf.setOperation('update');
   routerPush('/manager/confirm');
 }
 
 onMounted(() => {
   groupComponents.value = managerConf.getGroups();
-  console.log(groupComponents.value);
 });
 </script>
 
@@ -103,8 +114,23 @@ onMounted(() => {
             flex="~ items-center"
             v-model="checkedAllBundle"
             title="全选"
-            @click="handleSelectAll"
-          />
+          >
+            <template #icon>
+              <span
+                flex="~ items-center justify-center"
+                w="full"
+                h="full"
+                @click="handleSelectAll"
+              >
+                <i class="i-mdi:check" v-show="checkedAll" c="active" />
+                <i
+                  class="i-mdi:minus"
+                  v-show="!checkedAll && !checkedEmpty"
+                  c="active"
+                />
+              </span>
+            </template>
+          </base-check-box>
         </div>
 
         <check-box-group
@@ -119,7 +145,9 @@ onMounted(() => {
       <scroll-box basis="200px" grow="4" ml="12px">
         <div>组件详细信息</div>
         <p font="b">{{ curCheckComponent?.value.name }}</p>
-        <p v-for="item in curCheckComponent?.value.desc">{{ item }}</p>
+        <p v-for="item in curCheckComponent?.value.desc" :key="item">
+          {{ item }}
+        </p>
       </scroll-box>
     </div>
 

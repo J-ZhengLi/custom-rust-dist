@@ -5,6 +5,7 @@ import { CheckGroup, CheckGroupItem } from './types/CheckBoxGroup';
 import LabelComponent from '@/views/manager/components/Label.vue';
 import { invokeCommand } from './invokeCommand';
 
+
 type Target = {
   operation: 'update' | 'uninstall';
   components: ManagerComponent[];
@@ -39,7 +40,7 @@ class ManagerConf {
   public getGroups(): CheckGroup<ManagerComponent>[] {
     const checkItems: CheckGroupItem<ManagerComponent>[] =
       this._current.value?.components.map((item) => {
-        const installedItem = this._current.value?.components.find(
+        const installedItem = this._installed.value?.components.find(
           (c) => c.name === item.name
         );
 
@@ -59,8 +60,8 @@ class ManagerConf {
           labelComponent: shallowRef(LabelComponent),
           labelComponentProps: {
             label: item.name,
-            ver1: installedItem?.version,
-            ver2: item.version,
+            oldVer: installedItem?.version,
+            newVer: item.version,
           },
         };
       }) || [];
@@ -130,7 +131,7 @@ class ManagerConf {
       ...components
     );
   }
-  
+
   async loadConf() {
     let dir = await invokeCommand('get_install_dir');
     if (typeof dir === 'string' && dir.trim() !== '') {

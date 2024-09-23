@@ -27,8 +27,8 @@ const labels = computed(() => {
       <div v-for="item in labels" :key="item.label" mb="24px">
         <component-label
           label="item.label"
-          :ver1="item.originVer"
-          :ver2="item.targetVer"
+          :oldVer="item.originVer"
+          :newVer="item.targetVer"
         />
         <br />
         <span>path:</span>

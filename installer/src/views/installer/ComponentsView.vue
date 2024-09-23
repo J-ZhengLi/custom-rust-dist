@@ -21,6 +21,11 @@ const checkedAll = computed(() => {
     item.items.every((i) => i.checked)
   );
 });
+const checkedEmpty = computed(() => {
+  return groupComponents.value.every((item) =>
+    item.items.every((i) => !i.checked)
+  );
+});
 
 watch(checkedAll, (val) => {
   checkedAllBundle.value = val;
@@ -84,7 +89,8 @@ function handleSelectAll() {
   const target = !checkedAll.value;
   groupComponents.value.forEach((group) => {
     group.items.forEach((item) => {
-      item.checked = item.value.required ? true : target;
+      if (item.disabled) return;
+      item.checked = target;
     });
   });
 }
@@ -105,8 +111,23 @@ onMounted(() => {
             flex="~ items-center"
             v-model="checkedAllBundle"
             title="全选"
-            @click="handleSelectAll"
-          />
+          >
+            <template #icon>
+              <span
+                flex="~ items-center justify-center"
+                w="full"
+                h="full"
+                @click="handleSelectAll"
+              >
+                <i class="i-mdi:check" v-show="checkedAll" c="active" />
+                <i
+                  class="i-mdi:minus"
+                  v-show="!checkedAll && !checkedEmpty"
+                  c="active"
+                />
+              </span>
+            </template>
+          </base-check-box>
         </div>
 
         <check-box-group
