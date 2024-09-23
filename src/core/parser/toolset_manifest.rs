@@ -1,3 +1,6 @@
+//! `ToolsetManifest` contains information about each dist package,
+//! such as its name, version, and what's included etc.
+
 use std::collections::{HashMap, HashSet};
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -14,9 +17,16 @@ use super::TomlParser;
 /// A map of tools, contains the name and source package information.
 pub type ToolMap = IndexMap<String, ToolInfo>;
 
+pub const FILENAME: &str = "toolset-manifest.toml";
+
 #[derive(Debug, Deserialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToolsetManifest {
+    /// Product name to be cached after installation, so that we can show it as `installed`
+    pub name: Option<String>,
+    /// Product version to be cached after installation, so that we can show it as `installed`
+    pub version: Option<String>,
+
     pub(crate) rust: RustToolchain,
     #[serde(default)]
     pub(crate) tools: Tools,
@@ -37,6 +47,15 @@ impl TomlParser for ToolsetManifest {
 }
 
 impl ToolsetManifest {
+    /// Load toolset manfest from installed root.
+    ///
+    /// # Note
+    /// Only use this during **manager** mode.
+    pub fn load_from_install_dir() -> Result<Self> {
+        let root = super::get_installed_dir();
+        Self::load(root.join(FILENAME))
+    }
+
     // Get a list of all optional componets.
     pub fn optional_toolchain_components(&self) -> &[String] {
         self.rust.optional_components.as_slice()
@@ -960,5 +979,19 @@ x86_64-unknown-linux-gnu = "packages/x86_64-unknown-linux-gnu/rustup-init"
         }
 
         assert_eq!(expected.rustup_bin().unwrap().unwrap(), path);
+    }
+
+    #[test]
+    fn with_product_info() {
+        let input = r#"
+name = "my toolkit"
+version = "1.0"
+
+[rust]
+version = "1.0.0"
+"#;
+        let expected = ToolsetManifest::from_str(input).unwrap();
+        assert_eq!(expected.name.unwrap(), "my toolkit");
+        assert_eq!(expected.version.unwrap(), "1.0");
     }
 }

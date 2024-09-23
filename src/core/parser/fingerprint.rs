@@ -7,7 +7,7 @@ use crate::utils;
 
 use super::TomlParser;
 
-pub(crate) const FILENAME: &str = ".fingerprint";
+pub(crate) const FILENAME: &str = ".fingerprint.toml";
 
 /// Re-load fingerprint file just to get the list of installed tools,
 /// therefore we can use this list to uninstall, while avoiding race condition.
@@ -18,12 +18,15 @@ pub(crate) fn installed_tools_fresh(root: &Path) -> Result<IndexMap<String, Tool
 /// Holds Installation record.
 ///
 /// This tracks what tools/components we have installed, and where they are installed.
-#[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct InstallationRecord {
-    pub(crate) root: PathBuf,
-    rust: Option<RustRecord>,
+#[derive(Debug, Default, Deserialize, Serialize)]
+pub struct InstallationRecord {
+    /// Name of the bundle, such as `my-rust-stable`
+    pub name: Option<String>,
+    pub version: Option<String>,
+    pub root: PathBuf,
+    pub rust: Option<RustRecord>,
     #[serde(default)]
-    pub(crate) tools: IndexMap<String, ToolRecord>,
+    pub tools: IndexMap<String, ToolRecord>,
 }
 
 impl TomlParser for InstallationRecord {
@@ -35,7 +38,10 @@ impl TomlParser for InstallationRecord {
     where
         Self: Sized + serde::de::DeserializeOwned,
     {
-        assert!(root.as_ref().is_dir());
+        assert!(
+            root.as_ref().is_dir(),
+            "install record needs to be loaded from a directory"
+        );
 
         let fp_path = root.as_ref().join(FILENAME);
         if fp_path.is_file() {
@@ -44,8 +50,7 @@ impl TomlParser for InstallationRecord {
         } else {
             let default = InstallationRecord {
                 root: root.as_ref().to_path_buf(),
-                rust: None,
-                tools: IndexMap::default(),
+                ..Default::default()
             };
             default.write()?;
             Ok(default)
@@ -54,6 +59,26 @@ impl TomlParser for InstallationRecord {
 }
 
 impl InstallationRecord {
+    /// Used to detect whether a fingerprint file exists in parent directory.
+    ///
+    /// This is useful when you want to know it without causing
+    /// the program to panic using [`get_installed_dir`](super::get_installed_dir).
+    pub fn exists() -> Result<bool> {
+        let parent_dir = utils::parent_dir_of_cur_exe()?;
+        Ok(parent_dir.join(FILENAME).is_file())
+    }
+
+    /// Load installation record from a presumed install directory,
+    /// which is typically the parent directory of the current executable.
+    ///
+    /// # Note
+    /// Use this instead of [`InstallationRecord::load`] in **manager** mod.
+    // TODO: Cache the result using a `Cell` or `RwLock` or combined.
+    pub fn load_from_install_dir() -> Result<Self> {
+        let root = super::get_installed_dir();
+        Self::load(root)
+    }
+
     pub(crate) fn write(&self) -> Result<()> {
         let path = self.root.join(FILENAME);
         let content = self
@@ -98,6 +123,17 @@ impl InstallationRecord {
         self.tools.shift_remove(tool_name);
     }
 
+    pub fn installed_tools(&self) -> Vec<&str> {
+        self.tools.keys().map(|k| k.as_str()).collect()
+    }
+
+    pub fn installed_components(&self) -> Vec<&str> {
+        self.rust
+            .as_ref()
+            .map(|r| r.components.iter().map(|c| c.as_str()).collect::<Vec<_>>())
+            .unwrap_or_default()
+    }
+
     pub(crate) fn print_installation(&self) -> String {
         let mut installed = String::new();
         if let Some(rust) = &self.rust {
@@ -112,7 +148,7 @@ impl InstallationRecord {
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct RustRecord {
+pub struct RustRecord {
     version: String,
     #[serde(default)]
     pub(crate) components: Vec<String>,
@@ -129,12 +165,11 @@ impl RustRecord {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) struct ToolRecord {
+pub struct ToolRecord {
     #[serde(default)]
     pub(crate) use_cargo: bool,
     #[serde(default)]
     pub(crate) paths: Vec<PathBuf>,
-    // version: String,
 }
 
 impl ToolRecord {
@@ -157,6 +192,12 @@ impl ToolRecord {
 mod tests {
     use super::*;
 
+    // there is an inconsistency between OSs when serialize paths
+    #[cfg(not(windows))]
+    const QUOTE: &str = "\"";
+    #[cfg(windows)]
+    const QUOTE: &str = "'";
+
     #[test]
     fn create_local_install_info() {
         let install_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
@@ -166,15 +207,9 @@ mod tests {
         fp.add_rust_record("stable", &rust_components);
         fp.add_tool_record("aaa", ToolRecord::with_paths(vec![install_dir.join("aaa")]));
 
-        // there is an inconsistency between OSs when serialize paths
-        #[cfg(not(windows))]
-        let quote = "\"";
-        #[cfg(windows)]
-        let quote = "'";
-
         let v0 = format!(
             "\
-root = {quote}{}{quote}
+root = {QUOTE}{}{QUOTE}
 
 [rust]
 version = \"stable\"
@@ -182,11 +217,24 @@ components = [\"rustfmt\", \"cargo\"]
 
 [tools.aaa]
 use-cargo = false
-paths = [{quote}{}{quote}]
+paths = [{QUOTE}{}{QUOTE}]
 ",
             install_dir.display(),
             install_dir.join("aaa").display()
         );
         assert_eq!(v0, fp.to_toml().unwrap());
+    }
+
+    #[test]
+    fn with_name_and_ver() {
+        let input = r#"
+name = "rust bundle (experimental)"
+version = "0.1"
+root = '/path/to/something'"#;
+
+        let expected = InstallationRecord::from_str(input).unwrap();
+        assert_eq!(expected.name.unwrap(), "rust bundle (experimental)");
+        assert_eq!(expected.version.unwrap(), "0.1");
+        assert_eq!(expected.root, PathBuf::from("/path/to/something"));
     }
 }

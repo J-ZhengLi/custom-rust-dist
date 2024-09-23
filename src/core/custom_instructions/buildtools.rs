@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use anyhow::Result;
 use cc::windows_registry;
+use crate::core::directories::RimDir;
 use crate::core::install::InstallConfiguration;
 
 pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<Vec<PathBuf>> {

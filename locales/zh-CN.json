@@ -1,6 +1,5 @@
 {
     "vendor": "玄武",
-    "vendor_en": "xuanwu",
 
     "install_init": "初始化安装目录 '%{dir}' 中...",
     "install_env_config": "配置环境变量中...",

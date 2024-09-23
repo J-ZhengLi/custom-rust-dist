@@ -9,9 +9,10 @@ mod core;
 pub mod utils;
 
 // Exports
-pub use core::components::{get_component_list_from_manifest, Component};
+pub use core::components;
 pub use core::install::{default_install_dir, EnvConfig, InstallConfiguration};
-pub use core::parser::manifest;
+pub use core::parser::{fingerprint, get_installed_dir, toolset_manifest};
 pub use core::try_it::try_it;
+pub use core::uninstall::UninstallConfiguration;
 
 i18n!("locales", fallback = "en");

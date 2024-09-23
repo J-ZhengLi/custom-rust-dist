@@ -37,7 +37,7 @@ const handleInstall = () => {
       <div>
         <p flex="~ items-center">
           <img src="/favicon.ico" h="2rem" />
-          <span ml="1rem">玄武 Rust 安装工具</span>
+          <span ml="1rem">{{ props.kit.name }}</span>
         </p>
         <p ml="3rem">{{ props.kit.version }}</p>
         <p ml="3rem">{{ props.kit.desc }}</p>

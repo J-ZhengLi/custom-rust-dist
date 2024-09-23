@@ -7,7 +7,7 @@ export async function invokeCommand(command: string, args = {}) {
     return await invoke(command, args);
   } catch (error: any) {
     // 捕获错误并显示对话框
-    await message(error.message || '发生了一个错误', {
+    await message(error || '发生了一个错误', {
       title: '错误',
       type: 'error',
     });

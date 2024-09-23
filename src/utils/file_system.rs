@@ -286,3 +286,16 @@ pub fn move_to(src: &Path, dest: &Path, force: bool) -> Result<()> {
 
     Ok(())
 }
+
+/// Get the parent directory of current executable.
+///
+/// # Error
+/// This will fail if the path to current executable cannot be determined under some rare condition.
+pub fn parent_dir_of_cur_exe() -> Result<PathBuf> {
+    let exe_path = env::current_exe().context("unable to locate current executable")?;
+    let maybe_install_dir = exe_path
+        .parent()
+        .unwrap_or_else(|| unreachable!("executable should always have a parent directory"))
+        .to_path_buf();
+    Ok(maybe_install_dir)
+}

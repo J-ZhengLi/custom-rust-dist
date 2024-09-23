@@ -1,18 +1,21 @@
 <script setup lang="ts">
 import { useCustomRouter } from '@/router/index';
-import { managerConf } from '@/utils';
+import { invokeCommand, managerConf } from '@/utils';
 import { ref, watch } from 'vue';
+
 const { routerBack, routerPush } = useCustomRouter();
 
 const isUninstallManger = ref(false);
+const installDir = managerConf.path;
 
 watch(isUninstallManger, (val: boolean) => {
   managerConf.setUninstallManager(val);
 });
 
 function handleUninstall() {
-  // TODO: uninstall
-  routerPush('/manager/progress');
+  invokeCommand('uninstall_toolkit', {
+    remove_self: isUninstallManger.value,
+  }).then(() => routerPush('/manager/progress'));
 }
 </script>
 <template>
@@ -24,9 +27,7 @@ function handleUninstall() {
     <scroll-box mx="12px" flex="1">
       <div mb="12px">
         <p m="0">Visual Studio 生成工具 2022</p>
-        <p m="0">
-          C:\Program Files(x86)\Microsoft Visual Studio\2022\BuildTools
-        </p>
+        <p m="0">{{ installDir }}</p>
       </div>
     </scroll-box>
     <div mx="16px">

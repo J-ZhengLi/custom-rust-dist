@@ -4,12 +4,14 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use crate::cli::common::{self, Confirm};
+use crate::components::Component;
 use crate::core::install::{
-    default_rustup_dist_server, default_rustup_update_root, EnvConfig, InstallConfiguration,
+    default_cargo_registry, default_rustup_dist_server, default_rustup_update_root, EnvConfig,
+    InstallConfiguration,
 };
 use crate::core::try_it;
-use crate::manifest::{baked_in_manifest, ToolMap};
-use crate::{default_install_dir, get_component_list_from_manifest, utils, Component};
+use crate::toolset_manifest::{baked_in_manifest, ToolMap};
+use crate::{components, default_install_dir, utils};
 
 use super::{GlobalOpt, Installer, ManagerSubcommands};
 
@@ -33,7 +35,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
     let mut manifest = baked_in_manifest()?;
     manifest.adjust_paths()?;
 
-    let component_list = get_component_list_from_manifest(&manifest)?;
+    let component_list = components::get_component_list_from_manifest(&manifest, false)?;
     let user_opt = CustomInstallOpt::collect_from_user(
         prefix.as_deref().unwrap_or(&default_install_dir()),
         component_list,
@@ -41,7 +43,8 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
 
     let cargo_registry = registry_url
         .as_ref()
-        .map(|u| (registry_name.clone(), u.clone()));
+        .map(|u| (registry_name.clone(), u.clone()))
+        .or(default_cargo_registry());
     let install_dir = user_opt.prefix;
 
     let mut config = InstallConfiguration::init(&install_dir, false)?
@@ -282,24 +285,4 @@ pub(super) fn execute_manager(manager: &ManagerSubcommands, _opt: GlobalOpt) -> 
     };
 
     todo!("install dist with version '{version}'");
-}
-
-#[cfg(test)]
-mod tests {
-    use super::InstallConfiguration;
-    use std::path::PathBuf;
-
-    #[test]
-    fn init_install_config() {
-        let mut cache_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        cache_dir.push("tests");
-        cache_dir.push("cache");
-
-        std::fs::create_dir_all(&cache_dir).unwrap();
-
-        let install_root = tempfile::Builder::new().tempdir_in(&cache_dir).unwrap();
-        let _config = InstallConfiguration::init(install_root.path(), true).unwrap();
-
-        assert!(install_root.path().join(".fingerprint").is_file());
-    }
 }

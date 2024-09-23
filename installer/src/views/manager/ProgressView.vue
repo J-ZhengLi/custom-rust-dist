@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { event } from '@tauri-apps/api';
+import { computed, nextTick, onMounted, Ref, ref } from 'vue';
 import { managerConf, progressFormat } from '@/utils';
 import { useCustomRouter } from '@/router';
 import { message } from '@tauri-apps/api/dialog';
@@ -7,9 +8,9 @@ import { message } from '@tauri-apps/api/dialog';
 const { routerPush, routerBack } = useCustomRouter();
 
 const progress = ref(0);
-const output = ref([]);
-let timer: any;
+const output: Ref<string[]> = ref([]);
 const isUninstall = computed(() => managerConf.getOperation() === 'uninstall');
+const scrollBox = ref(null);
 
 function complete() {
   if (isUninstall.value) {
@@ -20,14 +21,50 @@ function complete() {
 }
 
 onMounted(() => {
-  timer = setInterval(() => {
-    if (progress.value < 100) progress.value += 10;
-    else clearInterval(timer);
-  }, 100);
+  event.listen('update-progress', (event) => {
+    if (typeof event.payload === 'number') {
+      progress.value = event.payload;
+    }
+  });
+
+  event.listen('update-output', (event) => {
+    if (typeof event.payload === 'string') {
+      event.payload.split('\n').forEach((line) => {
+        output.value.push(line);
+      });
+      toBottom();
+    }
+  });
+
+  event.listen('complete', () => {
+    output.value.push('卸载完成');
+    toBottom();
+    setTimeout(() => {
+      // FIXME: If `remove-self` is set to true, this will be closing the program.
+      routerPush('/manager');
+    }, 3000);
+  });
+
+  event.listen('uninstall-failed', (event) => {
+    if (typeof event.payload === 'string') {
+      output.value.push(event.payload);
+      toBottom();
+      message(event.payload, { title: '错误', type: 'error' }).then(() =>
+        routerPush('/manager')
+      );
+    }
+  });
 });
-onUnmounted(() => {
-  clearInterval(timer);
-});
+
+function toBottom() {
+  nextTick(() => {
+    if (scrollBox?.value) {
+      (scrollBox.value as HTMLElement).scrollTop = (
+        scrollBox.value as HTMLElement
+      ).scrollHeight;
+    }
+  });
+}
 </script>
 <template>
   <section flex="~ col">

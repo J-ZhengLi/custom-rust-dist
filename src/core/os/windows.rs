@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+use crate::core::directories::RimDir;
 use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
-use crate::manifest::ToolsetManifest;
+use crate::toolset_manifest::ToolsetManifest;
 use anyhow::Result;
 
 pub(crate) use rustup::*;
@@ -22,11 +23,9 @@ impl EnvConfig for InstallConfiguration {
 }
 
 impl Uninstallation for UninstallConfiguration {
-    fn remove_rustup_env_vars(&self, install_dir: &PathBuf) -> Result<()> {
+    fn remove_rustup_env_vars(&self) -> Result<()> {
         // Remove the `<InstallDir>/.cargo/bin` which is added by rustup
-        let mut cargo_bin_dir = install_dir.clone();
-        cargo_bin_dir.push(".cargo");
-        cargo_bin_dir.push("bin");
+        let cargo_bin_dir = self.cargo_home().join("bin");
         remove_from_path(&cargo_bin_dir)?;
 
         for var_to_remove in crate::core::ALL_VARS {
@@ -38,13 +37,13 @@ impl Uninstallation for UninstallConfiguration {
         Ok(())
     }
 
-    fn remove_self(&self, install_dir: &PathBuf) -> Result<()> {
+    fn remove_self(&self) -> Result<()> {
         // On windows, we cannot delete an executable that is currently running.
         // Therefore, we are spawning a child process that runs `rmdir` and hope for the best.
         // `rustup` did something like this, it creates a "self-destructable" clone called `rustup-gc`,
         // and it is far more safe than this primitive way of hack, if this method has problem,
         // use the rustup way.
-        remove_self_(install_dir)?;
+        remove_self_(&self.install_dir)?;
         Ok(())
     }
 }
@@ -63,6 +62,7 @@ fn remove_self_(install_dir: &PathBuf) -> Result<()> {
     let cmd = rmdir_cmd.args(["/C", "rmdir", "/s", "/q"]).arg(install_dir);
 
     do_remove_from_programs(uninstall_entry())?;
+    remove_from_path(install_dir)?;
 
     yolo(cmd);
 }
