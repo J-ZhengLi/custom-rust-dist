@@ -26,7 +26,7 @@ function titleClick() {
 <template>
   <label
     flex="inline items-center"
-    :class="{ 'opacity-60': disabled }"
+    :class="{ 'c-secondary': disabled }"
     :title="title"
     cursor-pointer
   >
@@ -42,6 +42,7 @@ function titleClick() {
         'bg-active border-active': isChecked,
         'bg-disabled-bg': disabled,
         'hover:b-active': !isChecked && !disabled,
+        'cursor-not-allowed': disabled,
       }"
       @click="toggleCheck"
     >

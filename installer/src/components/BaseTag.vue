@@ -31,20 +31,20 @@ withDefaults(
   --uno: bg-primary;
 }
 .tag.info {
-  --uno: bg-secondary;
+  --uno: bg-info;
 }
 .tag.success {
-  background-color: #10b981;
+  --uno: bg-success;
 }
 .tag.danger {
-  background-color: #ef4444;
+  --uno: bg-danger;
 }
 .tag.warning {
-  background-color: #f59e0b;
+  --uno: bg-warning;
 }
 .tag.small {
   font-size: 0.75rem;
-  padding: 0.125rem 0.25rem;
+  padding: 0 0.25rem;
 }
 .tag.large {
   padding: 0.5rem 1rem;

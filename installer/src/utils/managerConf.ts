@@ -45,7 +45,7 @@ class ManagerConf {
         );
 
         let versionStr =
-          installedItem?.version && installedItem?.version === item.version
+          installedItem?.version && installedItem?.version !== item.version
             ? `(${installedItem?.version} -> ${item.version})`
             : ` (${item.version})`;
 
@@ -56,7 +56,10 @@ class ManagerConf {
           disabled: item.required,
 
           focused: false,
-          value: item,
+          value: {
+            ...item,
+            desc: Array.isArray(item.desc)? item.desc : item.desc.split('\n'),
+          },
           labelComponent: shallowRef(LabelComponent),
           labelComponentProps: {
             label: item.name,
@@ -131,7 +134,6 @@ class ManagerConf {
       ...components
     );
   }
-
   async loadConf() {
     let dir = await invokeCommand('get_install_dir');
     if (typeof dir === 'string' && dir.trim() !== '') {

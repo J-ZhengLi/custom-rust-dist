@@ -26,7 +26,7 @@ const labels = computed(() => {
     <scroll-box mx="12px" flex="1">
       <div v-for="item in labels" :key="item.label" mb="24px">
         <component-label
-          label="item.label"
+          :label="item.label"
           :oldVer="item.originVer"
           :newVer="item.targetVer"
         />

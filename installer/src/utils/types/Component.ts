@@ -6,7 +6,7 @@ interface OriginComponent {
   installed: boolean;
 }
 export interface Component extends OriginComponent {
-  desc: string[];
+  desc: string[] | string;
   groupName: string | null;
   isToolchainComponent: boolean;
   toolInstaller: {

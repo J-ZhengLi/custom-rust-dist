@@ -107,8 +107,9 @@ onMounted(() => {
   <div flex="~ col" w="full" h="full">
     <h4 ml="12px">组件更改</h4>
     <div flex="1 ~" p="12px" overflow="auto">
-      <scroll-box overflow-auto p="4px" grow="1">
+      <scroll-box overflow-auto p="4px" grow="1" relative>
         <div p="t-8px l-8px">组件</div>
+
         <div ml="1.5rem">
           <base-check-box
             flex="~ items-center"
@@ -138,9 +139,44 @@ onMounted(() => {
           :key="group.label"
           :group="group"
           expand
+          mb="1rem"
           @itemClick="handleComponentsClick"
           @change="handleComponentsChange"
         />
+        <div
+          absolute
+          bottom="0"
+          left="0"
+          pl="8px"
+          flex="~ items-start wrap"
+          gap="3"
+          bg="back"
+        >
+          <span align="middle">
+            <base-tag size="small" w="1em" h="1.5em" mr="2px"></base-tag>
+            当前版本
+          </span>
+          <span align="middle">
+            <base-tag
+              type="success"
+              size="small"
+              w="1em"
+              h="1.5em"
+              mr="2px"
+            ></base-tag>
+            新版本
+          </span>
+          <span align="middle">
+            <base-tag
+              type="warning"
+              size="small"
+              w="1em"
+              h="1.5em"
+              mr="2px"
+            ></base-tag>
+            旧版本
+          </span>
+        </div>
       </scroll-box>
       <scroll-box basis="200px" grow="4" ml="12px">
         <div>组件详细信息</div>
