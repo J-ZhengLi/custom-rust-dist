@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+use crate::core::directories::RimDir;
 use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
-use crate::manifest::ToolsetManifest;
+use crate::toolset_manifest::ToolsetManifest;
 use anyhow::Result;
 
 pub(crate) use rustup::*;
@@ -24,8 +25,7 @@ impl EnvConfig for InstallConfiguration {
 impl Uninstallation for UninstallConfiguration {
     fn remove_rustup_env_vars(&self) -> Result<()> {
         // Remove the `<InstallDir>/.cargo/bin` which is added by rustup
-        let mut cargo_bin_dir = self.cargo_home();
-        cargo_bin_dir.push("bin");
+        let cargo_bin_dir = self.cargo_home().join("bin");
         remove_from_path(&cargo_bin_dir)?;
 
         for var_to_remove in crate::core::ALL_VARS {
