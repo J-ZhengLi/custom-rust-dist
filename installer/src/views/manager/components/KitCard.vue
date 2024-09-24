@@ -41,7 +41,7 @@ const handleInstall = () => {
         </p>
         <p ml="3rem">{{ props.kit.version }}</p>
         <p ml="3rem">{{ props.kit.desc }}</p>
-        <a m="l-3rem t-0.5rem">{{ props.kit.notes }}</a>
+        <a m="l-3rem t-0.5rem">{{ props.kit.info }}</a>
       </div>
     </div>
     <div v-if="props.installed" flex="~ col justify-around">

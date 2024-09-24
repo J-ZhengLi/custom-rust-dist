@@ -108,7 +108,7 @@ function toPage(target: number) {
       c="secondary hover:active"
       @click="toPage(current + 1)"
     />
-    <div v-if="showJumper" ml="12px">
+    <div v-if="props.showJumper" ml="12px">
       跳转至
       <base-input
         :min="1"

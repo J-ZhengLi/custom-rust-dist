@@ -1,6 +1,6 @@
 import { ref, Ref, shallowRef } from 'vue';
 import { KitItem, OriginKitItem } from './types/KitItem';
-import { Component, ManagerComponent } from './types/Component';
+import { ManagerComponent } from './types/Component';
 import { CheckGroup, CheckGroupItem } from './types/CheckBoxGroup';
 import LabelComponent from '@/views/manager/components/Label.vue';
 import { invokeCommand } from './invokeCommand';
