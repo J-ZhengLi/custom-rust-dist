@@ -30,8 +30,6 @@ const labels = computed(() => {
           :oldVer="item.originVer"
           :newVer="item.targetVer"
         />
-        <br />
-        <span>path:</span>
       </div>
     </scroll-box>
     <div basis="60px" flex="~ justify-end items-center">

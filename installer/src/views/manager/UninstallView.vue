@@ -6,7 +6,7 @@ import Label from './components/Label.vue';
 const { routerBack, routerPush } = useCustomRouter();
 
 const isUninstallManger = ref(false);
-const installDir = managerConf.path;
+const installDir = computed(() => managerConf.path);
 
 watch(isUninstallManger, (val: boolean) => {
   managerConf.setUninstallManager(val);
@@ -32,27 +32,20 @@ function handleUninstall() {
         :label="installed.value?.name || ''"
         :old-ver="installed.value?.version"
       ></Label>
-      <div mt="1em">组件</div>
+      <div mt="1em"><b>位置</b></div>
+      <span m="l-1em">{{ installDir }}</span>
+      <div mt="1em"><b>组件</b></div>
       <div
         v-for="item in installed.value?.components"
         :key="item.id"
-        m="b-12px l-1em"
+        m="b-1em l-1em"
       >
-        <Label m="0" :label="item.name" :old-ver="item.version"></Label>
-        <p v-if="item.toolInstaller?.path" m="0">
-          {{ item.toolInstaller?.path }}
-        </p>
-      </div>
-      <div mt="1em">其他选项</div>
-      <div mx="1em">
-        <base-check-box
-          v-model="isUninstallManger"
-          block
-          title="同时卸载此管理工具"
-        />
+        <Label :label="item.name" :old-ver="item.version"></Label>
       </div>
     </scroll-box>
-
+    <div m="l-2em t-0.5em" h="2em">
+      <base-check-box v-model="isUninstallManger" title="同时卸载此管理工具" />
+    </div>
     <div basis="60px" flex="~ justify-end items-center">
       <base-button theme="primary" mr="12px" @click="routerBack"
         >取消</base-button

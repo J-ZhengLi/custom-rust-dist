@@ -1,7 +1,8 @@
-import { ManagerComponent } from './Component';
+import { ManagerComponent, TauriComponent } from './Component';
 
-export interface KitItem {
-  /**
+
+interface BaseKitItem {
+    /**
    * The version number
    */
   version: string;
@@ -17,21 +18,17 @@ export interface KitItem {
   desc: string;
 
   /**
-   * The version release date
-   */
-  date: string;
-
-  /**
-   * The version release type
-   */
-  type: string;
-
-  /**
    * The version release notes
    */
-  notes: string;
+  info: string;
 
   manifestURL: string;
+}
 
+export interface KitItem extends BaseKitItem {
   components: ManagerComponent[];
+}
+
+export interface OriginKitItem extends BaseKitItem {
+  components: TauriComponent[];
 }

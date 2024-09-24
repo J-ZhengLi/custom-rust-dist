@@ -100,6 +100,7 @@ function handleClickNext() {
 
 onMounted(() => {
   groupComponents.value = managerConf.getGroups();
+  updateTargetComponents();
 });
 </script>
 
@@ -108,7 +109,33 @@ onMounted(() => {
     <h4 ml="12px">组件更改</h4>
     <div flex="1 ~" p="12px" overflow="auto">
       <scroll-box overflow-auto p="4px" grow="1" relative>
-        <div p="t-8px l-8px">组件</div>
+        <div p="l-8px t-8px" flex="~ items-center wrap" gap="3" bg="back">
+          <b>组件</b>
+          <span>
+            <base-tag size="small" w="1em" h="1.5em" m="r-2px b-4px"></base-tag>
+            当前版本
+          </span>
+          <span>
+            <base-tag
+              type="success"
+              size="small"
+              w="1em"
+              h="1.5em"
+              m="r-2px b-4px"
+            ></base-tag>
+            新版本
+          </span>
+          <span>
+            <base-tag
+              type="warning"
+              size="small"
+              w="1em"
+              h="1.5em"
+              m="r-2px b-4px"
+            ></base-tag>
+            旧版本
+          </span>
+        </div>
 
         <div ml="1.5rem">
           <base-check-box
@@ -143,43 +170,9 @@ onMounted(() => {
           @itemClick="handleComponentsClick"
           @change="handleComponentsChange"
         />
-        <div
-          absolute
-          bottom="0"
-          left="0"
-          pl="8px"
-          flex="~ items-start wrap"
-          gap="3"
-          bg="back"
-        >
-          <span align="middle">
-            <base-tag size="small" w="1em" h="1.5em" mr="2px"></base-tag>
-            当前版本
-          </span>
-          <span align="middle">
-            <base-tag
-              type="success"
-              size="small"
-              w="1em"
-              h="1.5em"
-              mr="2px"
-            ></base-tag>
-            新版本
-          </span>
-          <span align="middle">
-            <base-tag
-              type="warning"
-              size="small"
-              w="1em"
-              h="1.5em"
-              mr="2px"
-            ></base-tag>
-            旧版本
-          </span>
-        </div>
       </scroll-box>
       <scroll-box basis="200px" grow="4" ml="12px">
-        <div>组件详细信息</div>
+        <b>组件详细信息</b>
         <p font="b">{{ curCheckComponent?.value.name }}</p>
         <p v-for="item in curCheckComponent?.value.desc" :key="item">
           {{ item }}

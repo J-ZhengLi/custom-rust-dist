@@ -70,7 +70,7 @@ class InstallConf {
           group_name: groupName,
           is_toolchain_component: isToolchainComponent,
           tool_installer: toolInstaller,
-        };
+        } as TauriComponent;
       });
   }
 
@@ -125,7 +125,7 @@ class InstallConf {
               isToolchainComponent: is_toolchain_component,
               toolInstaller: tool_installer,
             },
-          };
+          } as CheckItem<Component>;
         }
       );
 

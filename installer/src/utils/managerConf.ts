@@ -1,6 +1,6 @@
 import { ref, Ref, shallowRef } from 'vue';
-import { KitItem } from './types/KitItem';
-import { ManagerComponent } from './types/Component';
+import { KitItem, OriginKitItem } from './types/KitItem';
+import { Component, ManagerComponent } from './types/Component';
 import { CheckGroup, CheckGroupItem } from './types/CheckBoxGroup';
 import LabelComponent from '@/views/manager/components/Label.vue';
 import { invokeCommand } from './invokeCommand';
@@ -56,10 +56,7 @@ class ManagerConf {
           disabled: item.required,
 
           focused: false,
-          value: {
-            ...item,
-            desc: Array.isArray(item.desc)? item.desc : item.desc.split('\n'),
-          },
+          value: item,
           labelComponent: shallowRef(LabelComponent),
           labelComponentProps: {
             label: item.name,
@@ -145,13 +142,32 @@ class ManagerConf {
   }
 
   async loadInstalledKit() {
-    const installedKit = (await invokeCommand(
+    const tauriInstalled = (await invokeCommand(
       'get_installed_kit'
-    )) as KitItem | undefined;
-    if (installedKit) {
-      this.setKits([installedKit]);
-      this.setInstalled(installedKit);
-      this.setCurrent(installedKit);
+    )) as OriginKitItem | undefined;
+    if (tauriInstalled) {
+      const installed = {...tauriInstalled, components: tauriInstalled.components.map((item) => {
+        
+        const {
+          group_name,
+          is_toolchain_component,
+          tool_installer,
+          desc,
+          ...rest
+        } = item;
+        return {
+            ...rest,
+            desc: desc.split('\n'),
+            groupName: group_name,
+            isToolchainComponent: is_toolchain_component,
+            toolInstaller: tool_installer,
+            version: tool_installer?.version || 'no version'
+        
+        } as ManagerComponent;
+      })};
+      this.setKits([installed]);
+      this.setInstalled(installed);
+      this.setCurrent(installed);
     }
   }
 

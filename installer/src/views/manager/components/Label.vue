@@ -27,32 +27,32 @@ const showSingleVer = computed(() => oldVer && !newVer);
 
 <template>
   <slot>
-    <span v-if="showSingleVer">
-      <base-tag w="3em" text="center" size="small">{{
+    <span v-if="showSingleVer" v-bind="$attrs">
+      <base-tag min-w="5em" text="center" size="small">{{
         oldVer ? oldVer : '--'
       }}</base-tag>
     </span>
-    <span v-else>
-      <base-tag w="3em" text="center" size="small">{{
+    <span v-else v-bind="$attrs">
+      <base-tag min-w="5em" text="center" size="small">{{
         oldVer ? oldVer : '--'
       }}</base-tag>
-      <i
-        class="i-mdi:arrow-right-thin w-[1.5em] h-[1.5em]"
-        mx="4px"
-        align="middle"
-      />
+      <i class="i-mdi:arrow-right-thin w-[1.5em] h-[1.5em]" align="middle" />
       <base-tag
-        w="3em"
+        min-w="5em"
         text="center"
         v-if="isNewerVersion"
         type="success"
         size="small"
         >{{ newVer }}</base-tag
       >
-      <base-tag v-else-if="isSameVersion" w="3em" text="center" size="small">{{
-        newVer
-      }}</base-tag>
-      <base-tag v-else w="3em" text="center" type="warning" size="small">{{
+      <base-tag
+        v-else-if="isSameVersion"
+        min-w="5em"
+        text="center"
+        size="small"
+        >{{ newVer }}</base-tag
+      >
+      <base-tag v-else min-w="5em" text="center" type="warning" size="small">{{
         newVer
       }}</base-tag>
     </span>
