@@ -199,7 +199,7 @@ impl InstallConfiguration {
             println!("{}", t!("installing_tool_info", name = name));
             self.install_tool(name, tool, manifest.proxy.as_ref(), mt_prog)?;
 
-            mt_prog.send_any_progress(sub_progress_delta)?;
+            mt_prog.update_progress(sub_progress_delta)?;
         }
 
         self.install_record.write()?;
@@ -222,6 +222,10 @@ impl InstallConfiguration {
         // Add the rust info to the fingerprint.
         self.install_record
             .add_rust_record(manifest.rust_version(), optional_components);
+        // record meta info
+        // TODO(?): Maybe this should be moved as a separate step?
+        self.install_record
+            .clone_toolkit_meta_from_manifest(manifest);
         // write changes
         self.install_record.write()?;
 
@@ -247,7 +251,7 @@ impl InstallConfiguration {
             println!("{}", t!("installing_via_cargo_info", name = name));
             self.install_tool(name, tool, None, mt_prog)?;
 
-            mt_prog.send_any_progress(sub_progress_delta)?;
+            mt_prog.update_progress(sub_progress_delta)?;
         }
 
         self.install_record.write()?;

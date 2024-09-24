@@ -17,7 +17,8 @@ class ManagerConf {
   private _installed: Ref<KitItem | null> = ref(null);
   private _current: Ref<KitItem | null> = ref(null);
   private _target: Ref<Target> = ref({ operation: 'update', components: [] });
-  private _isUninstallManager: Ref<boolean> = ref(false);
+  // TODO: change to `false` after implementing toolkit installation
+  private _isUninstallManager: Ref<boolean> = ref(true);
 
   constructor() {}
 

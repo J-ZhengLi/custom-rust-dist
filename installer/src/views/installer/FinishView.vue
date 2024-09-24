@@ -8,7 +8,7 @@ function closeWindow() {
   if (runApp.value) {
     invokeCommand('run_app', { install_dir: installConf.path.value });
   }
-  invokeCommand('finish');
+  invokeCommand('close_window');
 }
 </script>
 

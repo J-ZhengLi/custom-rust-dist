@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use crate::utils;
 
-use super::TomlParser;
+use super::{toolset_manifest::ToolsetManifest, TomlParser};
 
 pub(crate) const FILENAME: &str = ".fingerprint.toml";
 
@@ -90,6 +90,16 @@ impl InstallationRecord {
                 path.display()
             )
         })
+    }
+
+    pub(crate) fn clone_toolkit_meta_from_manifest(&mut self, manifest: &ToolsetManifest) {
+        self.name = manifest.name.clone();
+        self.version = manifest.version.clone();
+    }
+
+    pub(crate) fn remove_toolkit_meta(&mut self) {
+        self.name = None;
+        self.version = None;
     }
 
     pub(crate) fn add_rust_record(&mut self, version: &str, components: &[String]) {

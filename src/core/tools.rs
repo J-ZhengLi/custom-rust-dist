@@ -274,7 +274,7 @@ impl PluginType {
                     if utils::cmd_exist(program) {
                         let op = if uninstall { "uninstall" } else { "install" };
                         let arg_opt = format!("--{op}-extension");
-                        mt_prog.send_msg_and_print(t!(
+                        mt_prog.send_and_print(t!(
                             "handling_extension_info",
                             op = op,
                             ext = plugin_path.display(),
@@ -287,7 +287,7 @@ impl PluginType {
                             Ok(()) => continue,
                             // Ignore error when uninstalling.
                             Err(_) if uninstall => {
-                                mt_prog.send_msg_and_print(t!(
+                                mt_prog.send_and_print(t!(
                                     "skip_extension_uninstall_warn",
                                     ext = plugin_path.display(),
                                     program = program

@@ -56,32 +56,30 @@ impl UninstallConfiguration {
         mt_prog: &mut MultiThreadProgress,
     ) -> Result<()> {
         // remove all tools.
-        mt_prog.val = 55;
-        mt_prog.send_msg_and_print(t!("uninstalling_third_party_tools"))?;
+        mt_prog.send_and_print(t!("uninstalling_third_party_tools"))?;
         self.remove_tools(installed_tools_fresh(&self.install_dir)?, mt_prog)?;
+        mt_prog.update_progress(55)?;
 
         // Remove rust toolchain via rustup.
-        mt_prog.val = 30;
-        mt_prog.send_msg_and_print(t!("uninstalling_rust_toolchain"))?;
+        mt_prog.send_and_print(t!("uninstalling_rust_toolchain"))?;
         ToolchainInstaller::init().remove_self(&self)?;
         self.install_record.remove_rust_record();
-        mt_prog.send_progress()?;
+        mt_prog.update_progress(30)?;
 
         // remove all the environments.
-        mt_prog.val = 10;
-        mt_prog.send_msg_and_print(t!("uninstall_env_config"))?;
+        mt_prog.send_and_print(t!("uninstall_env_config"))?;
         self.remove_rustup_env_vars()?;
-        mt_prog.send_progress()?;
+        mt_prog.update_progress(10)?;
 
         // remove the manager binary itself or update install record
-        mt_prog.val = 5;
         if remove_self {
-            mt_prog.send_msg_and_print(t!("uninstall_self"))?;
+            mt_prog.send_and_print(t!("uninstall_self"))?;
             self.remove_self()?;
         } else {
+            self.install_record.remove_toolkit_meta();
             self.install_record.write()?;
         }
-        mt_prog.send_progress()?;
+        mt_prog.update_progress(5)?;
 
         Ok(())
     }
@@ -101,7 +99,7 @@ impl UninstallConfiguration {
             } else if !tool_detail.paths.is_empty() {
                 Tool::Executables(name.into(), tool_detail.paths.clone())
             } else {
-                mt_prog.send_msg_and_print(t!("uninstall_unknown_tool_warn", tool = name))?;
+                mt_prog.send_and_print(t!("uninstall_unknown_tool_warn", tool = name))?;
                 continue;
             };
             tools_to_uninstall.push(tool);
@@ -116,13 +114,13 @@ impl UninstallConfiguration {
         tools_to_uninstall.sort_by(|a, b| b.cmp(a));
 
         for tool in tools_to_uninstall {
-            mt_prog.send_msg_and_print(t!("uninstalling_for", name = tool.name()))?;
+            mt_prog.send_and_print(t!("uninstalling_for", name = tool.name()))?;
             if tool.uninstall(self, mt_prog).is_err() {
-                mt_prog.send_msg_and_print(t!("uninstall_tool_failed_warn", tool = tool.name()))?;
+                mt_prog.send_and_print(t!("uninstall_tool_failed_warn", tool = tool.name()))?;
             } else {
                 self.install_record.remove_tool_record(tool.name());
             }
-            mt_prog.send_any_progress(progress_dt)?;
+            mt_prog.update_progress(progress_dt)?;
         }
 
         Ok(())

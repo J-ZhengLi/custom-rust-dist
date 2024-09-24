@@ -24,8 +24,7 @@ pub(super) fn main() -> Result<()> {
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
-            close_window,
-            finish,
+            super::close_window,
             default_install_dir,
             select_folder,
             get_component_list,
@@ -48,17 +47,6 @@ pub(super) fn main() -> Result<()> {
         .run(tauri::generate_context!())
         .context("unknown error occurs while running tauri application")?;
     Ok(())
-}
-
-#[tauri::command]
-fn finish(window: tauri::Window) {
-    window.close().unwrap();
-}
-
-#[tauri::command]
-fn close_window(window: tauri::Window) {
-    // TODO：check and remove cache
-    window.close().unwrap();
 }
 
 #[tauri::command]

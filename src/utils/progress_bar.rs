@@ -1,6 +1,6 @@
 //! Progress bar indicator for commandline user interface.
 
-use std::{io::Write, sync::mpsc::Sender};
+use std::{io::Write, sync::mpsc::Sender, thread, time::Duration};
 
 use anyhow::Result;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
@@ -29,11 +29,14 @@ impl<'a> MultiThreadProgress<'a> {
     }
     pub fn send_msg(&self, msg: String) -> Result<()> {
         if let Some(sender) = self.msg_sender {
+            // Intentionally wait for a certain time to send,
+            // this is to make sure the last message won't get overrided.
+            thread::sleep(Duration::from_millis(250));
             sender.send(msg)?;
         }
         Ok(())
     }
-    pub fn send_msg_and_print<S: std::fmt::Display>(&self, msg: S) -> Result<()> {
+    pub fn send_and_print<S: std::fmt::Display>(&self, msg: S) -> Result<()> {
         let mut stdout = std::io::stdout();
         writeln!(&mut stdout, "{}", msg)?;
         self.send_msg(msg.to_string())
@@ -41,11 +44,12 @@ impl<'a> MultiThreadProgress<'a> {
     pub fn send_progress(&mut self) -> Result<()> {
         if let Some(sender) = self.prog_sender {
             self.cur_progress = (self.cur_progress + self.val).min(100);
+            thread::sleep(Duration::from_millis(250));
             sender.send(self.cur_progress)?;
         }
         Ok(())
     }
-    pub fn send_any_progress(&mut self, prog: usize) -> Result<()> {
+    pub fn update_progress(&mut self, prog: usize) -> Result<()> {
         self.val = prog;
         self.send_progress()
     }

@@ -1,7 +1,6 @@
 use std::{
     sync::{mpsc, Arc},
     thread,
-    time::Duration,
 };
 
 use crate::{error::Result, toolkit::Toolkit};
@@ -13,6 +12,7 @@ pub(super) fn main() -> Result<()> {
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
+            super::close_window,
             get_installed_kit,
             get_install_dir,
             uninstall_toolkit,
@@ -51,6 +51,7 @@ fn get_install_dir() -> String {
 #[tauri::command(rename_all = "snake_case")]
 fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
     let window = Arc::new(window);
+    let window_clone = Arc::clone(&window);
     let (tx_progress, rx_progress) = mpsc::channel();
     let (tx_output, rx_output) = mpsc::channel();
 
@@ -62,7 +63,6 @@ fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
     });
 
     let gui_thread = thread::spawn(move || -> anyhow::Result<()> {
-        let window_clone = Arc::clone(&window);
         loop {
             if let Ok(progress) = rx_progress.try_recv() {
                 window_clone.emit("update-progress", progress)?;
@@ -83,8 +83,6 @@ fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
                     Ok(())
                 };
             }
-
-            thread::sleep(Duration::from_millis(50));
         }
     });
 

@@ -37,18 +37,13 @@ onMounted(() => {
   });
 
   event.listen('complete', () => {
-    output.value.push('卸载完成');
-    toBottom();
     setTimeout(() => {
-      // FIXME: If `remove-self` is set to true, this will be closing the program.
-      routerPush('/manager');
-    }, 3000);
+      routerPush('/manager/complete');
+    }, 1000);
   });
 
   event.listen('uninstall-failed', (event) => {
     if (typeof event.payload === 'string') {
-      output.value.push(event.payload);
-      toBottom();
       message(event.payload, { title: '错误', type: 'error' }).then(() =>
         routerPush('/manager')
       );
@@ -88,9 +83,6 @@ function toBottom() {
       rounded="4px"
     >
       <p my="8px" v-for="item in output" :key="item">{{ item }}</p>
-    </div>
-    <div basis="60px" flex="~ justify-end items-center">
-      <base-button @click="routerBack" mr="12px">上一步</base-button>
     </div>
     <div basis="60px" flex="~ justify-end items-center">
       <base-button
