@@ -9,7 +9,6 @@
     "install_via_cargo": "正在通过 cargo 安装第三方工具...",
 
     "installing_tool_info": "info: 正在安装工具 '%{name}'",
-    "installing_toolchain_info": "info: 正在安装 rustup 和 rust 工具链",
     "installing_via_cargo_info": "info: 正在通过 cargo 安装 '%{name}'",
     "installing_msvc_info": "info: 正在安装 VS 生成工具...",
     "install_finish_info": "info: Rust 安装成功!",

@@ -10,7 +10,6 @@
     "install_via_cargo": "Installing cargo tools...",
 
     "installing_tool_info": "info: installing '%{name}'",
-    "installing_toolchain_info": "info: installing rustup and rust toolchain",
     "installing_via_cargo_info": "info: installing '%{name}' using cargo",
     "installing_msvc_info": "info: running VS BuildTools installer...",
     "install_finish_info": "info: Rust is successfully installed!",

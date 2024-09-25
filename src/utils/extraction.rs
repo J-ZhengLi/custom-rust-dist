@@ -11,7 +11,7 @@ use zip::ZipArchive;
 
 use crate::utils::progress_bar::Style;
 
-use super::progress_bar::ProgressIndicator;
+use super::progress_bar::CliProgress;
 
 enum ExtractableKind {
     /// `7-zip` compressed files, ended with `.7z`
@@ -82,7 +82,7 @@ impl<'a> Extractable<'a> {
     ///
     /// This will extract file under the `root`, make sure it's an empty folder before using this function.
     pub fn extract_to(&mut self, root: &Path) -> Result<()> {
-        let indicator = ProgressIndicator::new();
+        let indicator = CliProgress::new();
 
         let helper = ExtractHelper {
             file_path: self.path,
@@ -103,7 +103,7 @@ impl<'a> Extractable<'a> {
 struct ExtractHelper<'a, T: Sized> {
     file_path: &'a Path,
     output_dir: &'a Path,
-    indicator: ProgressIndicator<T>,
+    indicator: CliProgress<T>,
 }
 
 impl<'a, T: Sized> ExtractHelper<'a, T> {

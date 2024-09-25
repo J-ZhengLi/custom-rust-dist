@@ -8,13 +8,15 @@ use crate::utils;
 use anyhow::{Context, Result};
 use indexmap::IndexSet;
 
-impl EnvConfig for InstallConfiguration {
+impl EnvConfig for InstallConfiguration<'_> {
     // On linux, persistent env vars needs to be written in `.profile`, `.bash_profile`, etc.
     // Rustup already did all the dirty work by writting an entry in those files
     // to invoke `$CARGO_HOME/env.{sh|fish}`. Sadly we'll have to re-implement a similar procedure here,
     // because rustup will not write those file if a user has choose to pass `--no-modify-path`.
     // Which is not ideal for env vars such as `RUSTUP_DIST_SERVER`.
     fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()> {
+        self.show_progress(t!("install_env_config"))?;
+
         let vars_raw = self.env_vars(manifest)?;
         let backup_dir = self.install_dir.join("backup");
         utils::ensure_dir(&backup_dir)?;
@@ -41,7 +43,7 @@ impl EnvConfig for InstallConfiguration {
             env::set_var(key, val);
         }
 
-        Ok(())
+        self.inc_progress(2.0)
     }
 }
 
@@ -62,7 +64,7 @@ fn create_backup_for_rc(path: &Path, backup_dir: &Path) -> Result<()> {
     utils::copy_as(path, backup_path)
 }
 
-impl Uninstallation for UninstallConfiguration {
+impl Uninstallation for UninstallConfiguration<'_> {
     // This is basically removing the section marked with `rustup config section` in shell profiles.
     fn remove_rustup_env_vars(&self) -> Result<()> {
         remove_all_config_section()

@@ -1,68 +1,78 @@
 //! Progress bar indicator for commandline user interface.
 
-use std::{io::Write, sync::mpsc::Sender, thread, time::Duration};
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
-use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+use indicatif::{ProgressBar as CliProgressBar, ProgressState, ProgressStyle};
 
-#[derive(Debug, Clone, Copy, Default)]
-/// Help to send install progress across threads.
-pub struct MultiThreadProgress<'a> {
-    msg_sender: Option<&'a Sender<String>>,
-    prog_sender: Option<&'a Sender<usize>>,
-    pub val: usize,
-    cur_progress: usize,
+struct ProgressPos(Mutex<f32>);
+
+impl ProgressPos {
+    fn new(value: f32) -> Self {
+        Self(Mutex::new(value))
+    }
+    fn load(&self) -> f32 {
+        *self.0.lock().unwrap()
+    }
+    /// Increment position value, and ensure the end result not exceeding 100.
+    fn add(&self, value: f32) {
+        let mut guard = self.0.lock().unwrap();
+        *guard = (*guard + value).min(100.0);
+    }
 }
 
-impl<'a> MultiThreadProgress<'a> {
-    pub fn new(
-        msg_sender: &'a Sender<String>,
-        progress_sender: &'a Sender<usize>,
-        initial_progress: usize,
-    ) -> Self {
+#[derive(Clone)]
+pub struct Progress<'a> {
+    pos: Arc<ProgressPos>,
+    pub len: f32,
+    msg_callback: &'a dyn Fn(String) -> Result<()>,
+    pos_callback: &'a dyn Fn(f32) -> Result<()>,
+}
+
+impl<'a> Progress<'a> {
+    pub fn new<M, P>(msg_cb: &'a M, pos_cb: &'a P) -> Self
+    where
+        M: Fn(String) -> Result<()>,
+        P: Fn(f32) -> Result<()>,
+    {
         Self {
-            msg_sender: Some(msg_sender),
-            prog_sender: Some(progress_sender),
-            cur_progress: initial_progress,
-            ..Default::default()
+            pos: Arc::new(ProgressPos::new(0.0)),
+            len: 0.0,
+            msg_callback: msg_cb,
+            pos_callback: pos_cb,
         }
     }
-    pub fn send_msg(&self, msg: String) -> Result<()> {
-        if let Some(sender) = self.msg_sender {
-            // Intentionally wait for a certain time to send,
-            // this is to make sure the last message won't get overrided.
-            thread::sleep(Duration::from_millis(250));
-            sender.send(msg)?;
-        }
+
+    pub fn with_len(mut self, len: f32) -> Self {
+        self.len = len;
+        self
+    }
+
+    pub fn show_msg<S: ToString>(&self, msg: S) -> Result<()> {
+        (self.msg_callback)(msg.to_string())
+    }
+
+    /// Update the position of progress bar by increment a certain value.
+    ///
+    /// If a value given is `None`, this will increase the position by the whole `len`,
+    /// otherwise it will increase the desired value instead.
+    // FIXME: split `inc(None)` to a new function, such as `inc_len`, cuz this is kinda confusing.
+    pub fn inc(&self, value: Option<f32>) -> Result<()> {
+        let delta = value.unwrap_or(self.len);
+        self.pos.add(delta);
+        (self.pos_callback)(self.pos.load())?;
         Ok(())
-    }
-    pub fn send_and_print<S: std::fmt::Display>(&self, msg: S) -> Result<()> {
-        let mut stdout = std::io::stdout();
-        writeln!(&mut stdout, "{}", msg)?;
-        self.send_msg(msg.to_string())
-    }
-    pub fn send_progress(&mut self) -> Result<()> {
-        if let Some(sender) = self.prog_sender {
-            self.cur_progress = (self.cur_progress + self.val).min(100);
-            thread::sleep(Duration::from_millis(250));
-            sender.send(self.cur_progress)?;
-        }
-        Ok(())
-    }
-    pub fn update_progress(&mut self, prog: usize) -> Result<()> {
-        self.val = prog;
-        self.send_progress()
     }
 }
 
-/// Convinent struct with methods that are useful to indicate download progress.
+/// Convinent struct with methods that are useful to indicate various progress.
 #[derive(Debug, Clone, Copy)]
-pub struct ProgressIndicator<T: Sized> {
-    /// A start/initializing function which will be called once before downloading.
+pub struct CliProgress<T: Sized> {
+    /// A start/initializing function which will be called to setup progress bar.
     pub start: fn(u64, String, Style) -> Result<T>,
-    /// A update function that will be called after each downloaded chunk.
+    /// A update function that will be called upon each step completion.
     pub update: fn(&T, u64),
-    /// A function that will be called once after a successful download.
+    /// A function that will be called once to terminate progress.
     pub stop: fn(&T, String),
 }
 
@@ -85,14 +95,14 @@ impl Style {
 }
 
 // TODO: Mark this with cfg(feature = "cli")
-impl ProgressIndicator<ProgressBar> {
+impl CliProgress<CliProgressBar> {
     /// Create a new progress bar for CLI to indicate download progress.
     ///
     /// `progress_for`: used for displaying what the progress is for.
     /// i.e.: ("downloading", "download"), ("extracting", "extraction"), etc.
     pub fn new() -> Self {
-        fn start(total: u64, msg: String, style: Style) -> Result<ProgressBar> {
-            let pb = ProgressBar::new(total);
+        fn start(total: u64, msg: String, style: Style) -> Result<CliProgressBar> {
+            let pb = CliProgressBar::new(total);
             pb.set_style(
                 ProgressStyle::with_template(
                     &format!("{{msg}}\n{{spinner:.green}}] [{{elapsed_precise}}] [{{wide_bar:.cyan/blue}}] {} ({{eta}})", style.template_str())
@@ -105,17 +115,34 @@ impl ProgressIndicator<ProgressBar> {
             pb.set_message(msg);
             Ok(pb)
         }
-        fn update(pb: &ProgressBar, pos: u64) {
+        fn update(pb: &CliProgressBar, pos: u64) {
             pb.set_position(pos);
         }
-        fn stop(pb: &ProgressBar, msg: String) {
+        fn stop(pb: &CliProgressBar, msg: String) {
             pb.finish_with_message(msg);
         }
 
-        ProgressIndicator {
+        CliProgress {
             start,
             update,
             stop,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ProgressPos;
+
+    #[test]
+    fn progress_pos_add() {
+        let orig = ProgressPos::new(0.0);
+
+        orig.add(1.0);
+        assert_eq!(orig.load(), 1.0);
+        orig.add(2.0);
+        assert_eq!(orig.load(), 3.0);
+        orig.add(10.0);
+        assert_eq!(orig.load(), 13.0);
     }
 }

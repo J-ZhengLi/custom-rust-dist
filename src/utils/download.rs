@@ -10,7 +10,7 @@ use url::Url;
 
 use crate::toolset_manifest::Proxy;
 
-use super::progress_bar::{ProgressIndicator, Style};
+use super::progress_bar::{CliProgress, Style};
 
 fn client_builder() -> ClientBuilder {
     let user_agent = format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
@@ -24,14 +24,14 @@ pub struct DownloadOpt<T: Sized> {
     /// The verbose name of the file to download.
     pub name: String,
     client: Client,
-    pub handler: Option<ProgressIndicator<T>>,
+    pub handler: Option<CliProgress<T>>,
 }
 
 impl<T: Sized> DownloadOpt<T> {
     pub fn new(
         name: String,
         proxy: Option<Proxy>,
-        handler: Option<ProgressIndicator<T>>,
+        handler: Option<CliProgress<T>>,
     ) -> Result<Self> {
         let client = client_builder()
             .proxy(proxy.unwrap_or_default().try_into()?)
@@ -127,10 +127,6 @@ impl<T: Sized> DownloadOpt<T> {
 
 /// Download a file without resuming, with proxy settings.
 pub fn download<S: ToString>(name: S, url: &Url, dest: &Path, proxy: Option<&Proxy>) -> Result<()> {
-    let dl_opt = DownloadOpt::new(
-        name.to_string(),
-        proxy.cloned(),
-        Some(ProgressIndicator::new()),
-    )?;
+    let dl_opt = DownloadOpt::new(name.to_string(), proxy.cloned(), Some(CliProgress::new()))?;
     dl_opt.download_file(url, dest, false)
 }
