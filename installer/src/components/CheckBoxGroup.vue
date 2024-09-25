@@ -1,8 +1,5 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import MdiMenuRight from './icons/MdiMenuRight.vue';
-import MdiCheck from './icons/MdiCheck.vue';
-import MdiMinus from './icons/MdiMinus.vue';
 import { CheckGroup, CheckGroupItem } from '@/utils';
 
 type Props<T> = {
@@ -15,7 +12,7 @@ const emit = defineEmits(['itemClick', 'change']);
 
 const groupExpand = ref(expand);
 const isCheckedAll = computed(() => group.items.every((item) => item.checked));
-const isCheckedNull = computed(() =>
+const isCheckedEmpty = computed(() =>
   group.items.every((item) => !item.checked)
 );
 
@@ -24,19 +21,11 @@ function handleExpandClick() {
 }
 
 function handleCheckAllClick() {
-  if (isCheckedNull.value) {
-    group.items.forEach((item) => {
-      if (!item.disabled && !item.required) {
-        item.checked = true;
-      }
-    });
-  } else {
-    group.items.forEach((checkItem) => {
-      if (!checkItem.disabled) {
-        checkItem.checked = checkItem.required ? true : false;
-      }
-    });
-  }
+  const target = isCheckedEmpty.value;
+  group.items.forEach((checkItem) => {
+    if (checkItem.disabled) return;
+    checkItem.checked = target;
+  });
 }
 
 function handleItemClick<T>(item: CheckGroupItem<T>) {
@@ -54,7 +43,8 @@ watch(group.items, (newValue) => {
 <template>
   <div>
     <div flex="~ items-center">
-      <mdi-menu-right
+      <i
+        class="i-mdi:menu-right"
         w="1.5rem"
         h="1.5rem"
         transition="all"
@@ -63,8 +53,7 @@ watch(group.items, (newValue) => {
         :class="{ 'rotate-90': groupExpand }"
         @click="handleExpandClick"
       />
-      <base-check-box
-        ><b c="active">{{ group.label }}</b>
+      <base-check-box @titleClick="handleExpandClick">
         <template #icon>
           <span
             flex="~ items-center justify-center"
@@ -72,10 +61,15 @@ watch(group.items, (newValue) => {
             h="full"
             @click="handleCheckAllClick"
           >
-            <mdi-check v-show="isCheckedAll" c="active" />
-            <mdi-minus v-show="!isCheckedAll && !isCheckedNull" c="active" />
+            <i class="i-mdi:check" v-show="isCheckedAll" c="active" />
+            <i
+              class="i-mdi:minus"
+              v-show="!isCheckedAll && !isCheckedEmpty"
+              c="active"
+            />
           </span>
         </template>
+        <b c="active">{{ group.label }}</b>
       </base-check-box>
     </div>
     <transition name="group">

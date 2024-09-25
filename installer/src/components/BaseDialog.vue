@@ -1,7 +1,6 @@
 <script setup lang="ts">
 // base-dialog
 import { ref } from 'vue';
-import MdiClose from './icons/MdiClose.vue';
 
 const { title, width, height, closeButton } = defineProps({
   title: {
@@ -54,7 +53,8 @@ const close = () => {
     >
       <div>
         <h3 mt="0">{{ title }}</h3>
-        <mdi-close
+        <i
+          class="mdi:close"
           v-if="closeButton"
           h="1.2rem"
           w="1.2rem"

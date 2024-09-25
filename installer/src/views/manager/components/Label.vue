@@ -1,23 +1,61 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-const { label, ver1, ver2 } = defineProps<{
+const { label, oldVer, newVer } = defineProps<{
   label: string;
-  ver1?: string;
-  ver2?: string;
+  oldVer?: string;
+  newVer?: string;
 }>();
-const showVersionChange = computed(() => ver1 && ver2 && ver1 !== ver2);
-const showSameVersion = computed(() => ver1 && ver2 && ver1 === ver2);
-const showNewVersion = computed(() => (ver1 && !ver2) || (!ver1 && ver2));
+const isSameVersion = computed(() => oldVer && newVer && oldVer === newVer);
+const isNewerVersion = computed(() => {
+  const oldVers = oldVer?.split('.');
+  const newVers = newVer?.split('.');
+
+  if (!oldVers && newVers) return true;
+
+  if (!oldVers || !newVers) return false;
+
+  for (let i = 0; i < newVers.length; i++) {
+    if (parseInt(oldVers[i]) < parseInt(newVers[i])) return true;
+    if (parseInt(oldVers[i]) > parseInt(newVers[i])) return false;
+  }
+  return false;
+});
+
+const showSingleVer = computed(() => oldVer && !newVer);
 </script>
 
 <template>
-  <span>
-    <slot
-      ><span mr="1rem">{{ label }}</span>
-      <span v-if="showVersionChange"> {{ ver1 }} → {{ ver2 }}</span>
-      <span v-else-if="showSameVersion"> {{ ver1 }} → {{ ver2 }}</span>
-      <span v-else-if="showNewVersion"> {{ ver1 ? ver1 : ver2 }}</span></slot
-    >
-  </span>
+  <slot>
+    <span v-if="showSingleVer" v-bind="$attrs">
+      <base-tag min-w="5em" text="center" size="small">{{
+        oldVer ? oldVer : '--'
+      }}</base-tag>
+    </span>
+    <span v-else v-bind="$attrs">
+      <base-tag min-w="5em" text="center" size="small">{{
+        oldVer ? oldVer : '--'
+      }}</base-tag>
+      <i class="i-mdi:arrow-right-thin w-[1.5em] h-[1.5em]" align="middle" />
+      <base-tag
+        min-w="5em"
+        text="center"
+        v-if="isNewerVersion"
+        type="success"
+        size="small"
+        >{{ newVer }}</base-tag
+      >
+      <base-tag
+        v-else-if="isSameVersion"
+        min-w="5em"
+        text="center"
+        size="small"
+        >{{ newVer }}</base-tag
+      >
+      <base-tag v-else min-w="5em" text="center" type="warning" size="small">{{
+        newVer
+      }}</base-tag>
+    </span>
+    <span ml="0.5rem">{{ label }}</span>
+  </slot>
 </template>

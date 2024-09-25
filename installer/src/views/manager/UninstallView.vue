@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { useCustomRouter } from '@/router/index';
 import { invokeCommand, managerConf } from '@/utils';
-import { ref, watch } from 'vue';
-
+import { computed, ref, watch } from 'vue';
+import Label from './components/Label.vue';
 const { routerBack, routerPush } = useCustomRouter();
 
 const isUninstallManger = ref(false);
-const installDir = managerConf.path;
+const installDir = computed(() => managerConf.path);
 
 watch(isUninstallManger, (val: boolean) => {
   managerConf.setUninstallManager(val);
 });
+
+const installed = computed(() => managerConf.getInstalled() || []);
 
 function handleUninstall() {
   invokeCommand('uninstall_toolkit', {
@@ -25,19 +27,25 @@ function handleUninstall() {
       <p>即将卸载以下产品</p>
     </div>
     <scroll-box mx="12px" flex="1">
-      <div mb="12px">
-        <p m="0">Visual Studio 生成工具 2022</p>
-        <p m="0">{{ installDir }}</p>
+      <Label
+        m="0"
+        :label="installed.value?.name || ''"
+        :old-ver="installed.value?.version"
+      ></Label>
+      <div mt="1em"><b>位置</b></div>
+      <span m="l-1em">{{ installDir }}</span>
+      <div mt="1em"><b>组件</b></div>
+      <div
+        v-for="item in installed.value?.components"
+        :key="item.id"
+        m="b-1em l-1em"
+      >
+        <Label :label="item.name" :old-ver="item.version"></Label>
       </div>
     </scroll-box>
-    <div mx="16px">
-      <base-check-box
-        v-model="isUninstallManger"
-        block
-        title="同时卸载此管理工具"
-      />
+    <div m="l-2em t-0.5em" h="2em">
+      <base-check-box v-model="isUninstallManger" title="同时卸载此管理工具" />
     </div>
-
     <div basis="60px" flex="~ justify-end items-center">
       <base-button theme="primary" mr="12px" @click="routerBack"
         >取消</base-button

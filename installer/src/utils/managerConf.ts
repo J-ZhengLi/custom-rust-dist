@@ -1,9 +1,10 @@
 import { ref, Ref, shallowRef } from 'vue';
-import { KitItem } from './types/KitItem';
+import { KitItem, OriginKitItem } from './types/KitItem';
 import { ManagerComponent } from './types/Component';
 import { CheckGroup, CheckGroupItem } from './types/CheckBoxGroup';
 import LabelComponent from '@/views/manager/components/Label.vue';
 import { invokeCommand } from './invokeCommand';
+
 
 type Target = {
   operation: 'update' | 'uninstall';
@@ -39,12 +40,12 @@ class ManagerConf {
   public getGroups(): CheckGroup<ManagerComponent>[] {
     const checkItems: CheckGroupItem<ManagerComponent>[] =
       this._current.value?.components.map((item) => {
-        const installedItem = this._current.value?.components.find(
+        const installedItem = this._installed.value?.components.find(
           (c) => c.name === item.name
         );
 
         let versionStr =
-          installedItem?.version && installedItem?.version === item.version
+          installedItem?.version && installedItem?.version !== item.version
             ? `(${installedItem?.version} -> ${item.version})`
             : ` (${item.version})`;
 
@@ -59,8 +60,8 @@ class ManagerConf {
           labelComponent: shallowRef(LabelComponent),
           labelComponentProps: {
             label: item.name,
-            ver1: installedItem?.version,
-            ver2: item.version,
+            oldVer: installedItem?.version,
+            newVer: item.version,
           },
         };
       }) || [];
@@ -130,7 +131,6 @@ class ManagerConf {
       ...components
     );
   }
-  
   async loadConf() {
     let dir = await invokeCommand('get_install_dir');
     if (typeof dir === 'string' && dir.trim() !== '') {
@@ -142,13 +142,32 @@ class ManagerConf {
   }
 
   async loadInstalledKit() {
-    const installedKit = (await invokeCommand(
+    const tauriInstalled = (await invokeCommand(
       'get_installed_kit'
-    )) as KitItem | undefined;
-    if (installedKit) {
-      this.setKits([installedKit]);
-      this.setInstalled(installedKit);
-      this.setCurrent(installedKit);
+    )) as OriginKitItem | undefined;
+    if (tauriInstalled) {
+      const installed = {...tauriInstalled, components: tauriInstalled.components.map((item) => {
+        
+        const {
+          group_name,
+          is_toolchain_component,
+          tool_installer,
+          desc,
+          ...rest
+        } = item;
+        return {
+            ...rest,
+            desc: desc.split('\n'),
+            groupName: group_name,
+            isToolchainComponent: is_toolchain_component,
+            toolInstaller: tool_installer,
+            version: tool_installer?.version || 'no version'
+        
+        } as ManagerComponent;
+      })};
+      this.setKits([installed]);
+      this.setInstalled(installed);
+      this.setCurrent(installed);
     }
   }
 
@@ -163,7 +182,6 @@ class ManagerConf {
   //
   // but we'll need to download `DistManifest` from server fot it at first.
   async loadAvailableKit() {
-
   }
 }
 

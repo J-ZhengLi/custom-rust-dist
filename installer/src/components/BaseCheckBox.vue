@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import MdiCheck from './icons/MdiCheck.vue';
-
 const { title, disabled, labelComponent, labelComponentProps } = defineProps<{
   title?: string;
   disabled?: boolean;
@@ -28,7 +26,7 @@ function titleClick() {
 <template>
   <label
     flex="inline items-center"
-    :class="{ 'opacity-60': disabled }"
+    :class="{ 'c-secondary': disabled }"
     :title="title"
     cursor-pointer
   >
@@ -44,18 +42,21 @@ function titleClick() {
         'bg-active border-active': isChecked,
         'bg-disabled-bg': disabled,
         'hover:b-active': !isChecked && !disabled,
+        'cursor-not-allowed': disabled,
       }"
       @click="toggleCheck"
     >
       <slot name="icon">
-        <mdi-check v-if="isChecked" c="active" />
+        <i class="i-mdi:check" v-if="isChecked" c="active" />
       </slot>
     </span>
     <span ml="4px" @click="titleClick" whitespace-nowrap>
       <slot>
-        <span v-if="labelComponent">
-          <component :is="labelComponent" v-bind="labelComponentProps" />
-        </span>
+        <component
+          v-if="labelComponent"
+          :is="labelComponent"
+          v-bind="labelComponentProps"
+        />
         <span v-else>{{ title }}</span>
       </slot>
     </span>

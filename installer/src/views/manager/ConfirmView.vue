@@ -26,12 +26,10 @@ const labels = computed(() => {
     <scroll-box mx="12px" flex="1">
       <div v-for="item in labels" :key="item.label" mb="24px">
         <component-label
-          label="item.label"
-          :ver1="item.originVer"
-          :ver2="item.targetVer"
+          :label="item.label"
+          :oldVer="item.originVer"
+          :newVer="item.targetVer"
         />
-        <br />
-        <span>path:</span>
       </div>
     </scroll-box>
     <div basis="60px" flex="~ justify-end items-center">
