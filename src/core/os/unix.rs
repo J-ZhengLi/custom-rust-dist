@@ -283,6 +283,14 @@ pub(super) fn remove_from_path(path: &Path) -> Result<()> {
     modify_path(path, true)
 }
 
+/// Returns a string that looks like `source [rc]` where `[rc]` is a path
+/// to any rc file of any available shell in the user mechine.
+pub(crate) fn source_command() -> Option<String> {
+    let rcs = shell::get_available_shells().next()?.update_rcs();
+    let any_rc = rcs.first()?;
+    Some(format!("source \"{}\"", any_rc.display()))
+}
+
 /// Unix shell module, contains methods that are dedicated in configuring rustup env vars.
 // TODO?: Most code in this module are modified from rustup's `shell.rs`, this is not ideal for long term,
 // as the file in rustup could change drasically in the future and somehow we'll need to update

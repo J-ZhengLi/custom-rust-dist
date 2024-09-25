@@ -79,6 +79,10 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         try_it::try_it(Some(&install_dir))?;
     }
 
+    #[cfg(unix)]
+    if let Some(cmd) = crate::core::os::unix::source_command() {
+        println!("\n{}", t!("linux_source_hint", cmd = cmd));
+    }
     #[cfg(windows)]
     common::pause()?;
 
