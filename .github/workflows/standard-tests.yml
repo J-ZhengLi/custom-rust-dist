@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality-control:
+  basic-tests:
     strategy:
       fail-fast: false
       matrix:

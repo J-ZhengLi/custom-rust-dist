@@ -1,4 +1,4 @@
-name: Tauri Tests
+name: GUI Tests
 
 on:
   push:
@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-tauri:
+  gui-tests:
     strategy:
       fail-fast: false
       matrix:
@@ -47,17 +47,3 @@ jobs:
         run: cargo clippy --no-deps -p rim-gui -- -D warnings
       - name: run tests
         run: cargo test -p rim-gui --verbose
-
-      - name: install frontend dependencies
-        run: |
-          npm install pnpm -g
-          cd ./installer
-          pnpm install
-          cd -
-
-      # If tagName and releaseId are omitted tauri-action will only build the app and won't try to upload any assets.
-      - uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: ${{ matrix.args }}
