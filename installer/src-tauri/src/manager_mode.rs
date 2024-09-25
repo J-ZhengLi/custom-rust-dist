@@ -1,32 +1,28 @@
-use std::{
-    sync::{mpsc, Arc},
-    thread,
-    time::Duration,
-};
+use std::{sync::Arc, thread, time::Duration};
 
 use crate::{error::Result, toolkit::Toolkit};
 use anyhow::Context;
-use rim::{utils::MultiThreadProgress, UninstallConfiguration};
+use rim::{utils::Progress, UninstallConfiguration};
 
 pub(super) fn main() -> Result<()> {
     super::hide_console();
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
+            super::close_window,
             get_installed_kit,
             get_install_dir,
             uninstall_toolkit,
         ])
         .setup(|app| {
             let version = env!("CARGO_PKG_VERSION");
-            let _manager_window = tauri::WindowBuilder::new(
+            tauri::WindowBuilder::new(
                 app,
                 "manager_window",
                 tauri::WindowUrl::App("index.html/#/manager".into()),
             )
             .title(format!("玄武 Rust 管理工具 v{}", version))
-            .build()
-            .unwrap();
+            .build()?;
 
             Ok(())
         })
@@ -51,47 +47,36 @@ fn get_install_dir() -> String {
 #[tauri::command(rename_all = "snake_case")]
 fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
     let window = Arc::new(window);
-    let (tx_progress, rx_progress) = mpsc::channel();
-    let (tx_output, rx_output) = mpsc::channel();
+    let window_clone = Arc::clone(&window);
 
     let uninstall_thread = thread::spawn(move || -> anyhow::Result<()> {
-        let mut progress_sender = MultiThreadProgress::new(&tx_output, &tx_progress, 0);
-        let config = UninstallConfiguration::init()?;
-        config.uninstall_with_progress(remove_self, &mut progress_sender)?;
+        // Initialize a progress sender.
+        let msg_cb = |msg: String| -> anyhow::Result<()> {
+            // Note: a small timeout to make sure the message are emitted properly.
+            thread::sleep(Duration::from_millis(100));
+            Ok(window.emit("update-output", msg)?)
+        };
+        let pos_cb = |pos: f32| -> anyhow::Result<()> { Ok(window.emit("update-progress", pos)?) };
+        let progress = Progress::new(&msg_cb, &pos_cb);
+
+        let config = UninstallConfiguration::init(Some(progress))?;
+        config.uninstall(remove_self)?;
         Ok(())
     });
 
-    let gui_thread = thread::spawn(move || -> anyhow::Result<()> {
-        let window_clone = Arc::clone(&window);
-        loop {
-            if let Ok(progress) = rx_progress.try_recv() {
-                window_clone.emit("update-progress", progress)?;
-            }
-            if let Ok(detail) = rx_output.try_recv() {
-                window_clone.emit("update-output", detail)?;
-            }
-
-            if uninstall_thread.is_finished() {
-                return if let Err(known_error) = uninstall_thread
-                    .join()
-                    .expect("unexpected error occurs when processing uninstallation.")
-                {
-                    let error_str = known_error.to_string();
-                    window_clone.emit("uninstall-failed", error_str.clone())?;
-                    Err(known_error)
-                } else {
-                    Ok(())
-                };
-            }
-
-            thread::sleep(Duration::from_millis(50));
-        }
-    });
-
-    if gui_thread.is_finished() {
-        gui_thread
+    if uninstall_thread.is_finished() {
+        return if let Err(known_error) = uninstall_thread
             .join()
-            .expect("unexpected error occurs when handling toolkit uninstalltion")?;
+            .expect("unexpected error occurs when processing uninstallation.")
+        {
+            let error_str = known_error.to_string();
+            window_clone
+                .emit("uninstall-failed", error_str.clone())
+                .expect("failed to emit message");
+            Err(known_error.into())
+        } else {
+            Ok(())
+        };
     }
 
     Ok(())

@@ -13,10 +13,9 @@ use super::{
 use crate::{
     core::os::add_to_path,
     toolset_manifest::{Proxy, ToolMap},
-    utils::{self, Extractable, MultiThreadProgress},
+    utils::{self, Extractable, Progress},
 };
 use anyhow::{anyhow, bail, Context, Result};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -44,9 +43,8 @@ declare_unfallible_url!(
     default_rustup_update_root(DEFAULT_RUSTUP_UPDATE_ROOT) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
 );
 
-pub(crate) fn default_cargo_registry() -> Option<(String, String)> {
-    Some(("rsproxy".into(), "sparse+https://rsproxy.cn/index/".into()))
-}
+pub(crate) const DEFAULT_CARGO_REGISTRY: (&str, &str) =
+    ("rsproxy", "sparse+https://rsproxy.cn/index/");
 
 /// Contains definition of installation steps, including pre-install configs.
 ///
@@ -60,8 +58,7 @@ pub trait EnvConfig {
     fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()>;
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-pub struct InstallConfiguration {
+pub struct InstallConfiguration<'a> {
     pub cargo_registry: Option<(String, String)>,
     /// Path to install everything.
     ///
@@ -76,20 +73,24 @@ pub struct InstallConfiguration {
     /// Indicates whether `cargo` was already installed, useful when installing third-party tools.
     pub cargo_is_installed: bool,
     install_record: InstallationRecord,
+    pub(crate) progress_indicator: Option<Progress<'a>>,
 }
 
-impl RimDir for InstallConfiguration {
+impl RimDir for InstallConfiguration<'_> {
     fn install_dir(&self) -> &Path {
         self.install_dir.as_path()
     }
 }
 
-impl InstallConfiguration {
+impl<'a> InstallConfiguration<'a> {
     /// Creating install diretory and other preperations related to filesystem.
     ///
     /// If `lite` is set to true, this won't make modifications on environment, and
     /// won't write manager binary as well.
-    pub fn init(install_dir: &Path, lite: bool) -> Result<Self> {
+    pub fn init(install_dir: &Path, lite: bool, progress: Option<Progress<'a>>) -> Result<Self> {
+        if let Some(prog) = &progress {
+            prog.show_msg(t!("install_init", dir = install_dir.display()))?;
+        }
         if install_dir.parent().is_none() {
             bail!("unable to install in root directory");
         }
@@ -117,18 +118,43 @@ impl InstallConfiguration {
             super::os::windows::do_add_to_programs(&manager_exe)?;
         }
 
+        if let Some(prog) = &progress {
+            prog.inc(Some(5.0))?;
+        }
+
         Ok(Self {
             install_dir: install_dir.to_path_buf(),
             install_record: InstallationRecord::load(install_dir)?,
-            cargo_registry: default_cargo_registry(),
+            cargo_registry: Some(DEFAULT_CARGO_REGISTRY)
+                .map(|(n, v)| (n.to_string(), v.to_string())),
             rustup_dist_server: default_rustup_dist_server().clone(),
             rustup_update_root: default_rustup_update_root().clone(),
             cargo_is_installed: false,
+            progress_indicator: progress,
         })
     }
 
-    pub fn cargo_registry(mut self, registry: Option<(String, String)>) -> Self {
-        self.cargo_registry = registry;
+    /// Print message via progress indicator.
+    pub(crate) fn show_progress<S: ToString>(&self, msg: S) -> Result<()> {
+        if let Some(prog) = &self.progress_indicator {
+            prog.show_msg(msg)?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn inc_progress(&self, val: f32) -> Result<()> {
+        if let Some(prog) = &self.progress_indicator {
+            prog.inc(Some(val))?;
+        }
+        Ok(())
+    }
+
+    pub fn cargo_registry<N, V>(mut self, name: N, value: V) -> Self
+    where
+        N: ToString,
+        V: ToString,
+    {
+        self.cargo_registry = Some((name.to_string(), value.to_string()));
         self
     }
 
@@ -178,28 +204,41 @@ impl InstallConfiguration {
         Ok(env_vars)
     }
 
-    pub fn install_tools_with_progress(
+    fn install_tools_(
         &mut self,
-        manifest: &ToolsetManifest,
+        manifest: Option<&ToolsetManifest>,
         tools: &ToolMap,
-        mt_prog: &mut MultiThreadProgress,
+        weight: f32,
     ) -> Result<()> {
-        // Ignore tools that need to be installed using `cargo install`
+        let use_cargo = manifest.is_none();
+
         let to_install = tools
             .into_iter()
-            .filter(|(_, t)| !t.is_cargo_tool())
+            .filter(|(_, t)| {
+                if use_cargo {
+                    t.is_cargo_tool()
+                } else {
+                    !t.is_cargo_tool()
+                }
+            })
             .collect::<Vec<_>>();
-        let sub_progress_delta = if to_install.is_empty() {
-            return mt_prog.send_progress();
-        } else {
-            mt_prog.val / to_install.len()
-        };
+
+        if to_install.is_empty() {
+            return self.inc_progress(weight);
+        }
+        let sub_progress_delta = weight / to_install.len() as f32;
 
         for (name, tool) in to_install {
-            println!("{}", t!("installing_tool_info", name = name));
-            self.install_tool(name, tool, manifest.proxy.as_ref(), mt_prog)?;
+            let info = if use_cargo {
+                t!("installing_via_cargo_info", name = name)
+            } else {
+                t!("installing_tool_info", name = name)
+            };
+            println!("{info}");
 
-            mt_prog.send_any_progress(sub_progress_delta)?;
+            self.install_tool(name, tool, manifest.and_then(|m| m.proxy.as_ref()))?;
+
+            self.inc_progress(sub_progress_delta)?;
         }
 
         self.install_record.write()?;
@@ -207,13 +246,22 @@ impl InstallConfiguration {
         Ok(())
     }
 
-    pub fn install_rust_with_progress(
+    pub fn install_tools(&mut self, manifest: &ToolsetManifest, tools: &ToolMap) -> Result<()> {
+        self.show_progress(t!("install_tools"))?;
+        self.install_tools_(Some(manifest), tools, 30.0)
+    }
+
+    pub fn cargo_install(&mut self, tools: &ToolMap) -> Result<()> {
+        self.show_progress(t!("install_via_cargo"))?;
+        self.install_tools_(None, tools, 30.0)
+    }
+
+    pub fn install_rust(
         &mut self,
         manifest: &ToolsetManifest,
         optional_components: &[String],
-        mt_prog: &mut MultiThreadProgress,
     ) -> Result<()> {
-        println!("{}", t!("installing_toolchain_info"));
+        self.show_progress(t!("install_toolchain"))?;
 
         ToolchainInstaller::init().install(self, manifest, optional_components)?;
         add_to_path(self.cargo_bin())?;
@@ -222,52 +270,22 @@ impl InstallConfiguration {
         // Add the rust info to the fingerprint.
         self.install_record
             .add_rust_record(manifest.rust_version(), optional_components);
+        // record meta info
+        // TODO(?): Maybe this should be moved as a separate step?
+        self.install_record
+            .clone_toolkit_meta_from_manifest(manifest);
         // write changes
         self.install_record.write()?;
 
-        mt_prog.send_progress()
-    }
-
-    pub fn cargo_install_with_progress(
-        &mut self,
-        tools: &ToolMap,
-        mt_prog: &mut MultiThreadProgress,
-    ) -> Result<()> {
-        let to_install = tools
-            .into_iter()
-            .filter(|(_, t)| t.is_cargo_tool())
-            .collect::<Vec<_>>();
-        let sub_progress_delta = if to_install.is_empty() {
-            return mt_prog.send_progress();
-        } else {
-            mt_prog.val / to_install.len()
-        };
-
-        for (name, tool) in to_install {
-            println!("{}", t!("installing_via_cargo_info", name = name));
-            self.install_tool(name, tool, None, mt_prog)?;
-
-            mt_prog.send_any_progress(sub_progress_delta)?;
-        }
-
-        self.install_record.write()?;
-
-        Ok(())
+        self.inc_progress(30.0)
     }
 
     // TODO: Write version info after installing each tool,
     // which is later used for updating.
-    fn install_tool(
-        &mut self,
-        name: &str,
-        tool: &ToolInfo,
-        proxy: Option<&Proxy>,
-        mt_prog: &mut MultiThreadProgress,
-    ) -> Result<()> {
+    fn install_tool(&mut self, name: &str, tool: &ToolInfo, proxy: Option<&Proxy>) -> Result<()> {
         let record = match tool {
             ToolInfo::PlainVersion(version) | ToolInfo::DetailedVersion { ver: version, .. } => {
-                Tool::cargo_tool(name, Some(vec![name, "--version", version]))
-                    .install(self, mt_prog)?
+                Tool::cargo_tool(name, Some(vec![name, "--version", version])).install(self)?
             }
             ToolInfo::Git {
                 git,
@@ -287,9 +305,9 @@ impl InstallConfiguration {
                     args.extend(["--rev", s]);
                 }
 
-                Tool::cargo_tool(name, Some(args)).install(self, mt_prog)?
+                Tool::cargo_tool(name, Some(args)).install(self)?
             }
-            ToolInfo::Path { path, .. } => self.try_install_from_path(name, path, mt_prog)?,
+            ToolInfo::Path { path, .. } => self.try_install_from_path(name, path)?,
             // TODO: Have a dedicated download folder, do not use temp dir to store downloaded artifacts,
             // so then we can have the `resume download` feature.
             ToolInfo::Url { url, .. } => {
@@ -304,7 +322,7 @@ impl InstallConfiguration {
                 let dest = temp_dir.path().join(downloaded_file_name);
                 utils::download(name, url, &dest, proxy)?;
 
-                self.try_install_from_path(name, &dest, mt_prog)?
+                self.try_install_from_path(name, &dest)?
             }
         };
 
@@ -313,12 +331,7 @@ impl InstallConfiguration {
         Ok(())
     }
 
-    fn try_install_from_path(
-        &self,
-        name: &str,
-        path: &Path,
-        mt_prog: &mut MultiThreadProgress,
-    ) -> Result<ToolRecord> {
+    fn try_install_from_path(&self, name: &str, path: &Path) -> Result<ToolRecord> {
         if !path.exists() {
             bail!(
                 "unable to install '{name}' because the path to it's installer '{}' does not exist.",
@@ -330,13 +343,15 @@ impl InstallConfiguration {
         let tool_installer_path = extract_or_copy_to(path, temp_dir.path())?;
         let tool_installer = Tool::from_path(name, &tool_installer_path)
             .with_context(|| format!("no install method for tool '{name}'"))?;
-        tool_installer.install(self, mt_prog)
+        tool_installer.install(self)
     }
 
     /// Configuration options for `cargo`.
     ///
     /// This will write a `config.toml` file to `CARGO_HOME`.
     pub fn config_cargo(&self) -> Result<()> {
+        self.show_progress(t!("install_cargo_config"))?;
+
         let mut config = CargoConfig::new();
         if let Some((name, url)) = &self.cargo_registry {
             config.add_source(name, url, true);
@@ -348,7 +363,7 @@ impl InstallConfiguration {
             utils::write_file(config_path, &config_toml, false)?;
         }
 
-        Ok(())
+        self.inc_progress(3.0)
     }
 
     /// Creates a temporary directory under `install_dir/temp`, with a certain prefix.
@@ -408,7 +423,7 @@ mod tests {
         std::fs::create_dir_all(&cache_dir).unwrap();
 
         let install_root = tempfile::Builder::new().tempdir_in(&cache_dir).unwrap();
-        let config = InstallConfiguration::init(install_root.path(), true).unwrap();
+        let config = InstallConfiguration::init(install_root.path(), true, None).unwrap();
 
         assert!(config.install_record.name.is_none());
         assert!(install_root.path().join(fingerprint::FILENAME).is_file());

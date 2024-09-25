@@ -69,3 +69,9 @@ fn hide_console() {
         winapi::um::wincon::FreeConsole();
     }
 }
+
+#[tauri::command]
+fn close_window(window: tauri::Window) {
+    // TODO：check and remove cache
+    window.close().unwrap();
+}

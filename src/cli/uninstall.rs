@@ -12,7 +12,7 @@ pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Resul
         return Ok(false);
     };
 
-    let config = UninstallConfiguration::init()?;
+    let config = UninstallConfiguration::init(None)?;
     let installed = config.install_record.print_installation();
 
     // Ask confirmation

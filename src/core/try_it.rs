@@ -16,6 +16,10 @@ pub fn try_it(path: Option<&Path>) -> Result<()> {
     let example_sources = ExampleTemplate::load();
     // Export the example to user selected location
     let example_dir = example_sources.export(&path_to_init)?;
+    println!(
+        "{}",
+        t!("demo_project_exported", dir = example_dir.display())
+    );
 
     // attempts to open the directory with `VS-Code`, if that didn't work
     // open directory using file explorer.
@@ -32,18 +36,8 @@ pub fn try_it(path: Option<&Path>) -> Result<()> {
         .iter()
         .find_map(|p| utils::cmd_exist(p).then_some(*p))
         .unwrap_or(file_explorer);
-    if utils::execute(program, &[&example_dir]).is_err() {
-        #[cfg(windows)]
-        if program == file_explorer {
-            // explorer.exe return 1 even on success for some weird reason.
-            return Ok(());
-        }
-
-        println!(
-            "{}",
-            t!("open_example_project_warn", dir = example_dir.display())
-        );
-    }
+    // Try to open the project, but don't do anything if it fails cuz it's pretty noisy.
+    _ = utils::execute(program, &[&example_dir]);
 
     Ok(())
 }

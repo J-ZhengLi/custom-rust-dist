@@ -9,8 +9,10 @@ use anyhow::Result;
 
 pub(crate) use rustup::*;
 
-impl EnvConfig for InstallConfiguration {
+impl EnvConfig for InstallConfiguration<'_> {
     fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()> {
+        self.show_progress(t!("install_env_config"))?;
+
         let vars_raw = self.env_vars(manifest)?;
         for (key, val) in vars_raw {
             set_env_var(key, val.encode_utf16().collect())?;
@@ -18,11 +20,11 @@ impl EnvConfig for InstallConfiguration {
 
         update_env();
 
-        Ok(())
+        self.inc_progress(2.0)
     }
 }
 
-impl Uninstallation for UninstallConfiguration {
+impl Uninstallation for UninstallConfiguration<'_> {
     fn remove_rustup_env_vars(&self) -> Result<()> {
         // Remove the `<InstallDir>/.cargo/bin` which is added by rustup
         let cargo_bin_dir = self.cargo_home().join("bin");

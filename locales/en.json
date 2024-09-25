@@ -10,7 +10,6 @@
     "install_via_cargo": "Installing cargo tools...",
 
     "installing_tool_info": "info: installing '%{name}'",
-    "installing_toolchain_info": "info: installing rustup and rust toolchain",
     "installing_via_cargo_info": "info: installing '%{name}' using cargo",
     "installing_msvc_info": "info: running VS BuildTools installer...",
     "install_finish_info": "info: Rust is successfully installed!",
@@ -22,7 +21,6 @@
     "windows_not_modify_path_warn": "warn: the registry key HKEY_CURRENT_USER\\Environment\\PATH is not a string, skip modifying the PATH variable.",
     "remove_vscode_shortcut_warn": "warn: unable to remove shortcut file '%{path}'",
     "remove_path_fail_warn": "warn: unable to remove '%{path}', please try manually removing it.",
-    "open_example_project_warn": "warn: unable to open example directory with `VSCode` or `file explorer`, try open it manually: %{dir}",
 
     "handling_extension_info": "info: %{op}ing extension '%{ext}' for program '%{program}'",
     "skip_extension_uninstall_warn": "warn: extension '%{ext}' for '%{program}' is not installed, skipping...",
@@ -40,6 +38,7 @@
     "question_install_dir": "Installation path?",
     "question_component_choice": "Choose what to install: (separated by spaces, required tools are automatically selected)",
     "question_try_demo": "Do you want to try Rust with a demo project?",
+    "demo_project_exported": "The demo project was successfully exported to '%{dir}'",
     
     "question_install_options": "Proceed with above installation options?",
     "pause_prompt": "press ENTER key to continue...",
@@ -62,5 +61,6 @@
     "uninstall_self": "Removing self & wrapping up",
     "uninstall_tool_failed_warn": "warn: unable to uninstall tool '%{tool}', maybe it was already uninstalled, skipping",
 
+    "linux_source_hint": "Please restart the current shell or run `%{cmd}` for the environment changes to take effect",
     "unknown_toolkit": "Unknown Toolkit"
 }

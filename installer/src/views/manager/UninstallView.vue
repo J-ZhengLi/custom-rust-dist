@@ -5,7 +5,8 @@ import { computed, ref, watch } from 'vue';
 import Label from './components/Label.vue';
 const { routerBack, routerPush } = useCustomRouter();
 
-const isUninstallManger = ref(false);
+// TODO: change to `false` after implementing installation via manager
+const isUninstallManger = ref(true);
 const installDir = computed(() => managerConf.path);
 
 watch(isUninstallManger, (val: boolean) => {
@@ -43,9 +44,10 @@ function handleUninstall() {
         <Label :label="item.name" :old-ver="item.version"></Label>
       </div>
     </scroll-box>
-    <div m="l-2em t-0.5em" h="2em">
+    <!-- TODO: uncomment after implementing installation via manager -->
+    <!-- <div m="l-2em t-0.5em" h="2em">
       <base-check-box v-model="isUninstallManger" title="同时卸载此管理工具" />
-    </div>
+    </div> -->
     <div basis="60px" flex="~ justify-end items-center">
       <base-button theme="primary" mr="12px" @click="routerBack"
         >取消</base-button

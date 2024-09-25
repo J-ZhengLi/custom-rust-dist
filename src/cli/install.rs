@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use crate::cli::common::{self, Confirm};
 use crate::components::Component;
 use crate::core::install::{
-    default_cargo_registry, default_rustup_dist_server, default_rustup_update_root, EnvConfig,
-    InstallConfiguration,
+    default_rustup_dist_server, default_rustup_update_root, EnvConfig, InstallConfiguration,
+    DEFAULT_CARGO_REGISTRY,
 };
 use crate::core::try_it;
 use crate::toolset_manifest::{baked_in_manifest, ToolMap};
@@ -41,14 +41,14 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         component_list,
     )?;
 
-    let cargo_registry = registry_url
-        .as_ref()
-        .map(|u| (registry_name.clone(), u.clone()))
-        .or(default_cargo_registry());
+    let (registry_name, registry_value) = registry_url
+        .as_deref()
+        .map(|u| (registry_name.as_str(), u))
+        .unwrap_or(DEFAULT_CARGO_REGISTRY);
     let install_dir = user_opt.prefix;
 
-    let mut config = InstallConfiguration::init(&install_dir, false)?
-        .cargo_registry(cargo_registry)
+    let mut config = InstallConfiguration::init(&install_dir, false, None)?
+        .cargo_registry(registry_name, registry_value)
         .rustup_dist_server(
             rustup_dist_server
                 .clone()
@@ -62,16 +62,11 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
     config.config_env_vars(&manifest)?;
     config.config_cargo()?;
 
-    let mut dummy_prog = utils::MultiThreadProgress::default();
     // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
-    config.install_tools_with_progress(&manifest, &user_opt.toolset, &mut dummy_prog)?;
-    config.install_rust_with_progress(
-        &manifest,
-        &user_opt.toolchain_components,
-        &mut dummy_prog,
-    )?;
+    config.install_tools(&manifest, &user_opt.toolset)?;
+    config.install_rust(&manifest, &user_opt.toolchain_components)?;
     // install third-party tools via cargo that got installed by rustup
-    config.cargo_install_with_progress(&user_opt.toolset, &mut dummy_prog)?;
+    config.cargo_install(&user_opt.toolset)?;
 
     println!("\n{}\n", t!("install_finish_info"));
 
@@ -79,6 +74,10 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         try_it::try_it(Some(&install_dir))?;
     }
 
+    #[cfg(unix)]
+    if let Some(cmd) = crate::core::os::unix::source_command() {
+        println!("\n{}", t!("linux_source_hint", cmd = cmd));
+    }
     #[cfg(windows)]
     common::pause()?;
 
