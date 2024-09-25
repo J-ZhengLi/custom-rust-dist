@@ -44,9 +44,8 @@ declare_unfallible_url!(
     default_rustup_update_root(DEFAULT_RUSTUP_UPDATE_ROOT) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
 );
 
-pub(crate) fn default_cargo_registry() -> Option<(String, String)> {
-    Some(("rsproxy".into(), "sparse+https://rsproxy.cn/index/".into()))
-}
+pub(crate) const DEFAULT_CARGO_REGISTRY: (&str, &str) =
+    ("rsproxy", "sparse+https://rsproxy.cn/index/");
 
 /// Contains definition of installation steps, including pre-install configs.
 ///
@@ -120,15 +119,20 @@ impl InstallConfiguration {
         Ok(Self {
             install_dir: install_dir.to_path_buf(),
             install_record: InstallationRecord::load(install_dir)?,
-            cargo_registry: default_cargo_registry(),
+            cargo_registry: Some(DEFAULT_CARGO_REGISTRY)
+                .map(|(n, v)| (n.to_string(), v.to_string())),
             rustup_dist_server: default_rustup_dist_server().clone(),
             rustup_update_root: default_rustup_update_root().clone(),
             cargo_is_installed: false,
         })
     }
 
-    pub fn cargo_registry(mut self, registry: Option<(String, String)>) -> Self {
-        self.cargo_registry = registry;
+    pub fn cargo_registry<N, V>(mut self, name: N, value: V) -> Self
+    where
+        N: ToString,
+        V: ToString,
+    {
+        self.cargo_registry = Some((name.to_string(), value.to_string()));
         self
     }
 

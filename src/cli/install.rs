@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use crate::cli::common::{self, Confirm};
 use crate::components::Component;
 use crate::core::install::{
-    default_cargo_registry, default_rustup_dist_server, default_rustup_update_root, EnvConfig,
-    InstallConfiguration,
+    default_rustup_dist_server, default_rustup_update_root, EnvConfig, InstallConfiguration,
+    DEFAULT_CARGO_REGISTRY,
 };
 use crate::core::try_it;
 use crate::toolset_manifest::{baked_in_manifest, ToolMap};
@@ -41,14 +41,14 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         component_list,
     )?;
 
-    let cargo_registry = registry_url
-        .as_ref()
-        .map(|u| (registry_name.clone(), u.clone()))
-        .or(default_cargo_registry());
+    let (registry_name, registry_value) = registry_url
+        .as_deref()
+        .map(|u| (registry_name.as_str(), u))
+        .unwrap_or(DEFAULT_CARGO_REGISTRY);
     let install_dir = user_opt.prefix;
 
     let mut config = InstallConfiguration::init(&install_dir, false)?
-        .cargo_registry(cargo_registry)
+        .cargo_registry(registry_name, registry_value)
         .rustup_dist_server(
             rustup_dist_server
                 .clone()
