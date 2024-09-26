@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use crate::cli::common::{self, Confirm};
 use crate::components::Component;
 use crate::core::install::{
-    default_rustup_dist_server, default_rustup_update_root, EnvConfig, InstallConfiguration,
+    default_rustup_dist_server, default_rustup_update_root, InstallConfiguration,
     DEFAULT_CARGO_REGISTRY,
 };
 use crate::core::try_it;
@@ -47,7 +47,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         .unwrap_or(DEFAULT_CARGO_REGISTRY);
     let install_dir = user_opt.prefix;
 
-    let mut config = InstallConfiguration::init(&install_dir, false, None)?
+    InstallConfiguration::init(&install_dir, false, None)?
         .cargo_registry(registry_name, registry_value)
         .rustup_dist_server(
             rustup_dist_server
@@ -58,15 +58,8 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
             rustup_update_root
                 .clone()
                 .unwrap_or_else(|| default_rustup_update_root().clone()),
-        );
-    config.config_env_vars(&manifest)?;
-    config.config_cargo()?;
-
-    // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
-    config.install_tools(&manifest, &user_opt.toolset)?;
-    config.install_rust(&manifest, &user_opt.toolchain_components)?;
-    // install third-party tools via cargo that got installed by rustup
-    config.cargo_install(&user_opt.toolset)?;
+        )
+        .install(user_opt.toolchain_components, user_opt.toolset)?;
 
     println!("\n{}\n", t!("install_finish_info"));
 

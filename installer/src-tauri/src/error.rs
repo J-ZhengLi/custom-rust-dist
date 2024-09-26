@@ -1,45 +1,57 @@
-use std::fmt::{Debug, Display};
-
 pub type Result<T> = core::result::Result<T, InstallerError>;
 
-pub enum InstallerError {
+macro_rules! installer_error {
+    ($($varient:ident ( $error_ty:ty )),+) => {
+        pub enum InstallerError {
+            $(
+                $varient($error_ty),
+            )*
+        }
+        impl std::fmt::Debug for InstallerError {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    $(
+                        Self::$varient(e) => write!(f, "{e:?}"),
+                    )*
+                }
+            }
+        }
+        impl std::fmt::Display for InstallerError {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    $(
+                        Self::$varient(e) => write!(f, "{e}"),
+                    )*
+                }
+            }
+        }
+        $(
+            impl From<$error_ty> for InstallerError {
+                fn from(value: $error_ty) -> Self {
+                    Self::$varient(value)
+                }
+            }
+        )*
+    };
+}
+
+installer_error! {
     Anyhow(anyhow::Error),
-}
-
-impl Display for InstallerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Anyhow(e) => write!(f, "{e}"),
-        }
-    }
-}
-
-impl Debug for InstallerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Anyhow(e) => write!(f, "{e}"),
-        }
-    }
+    Tauri(tauri::Error)
 }
 
 impl std::error::Error for InstallerError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
             Self::Anyhow(ref e) => Some(e.root_cause()),
+            Self::Tauri(ref e) => Some(e),
         }
-    }
-}
-
-impl From<anyhow::Error> for InstallerError {
-    fn from(value: anyhow::Error) -> Self {
-        Self::Anyhow(value)
     }
 }
 
 impl From<InstallerError> for tauri::InvokeError {
     fn from(value: InstallerError) -> Self {
-        match value {
-            InstallerError::Anyhow(ah) => tauri::InvokeError::from_anyhow(ah),
-        }
+        let anyhow_error: anyhow::Error = value.into();
+        tauri::InvokeError::from_anyhow(anyhow_error)
     }
 }
