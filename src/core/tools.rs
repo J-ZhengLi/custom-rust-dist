@@ -291,6 +291,11 @@ impl PluginType {
                         }
                     }
                 }
+
+                // Remove the plugin file if uninstalling
+                if uninstall {
+                    utils::remove(plugin_path)?;
+                }
             }
         }
         Ok(())
