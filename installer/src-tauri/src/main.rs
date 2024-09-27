@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 #[macro_use]
 extern crate rust_i18n;
 
@@ -60,14 +62,6 @@ impl Mode {
 
 fn main() -> Result<()> {
     Mode::detect().run()
-}
-
-/// Prevents additional console window on Windows in release
-fn hide_console() {
-    #[cfg(all(windows, not(debug_assertions)))]
-    unsafe {
-        winapi::um::wincon::FreeConsole();
-    }
 }
 
 #[tauri::command]

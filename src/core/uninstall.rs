@@ -66,15 +66,18 @@ impl<'a> UninstallConfiguration<'a> {
     pub fn uninstall(mut self, remove_self: bool) -> Result<()> {
         // remove all tools.
         self.show_progress(t!("uninstalling_third_party_tools"))?;
-        self.remove_tools(installed_tools_fresh(&self.install_dir)?, 55.0)?;
+        self.remove_tools(installed_tools_fresh(&self.install_dir)?, 40.0)?;
 
         // Remove rust toolchain via rustup.
-        self.show_progress(t!("uninstalling_rust_toolchain"))?;
-        ToolchainInstaller::init().remove_self(&self)?;
-        self.install_record.remove_rust_record();
-        self.inc_progress(30.0)?;
+        if self.install_record.rust.is_some() {
+            self.show_progress(t!("uninstalling_rust_toolchain"))?;
+            ToolchainInstaller::init().remove_self(&self)?;
+            self.install_record.remove_rust_record();
+            self.install_record.write()?;
+        }
+        self.inc_progress(40.0)?;
 
-        // remove all the environments.
+        // remove all env configuration.
         self.show_progress(t!("uninstall_env_config"))?;
         self.remove_rustup_env_vars()?;
         self.inc_progress(10.0)?;
@@ -87,7 +90,7 @@ impl<'a> UninstallConfiguration<'a> {
             self.install_record.remove_toolkit_meta();
             self.install_record.write()?;
         }
-        self.inc_progress(5.0)?;
+        self.inc_progress(10.0)?;
 
         Ok(())
     }
@@ -120,9 +123,9 @@ impl<'a> UninstallConfiguration<'a> {
             self.show_progress(t!("uninstalling_for", name = tool.name()))?;
             if tool.uninstall(self).is_err() {
                 self.show_progress(t!("uninstall_tool_failed_warn", tool = tool.name()))?;
-            } else {
-                self.install_record.remove_tool_record(tool.name());
             }
+            self.install_record.remove_tool_record(tool.name());
+            self.install_record.write()?;
             self.inc_progress(progress_dt)?;
         }
 

@@ -9,7 +9,10 @@ mod file_system;
 mod process;
 mod progress_bar;
 
-use std::path::{Path, PathBuf};
+use std::{
+    ffi::OsStr,
+    path::{Path, PathBuf},
+};
 
 pub use download::download;
 pub use extraction::Extractable;
@@ -64,4 +67,11 @@ pub fn lowercase_program_name() -> Option<String> {
         .file_name()
         .and_then(|oss| oss.to_str())?;
     Some(program_name.to_lowercase())
+}
+
+/// Lossy convert any [`OsStr`] representation into [`String`].
+///
+/// Check [`OsStr::to_string_lossy`] for detailed conversion.
+pub fn to_string_lossy<S: AsRef<OsStr>>(s: S) -> String {
+    s.as_ref().to_string_lossy().to_string()
 }

@@ -53,7 +53,7 @@ export default defineConfig({
     presetUno(),
     presetAttributify(),
     presetIcons({
-      extraProperties: { display: 'inline-block', verticalAlign: 'middle' },
+      extraProperties: { display: 'inline-block', "vertical-align": 'middle' },
     }),
     presetTypography(),
     presetWebFonts({

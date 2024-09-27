@@ -12,7 +12,7 @@ use super::{
 };
 use crate::{
     core::os::add_to_path,
-    toolset_manifest::{Proxy, ToolMap},
+    toolset_manifest::{baked_in_manifest, Proxy, ToolMap},
     utils::{self, Extractable, Progress},
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -132,6 +132,20 @@ impl<'a> InstallConfiguration<'a> {
             cargo_is_installed: false,
             progress_indicator: progress,
         })
+    }
+
+    pub fn install(mut self, tc_components: Vec<String>, tools: ToolMap) -> Result<()> {
+        // FIXME: Don't use manifest here, instead, load everything we need to `component`
+        let manifest = baked_in_manifest()?;
+
+        self.config_env_vars(&manifest)?;
+        self.config_cargo()?;
+        // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
+        self.install_tools(&manifest, &tools)?;
+        self.install_rust(&manifest, &tc_components)?;
+        // install third-party tools via cargo that got installed by rustup
+        self.cargo_install(&tools)?;
+        Ok(())
     }
 
     /// Print message via progress indicator.

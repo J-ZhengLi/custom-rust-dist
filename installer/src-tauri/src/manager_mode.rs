@@ -5,8 +5,6 @@ use anyhow::Context;
 use rim::{utils::Progress, UninstallConfiguration};
 
 pub(super) fn main() -> Result<()> {
-    super::hide_console();
-
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             super::close_window,
@@ -64,20 +62,30 @@ fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
         Ok(())
     });
 
-    if uninstall_thread.is_finished() {
-        return if let Err(known_error) = uninstall_thread
-            .join()
-            .expect("unexpected error occurs when processing uninstallation.")
-        {
-            let error_str = known_error.to_string();
-            window_clone
-                .emit("uninstall-failed", error_str.clone())
-                .expect("failed to emit message");
-            Err(known_error.into())
-        } else {
-            Ok(())
-        };
-    }
+    let gui_thread = spawn_gui_update_thread(window_clone, uninstall_thread);
 
+    if gui_thread.is_finished() {
+        gui_thread.join().expect("failed to join GUI thread")?;
+    }
     Ok(())
+}
+
+fn spawn_gui_update_thread(
+    win: Arc<tauri::Window>,
+    core_thread: thread::JoinHandle<anyhow::Result<()>>,
+) -> thread::JoinHandle<anyhow::Result<()>> {
+    thread::spawn(move || loop {
+        if core_thread.is_finished() {
+            return if let Err(known_error) = core_thread
+                .join()
+                .expect("failed to join uninstallation thread.")
+            {
+                let error_str = known_error.to_string();
+                win.emit("uninstall-failed", error_str.clone())?;
+                Err(known_error)
+            } else {
+                Ok(())
+            };
+        }
+    })
 }

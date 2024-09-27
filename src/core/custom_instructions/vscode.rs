@@ -72,7 +72,11 @@ impl VSCodeInstaller<'_> {
                 utils::path_to_str(&shortcut_path)?,
                 utils::path_to_str(&target_path)?,
             );
-            if utils::execute("powershell.exe", &[weird_powershell_cmd]).is_err() {
+            if utils::Command::new("powershell")
+                .arg(weird_powershell_cmd)
+                .run()
+                .is_err()
+            {
                 show_failure_warning();
             }
         }

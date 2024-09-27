@@ -1,8 +1,9 @@
 use anyhow::{bail, Context, Result};
+use cfg_if::cfg_if;
 use rust_i18n::{i18n, t};
 use std::io::{stdout, Write};
 use std::path::PathBuf;
-use std::process::{Command, ExitCode};
+use std::process::{Command, ExitCode, Stdio};
 use std::{env, fs};
 
 i18n!("../locales", fallback = "en");
@@ -110,6 +111,10 @@ impl DevCmd {
                     }
                 };
 
+                if !matches!(mode, DistMode::Cli) {
+                    pnpm_install();
+                }
+
                 let dist_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_file_name("dist");
                 // make sure there is a `dist` folder in root
                 std::fs::create_dir_all(&dist_dir)?;
@@ -153,6 +158,38 @@ impl DevCmd {
             }
         }
         Ok(())
+    }
+}
+
+fn pnpm_install() {
+    println!("running `pnpm i`");
+    let fail_msg = "unable to run `pnpm i`, \
+            please manually cd to `installer/` then run the command manually";
+
+    let gui_crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_file_name("installer");
+    assert!(gui_crate_dir.exists());
+
+    cfg_if! {
+        if #[cfg(windows)] {
+            let mut status = Command::new("cmd.exe");
+            status.args(["/C", "pnpm", "i"]);
+        } else {
+            let mut status = Command::new("pnpm");
+            status.arg("i");
+        }
+    }
+    status
+        .current_dir(gui_crate_dir)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
+
+    let Ok(st) = status.status() else {
+        println!("{fail_msg}");
+        return;
+    };
+
+    if !st.success() {
+        println!("{fail_msg}: {}", st.code().unwrap_or(-1));
     }
 }
 
