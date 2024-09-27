@@ -6,4 +6,5 @@ edition = "2021"
 
 [dependencies]
 anyhow.workspace = true
+cfg-if = "1"
 rust-i18n.workspace = true
