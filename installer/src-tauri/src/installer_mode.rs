@@ -19,8 +19,6 @@ use rim::{try_it, utils, InstallConfiguration};
 static LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
 
 pub(super) fn main() -> Result<()> {
-    super::hide_console();
-
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             super::close_window,

@@ -5,8 +5,6 @@ use anyhow::Context;
 use rim::{utils::Progress, UninstallConfiguration};
 
 pub(super) fn main() -> Result<()> {
-    super::hide_console();
-
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             super::close_window,

@@ -12,9 +12,7 @@ use super::CARGO_HOME;
 use super::RUSTUP_DIST_SERVER;
 use super::RUSTUP_HOME;
 use crate::toolset_manifest::Proxy;
-use crate::utils;
-use crate::utils::execute_with_env;
-use crate::utils::{download, execute, force_url_join, set_exec_permission};
+use crate::utils::{self, download, force_url_join, set_exec_permission};
 
 #[cfg(windows)]
 pub(crate) const RUSTUP_INIT: &str = "rustup-init.exe";
@@ -51,7 +49,10 @@ impl ToolchainInstaller {
             env!("TARGET"),
             "-vy",
         ];
-        execute(rustup_init, &args)
+        utils::Command::new(rustup_init)
+            .args(&args)
+            .inherit_stderr()
+            .run()
     }
 
     fn install_toolchain_via_rustup(
@@ -71,9 +72,16 @@ impl ToolchainInstaller {
             args.extend(components);
         }
         if let Some(local_server) = manifest.offline_dist_server()? {
-            execute_with_env(rustup, &args, [(RUSTUP_DIST_SERVER, local_server.as_str())])
+            utils::Command::new(rustup)
+                .args(&args)
+                .env(RUSTUP_DIST_SERVER, local_server.as_str())
+                .inherit_stderr()
+                .run()
         } else {
-            execute(rustup, &args)
+            utils::Command::new(rustup)
+                .args(&args)
+                .inherit_stderr()
+                .run()
         }
     }
 
@@ -129,15 +137,11 @@ impl ToolchainInstaller {
     // Rustup self uninstall all the components and toolchains.
     pub(crate) fn remove_self(&self, config: &UninstallConfiguration) -> Result<()> {
         let rustup = config.cargo_bin().join(RUSTUP);
-        let args = vec!["self", "uninstall", "-y"];
-        execute_with_env(
-            rustup,
-            &args,
-            [
-                (CARGO_HOME, utils::path_to_str(config.cargo_home())?),
-                (RUSTUP_HOME, utils::path_to_str(config.rustup_home())?),
-            ],
-        )?;
-        Ok(())
+        utils::Command::new(rustup)
+            .args(&["self", "uninstall", "-y"])
+            .env(CARGO_HOME, config.cargo_home())
+            .env(RUSTUP_HOME, config.rustup_home())
+            .inherit_stderr()
+            .run()
     }
 }

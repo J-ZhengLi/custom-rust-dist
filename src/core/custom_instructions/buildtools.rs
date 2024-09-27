@@ -41,7 +41,7 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<Vec<
 
     // Step 3: Invoke the install command.
     println!("{}", t!("installing_msvc_info"));
-    let exit_code: VSExitCode = utils::execute_for_ret_code(buildtools_exe, &cmd)?.into();
+    let exit_code: VSExitCode = utils::Command::new(buildtools_exe).args(&cmd).run_with_ret_code()?.into();
     match exit_code {
         VSExitCode::Success => {
             println!("info: {}", exit_code);

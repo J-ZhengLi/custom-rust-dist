@@ -196,12 +196,12 @@ fn cargo_install_or_uninstall(op: &str, args: &[&str], cargo_home: &Path) -> Res
     cargo_bin.push("bin");
     cargo_bin.push(format!("cargo{}", std::env::consts::EXE_SUFFIX));
 
-    let mut full_args = vec![op];
-    full_args.extend_from_slice(args);
-
-    let cargo_home = utils::path_to_str(cargo_home)?;
-
-    utils::execute_with_env(cargo_bin, &full_args, [(CARGO_HOME, cargo_home)])
+    utils::Command::new(cargo_bin)
+        .arg(op)
+        .args(args)
+        .env(CARGO_HOME, cargo_home)
+        .inherit_stderr()
+        .run()
 }
 
 /// Installing [`ToolInstaller::DirWithBin`], with a couple steps:
@@ -270,10 +270,11 @@ impl PluginType {
                                 program = program
                             )
                         );
-                        match utils::execute(
-                            program,
-                            &[arg_opt.as_str(), utils::path_to_str(plugin_path)?],
-                        ) {
+                        match utils::Command::new(program)
+                            .arg(arg_opt)
+                            .arg(plugin_path)
+                            .run()
+                        {
                             Ok(()) => continue,
                             // Ignore error when uninstalling.
                             Err(_) if uninstall => {
