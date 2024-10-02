@@ -20,7 +20,7 @@ class ManagerConf {
   // TODO: change to `false` after implementing toolkit installation
   private _isUninstallManager: Ref<boolean> = ref(true);
 
-  constructor() {}
+  constructor() { }
 
   public getUninstallManager() {
     return this._isUninstallManager.value;
@@ -147,25 +147,27 @@ class ManagerConf {
       'get_installed_kit'
     )) as OriginKitItem | undefined;
     if (tauriInstalled) {
-      const installed = {...tauriInstalled, components: tauriInstalled.components.map((item) => {
-        
-        const {
-          group_name,
-          is_toolchain_component,
-          tool_installer,
-          desc,
-          ...rest
-        } = item;
-        return {
+      const installed = {
+        ...tauriInstalled, components: tauriInstalled.components.filter((c) => c.installed).map((item) => {
+
+          const {
+            group_name,
+            is_toolchain_component,
+            tool_installer,
+            desc,
+            ...rest
+          } = item;
+          return {
             ...rest,
             desc: desc.split('\n'),
             groupName: group_name,
             isToolchainComponent: is_toolchain_component,
             toolInstaller: tool_installer,
             version: tool_installer?.version || 'no version'
-        
-        } as ManagerComponent;
-      })};
+
+          } as ManagerComponent;
+        })
+      };
       this.setKits([installed]);
       this.setInstalled(installed);
       this.setCurrent(installed);
