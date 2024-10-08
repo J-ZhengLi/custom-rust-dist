@@ -88,6 +88,11 @@ fn install_toolchain(
     let window = Arc::new(window);
     let window_clone = Arc::clone(&window);
     let log_path = log_file_path(&install_dir);
+    // FIXME: for some reason, having an existin log file makes other thread fails to read the log,
+    // find the cause of it. Until then, let's just remove the existing file for now.
+    if log_path.is_file() {
+        _ = utils::remove(log_path);
+    }
 
     // 在一个新线程中执行安装过程
     let install_thread = spawn_install_thread(window, components_list, install_dir, log_path)?;

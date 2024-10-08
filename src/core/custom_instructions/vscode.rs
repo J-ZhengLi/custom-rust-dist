@@ -41,7 +41,7 @@ impl VSCodeInstaller<'_> {
     pub(crate) fn install(&self, path: &Path, config: &InstallConfiguration) -> Result<Vec<PathBuf>> {
         // Step 1: Move the root of the directory into `tools` directory
         let vscode_dir = config.tools_dir().join(self.tool_name);
-        utils::move_to(path, &vscode_dir, true)?;
+        utils::move_to(path, &vscode_dir, false)?;
 
         // Step 2: Add the `bin/` folder to path
         let bin_dir = vscode_dir.join("bin");

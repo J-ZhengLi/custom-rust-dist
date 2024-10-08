@@ -1,11 +1,14 @@
 {
     "vendor": "玄武",
 
+    "install": "安装",
+    "uninstall": "卸载",
+
     "install_init": "初始化安装目录 '%{dir}' 中...",
     "install_env_config": "配置环境变量中...",
     "install_cargo_config": "写入 cargo 配置中...",
     "install_tools": "正在安装依赖项和独立工具...",
-    "install_toolchain": "正在安装 Rust 最小级工具链及额外组件...",
+    "install_toolchain": "正在安装 rustup 和 Rust 工具链...",
     "install_via_cargo": "正在通过 cargo 安装第三方工具...",
 
     "installing_tool_info": "info: 正在安装工具 '%{name}'",
@@ -20,10 +23,10 @@
     "remove_vscode_shortcut_warn": "warn: 无法移除 VSCode 快捷方式 '%{path}'",
     "remove_path_fail_warn": "warn: 文件或文件夹 '%{path}' 删除失败, 请尝试手动删除。",
 
-    "handling_extension_info": "info: 正在处理（%{op}） '%{program}' 的插件: '%{ext}'",
+    "handling_extension_info": "info: 正在%{op} '%{program}' 的以下插件: '%{ext}'",
     "skip_extension_uninstall_warn": "warn: 未针对应用 '%{program}' 安装插件 '%{ext}'，正在跳过卸载...",
 
-    "loading_archive_info": "info: 正在加载 %{kind} 压缩包 '%{path}'",
+    "loading_archive_info": "info: 正在提取 %{kind} 压缩包 '%{path}'",
     "channel_communicate_err": "error: 线程信号发送失败: %{sum}",
 
     "default": "默认",

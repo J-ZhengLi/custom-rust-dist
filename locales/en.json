@@ -2,6 +2,9 @@
     "vendor": "XuanWu",
     "vendor_en": "xuanwu-rust",
 
+    "install": "install",
+    "uninstall": "uninstall",
+
     "install_init": "Initalizing & Creating directory '%{dir}'...",
     "install_env_config": "Configuring environment variables...",
     "install_cargo_config": "Writing cargo configuration...",
@@ -25,7 +28,7 @@
     "handling_extension_info": "info: %{op}ing extension '%{ext}' for program '%{program}'",
     "skip_extension_uninstall_warn": "warn: extension '%{ext}' for '%{program}' is not installed, skipping...",
 
-    "loading_archive_info": "info: loading %{kind} archive '%{path}'",
+    "loading_archive_info": "info: extracting %{kind} archive '%{path}'",
     "channel_communicate_err": "error: unable to send tx details: %{sum}",
 
     "default": "default",

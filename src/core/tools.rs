@@ -240,8 +240,17 @@ pub(crate) enum PluginType {
 }
 
 // This list has a fallback order, DO NOT change the order.
+#[cfg(not(windows))]
 pub(crate) static VSCODE_FAMILY: &[&str] =
     &["hwcode", "wecode", "code-exploration", "code-oss", "code"];
+#[cfg(windows)]
+pub(crate) static VSCODE_FAMILY: &[&str] = &[
+    "hwcode.cmd",
+    "wecode.cmd",
+    "code-exploration.cmd",
+    "code-oss.cmd",
+    "code.cmd",
+];
 
 impl FromStr for PluginType {
     type Err = anyhow::Error;
