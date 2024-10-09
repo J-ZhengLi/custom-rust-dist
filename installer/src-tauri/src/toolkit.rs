@@ -39,10 +39,10 @@ impl Toolkit {
         let manifest = ToolsetManifest::load_from_install_dir()?;
 
         if let Some(name) = &fp.name {
-            tk.name = name.to_owned();
+            name.clone_into(&mut tk.name);
         }
         if let Some(ver) = &fp.version {
-            tk.version = ver.to_owned();
+            ver.clone_into(&mut tk.version);
         }
         // TODO: We might deprecate `name` and `version` fields in `ToolsetManifest`,
         // but until so, this check is only used to ensure the components can be installed using

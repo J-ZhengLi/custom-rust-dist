@@ -416,8 +416,19 @@ impl ToolInfo {
     }
 }
 
+/// Get the content of baked-in toolset manifest as `str`.
+pub fn baked_in_manifest_raw() -> &'static str {
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "no-web")] {
+            include_str!("../../../resources/toolset_manifest_noweb.toml")
+        } else {
+            include_str!("../../../resources/toolset_manifest.toml")
+        }
+    }
+}
+
 pub fn baked_in_manifest() -> Result<ToolsetManifest> {
-    ToolsetManifest::from_str(include_str!("../../../resources/toolset_manifest.toml"))
+    ToolsetManifest::from_str(baked_in_manifest_raw())
 }
 
 #[cfg(test)]

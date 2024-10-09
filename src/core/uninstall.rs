@@ -28,7 +28,7 @@ pub struct UninstallConfiguration<'a> {
     /// including the manager binary.
     pub(crate) install_dir: PathBuf,
     pub(crate) install_record: InstallationRecord,
-    progress_indicator: Option<Progress<'a>>,
+    pub(crate) progress_indicator: Option<Progress<'a>>,
 }
 
 impl RimDir for UninstallConfiguration<'_> {

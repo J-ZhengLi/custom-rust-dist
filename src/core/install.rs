@@ -12,12 +12,13 @@ use super::{
 };
 use crate::{
     core::os::add_to_path,
-    toolset_manifest::{baked_in_manifest, Proxy, ToolMap},
+    toolset_manifest::{baked_in_manifest, baked_in_manifest_raw, Proxy, ToolMap},
     utils::{self, Extractable, Progress},
 };
 use anyhow::{anyhow, bail, Context, Result};
 use std::{
     collections::HashMap,
+    fmt::Display,
     path::{Path, PathBuf},
 };
 use tempfile::TempDir;
@@ -110,8 +111,7 @@ impl<'a> InstallConfiguration<'a> {
 
             // Create a copy of the baked manifest which is later used for component management.
             let manifest_out_path = install_dir.join("toolset-manifest.toml");
-            let baked_manfest = include_str!("../../resources/toolset_manifest.toml");
-            utils::write_file(manifest_out_path, baked_manfest, false)?;
+            utils::write_file(manifest_out_path, baked_in_manifest_raw(), false)?;
 
             #[cfg(windows)]
             // Create registry entry to add this program into "installed programs".
@@ -149,7 +149,8 @@ impl<'a> InstallConfiguration<'a> {
     }
 
     /// Print message via progress indicator.
-    pub(crate) fn show_progress<S: ToString>(&self, msg: S) -> Result<()> {
+    pub(crate) fn show_progress<S: Display + ToString>(&self, msg: S) -> Result<()> {
+        println!("{msg}");
         if let Some(prog) = &self.progress_indicator {
             prog.show_msg(msg)?;
         }
@@ -248,7 +249,7 @@ impl<'a> InstallConfiguration<'a> {
             } else {
                 t!("installing_tool_info", name = name)
             };
-            println!("{info}");
+            self.show_progress(info)?;
 
             self.install_tool(name, tool, manifest.and_then(|m| m.proxy.as_ref()))?;
 
@@ -354,7 +355,7 @@ impl<'a> InstallConfiguration<'a> {
         }
 
         let temp_dir = self.create_temp_dir(name)?;
-        let tool_installer_path = extract_or_copy_to(path, temp_dir.path())?;
+        let tool_installer_path = self.extract_or_copy_to(path, temp_dir.path())?;
         let tool_installer = Tool::from_path(name, &tool_installer_path)
             .with_context(|| format!("no install method for tool '{name}'"))?;
         tool_installer.install(self)
@@ -389,23 +390,24 @@ impl<'a> InstallConfiguration<'a> {
             .tempdir_in(root)
             .with_context(|| format!("unable to create temp directory under '{}'", root.display()))
     }
+
+    /// Perform extraction or copy action base on the given path.
+    ///
+    /// If `maybe_file` is a path to compressed file, this will try to extract it to `dest`;
+    /// otherwise this will copy that file into dest.
+    fn extract_or_copy_to(&self, maybe_file: &Path, dest: &Path) -> Result<PathBuf> {
+        if let Ok(mut extractable) = Extractable::load(maybe_file, self.progress_indicator.as_ref())
+        {
+            extractable.extract_to(dest)?;
+            Ok(dest.to_path_buf())
+        } else {
+            utils::copy_into(maybe_file, dest)
+        }
+    }
 }
 
 pub fn default_install_dir() -> PathBuf {
     utils::home_dir().join(&*t!("vendor_en"))
-}
-
-/// Perform extraction or copy action base on the given path.
-///
-/// If `maybe_file` is a path to compressed file, this will try to extract it to `dest`;
-/// otherwise this will copy that file into dest.
-fn extract_or_copy_to(maybe_file: &Path, dest: &Path) -> Result<PathBuf> {
-    if let Ok(mut extractable) = Extractable::load(maybe_file) {
-        extractable.extract_to(dest)?;
-        Ok(dest.to_path_buf())
-    } else {
-        utils::copy_into(maybe_file, dest)
-    }
 }
 
 #[cfg(test)]

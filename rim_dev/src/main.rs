@@ -75,7 +75,7 @@ impl DevCmd {
                 let x = match mode {
                     DistMode::Cli => {
                         vec![(
-                            ["build", "--release"].as_slice(),
+                            ["build", "--release", "--locked"].as_slice(),
                             format!("rim-cli{}", env::consts::EXE_SUFFIX),
                             format!(
                                 "{}-installer-cli{}",
@@ -86,7 +86,7 @@ impl DevCmd {
                     }
                     DistMode::Gui => {
                         vec![(
-                            ["tauri", "build", "-b", "none"].as_slice(),
+                            ["tauri", "build", "-b", "none", "--", "--locked"].as_slice(),
                             format!("rim-gui{}", env::consts::EXE_SUFFIX),
                             format!("{}-installer{}", t!("vendor_en"), env::consts::EXE_SUFFIX),
                         )]
@@ -94,7 +94,7 @@ impl DevCmd {
                     DistMode::Both => {
                         vec![
                             (
-                                ["build", "--release"].as_slice(),
+                                ["build", "--release", "--locked"].as_slice(),
                                 format!("rim-cli{}", env::consts::EXE_SUFFIX),
                                 format!(
                                     "{}-installer-cli{}",
@@ -103,7 +103,7 @@ impl DevCmd {
                                 ),
                             ),
                             (
-                                ["tauri", "build", "-b", "none"].as_slice(),
+                                ["tauri", "build", "-b", "none", "--", "--locked"].as_slice(),
                                 format!("rim-gui{}", env::consts::EXE_SUFFIX),
                                 format!("{}-installer{}", t!("vendor_en"), env::consts::EXE_SUFFIX),
                             ),
@@ -122,8 +122,13 @@ impl DevCmd {
                 // Get the target dir
                 let dev_bin = current_exe()?;
                 let release_dir = dev_bin.parent().unwrap().with_file_name("release");
+
+                // Get additional args
+                let num_to_skip = if let DistMode::Both = mode { 2 } else { 3 };
+                let adt_args = env::args().skip(num_to_skip).collect::<Vec<_>>();
+
                 for (args, orig_name, new_name) in x {
-                    let status = Command::new("cargo").args(args).status()?;
+                    let status = Command::new("cargo").args(args).args(&adt_args).status()?;
                     if status.success() {
                         // copy and rename the binary with vendor name
                         let from = release_dir.join(&orig_name);

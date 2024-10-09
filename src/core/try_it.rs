@@ -72,9 +72,9 @@ impl<'a> ExampleTemplate<'a> {
         let vscode_config_fp = vscode_dir.join("launch.json");
 
         // write source files
-        utils::write_file(&main_fp, self.src_main, false)?;
-        utils::write_file(&cargo_toml_fp, self.cargo_toml, false)?;
-        utils::write_file(&vscode_config_fp, self.vscode_config, false)?;
+        utils::write_file(main_fp, self.src_main, false)?;
+        utils::write_file(cargo_toml_fp, self.cargo_toml, false)?;
+        utils::write_file(vscode_config_fp, self.vscode_config, false)?;
 
         Ok(root)
     }

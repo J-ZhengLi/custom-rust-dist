@@ -65,6 +65,16 @@ impl<'a> Progress<'a> {
     }
 }
 
+/// Send the message via [`Progress`] and print it on console as well.
+pub fn send_and_print<T: ToString>(msg: T, progress: Option<&Progress<'_>>) -> Result<()> {
+    let m = msg.to_string();
+    println!("{m}");
+    if let Some(prog) = progress {
+        prog.show_msg(m)?;
+    }
+    Ok(())
+}
+
 /// Convinent struct with methods that are useful to indicate various progress.
 #[derive(Debug, Clone, Copy)]
 pub struct CliProgress<T: Sized> {

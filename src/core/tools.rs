@@ -10,7 +10,11 @@ use super::{
     directories::RimDir, parser::fingerprint::ToolRecord, uninstall::UninstallConfiguration,
     CARGO_HOME,
 };
-use crate::{core::custom_instructions, utils, InstallConfiguration};
+use crate::{
+    core::custom_instructions,
+    utils::{self, Progress},
+    InstallConfiguration,
+};
 
 #[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
 /// Representing the structure of an (extracted) tool's directory.
@@ -161,7 +165,7 @@ impl<'a> Tool<'a> {
             }
             Self::Plugin { kind, path, .. } => {
                 // run the installation command.
-                kind.install_plugin(path)?;
+                kind.install_plugin(path, config)?;
                 // we need to "cache" to installer, so that we could uninstall with it.
                 let plugin_backup = utils::copy_file_to(path, config.tools_dir())?;
                 Ok(ToolRecord::with_paths(vec![plugin_backup]))
@@ -185,7 +189,7 @@ impl<'a> Tool<'a> {
             }
             Self::Custom { name, .. } => custom_instructions::uninstall(name, config)?,
             Self::DirWithBin { path, .. } => uninstall_dir_with_bin_(path)?,
-            Self::Plugin { kind, path, .. } => kind.uninstall_plugin(path)?,
+            Self::Plugin { kind, path, .. } => kind.uninstall_plugin(path, config)?,
         }
         Ok(())
     }
@@ -263,22 +267,27 @@ impl FromStr for PluginType {
 }
 
 impl PluginType {
-    fn install_or_uninstall_(&self, plugin_path: &Path, uninstall: bool) -> Result<()> {
+    fn install_or_uninstall_(
+        &self,
+        plugin_path: &Path,
+        uninstall: bool,
+        prog: Option<&Progress<'_>>,
+    ) -> Result<()> {
         match self {
             PluginType::Vsix => {
                 for program in VSCODE_FAMILY {
                     if utils::cmd_exist(program) {
                         let op = if uninstall { "uninstall" } else { "install" };
                         let arg_opt = format!("--{op}-extension");
-                        println!(
-                            "{}",
+                        utils::send_and_print(
                             t!(
                                 "handling_extension_info",
-                                op = op,
+                                op = t!(op),
                                 ext = plugin_path.display(),
                                 program = program
-                            )
-                        );
+                            ),
+                            prog,
+                        )?;
                         match utils::Command::new(program)
                             .arg(arg_opt)
                             .arg(plugin_path)
@@ -287,14 +296,14 @@ impl PluginType {
                             Ok(()) => continue,
                             // Ignore error when uninstalling.
                             Err(_) if uninstall => {
-                                println!(
-                                    "{}",
+                                utils::send_and_print(
                                     t!(
                                         "skip_extension_uninstall_warn",
                                         ext = plugin_path.display(),
                                         program = program
-                                    )
-                                );
+                                    ),
+                                    prog,
+                                )?;
                                 continue;
                             }
                             Err(e) => return Err(e),
@@ -311,12 +320,12 @@ impl PluginType {
         Ok(())
     }
 
-    fn install_plugin(&self, plugin_path: &Path) -> Result<()> {
-        self.install_or_uninstall_(plugin_path, false)
+    fn install_plugin(&self, plugin_path: &Path, config: &InstallConfiguration) -> Result<()> {
+        self.install_or_uninstall_(plugin_path, false, config.progress_indicator.as_ref())
     }
 
-    fn uninstall_plugin(&self, plugin_path: &Path) -> Result<()> {
-        self.install_or_uninstall_(plugin_path, true)
+    fn uninstall_plugin(&self, plugin_path: &Path, config: &UninstallConfiguration) -> Result<()> {
+        self.install_or_uninstall_(plugin_path, true, config.progress_indicator.as_ref())
     }
 }
 

@@ -93,8 +93,8 @@ impl InstallationRecord {
     }
 
     pub(crate) fn clone_toolkit_meta_from_manifest(&mut self, manifest: &ToolsetManifest) {
-        self.name = manifest.name.clone();
-        self.version = manifest.version.clone();
+        self.name.clone_from(&manifest.name);
+        self.version.clone_from(&manifest.version);
     }
 
     pub(crate) fn remove_toolkit_meta(&mut self) {

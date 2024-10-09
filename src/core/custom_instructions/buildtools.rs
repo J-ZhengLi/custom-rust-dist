@@ -40,14 +40,14 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<Vec<
     utils::copy_file_to(&buildtools_exe, &installer_dir)?;
 
     // Step 3: Invoke the install command.
-    println!("{}", t!("installing_msvc_info"));
+    config.show_progress(t!("installing_msvc_info"))?;
     let exit_code: VSExitCode = utils::Command::new(buildtools_exe).args(&cmd).run_with_ret_code()?.into();
     match exit_code {
         VSExitCode::Success => {
-            println!("info: {}", exit_code);
+            config.show_progress(format!("info: {exit_code}"))?;
         }
         VSExitCode::RebootRequired | VSExitCode::RebootInitiated => {
-            println!("warn: {}", exit_code);
+            config.show_progress(format!("warn: {exit_code}"))?;
         }
         _ => {
             return Err(anyhow!("unable to install VS buildtools: {}", exit_code));

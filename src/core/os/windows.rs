@@ -118,11 +118,8 @@ pub(crate) mod rustup {
         uninstall_cmd.push(program_bin);
         uninstall_cmd.push("\"");
 
-        // FIXME: Remove this if the GUI app supports uninstallation with ui.
-        #[cfg(feature = "gui")]
-        uninstall_cmd.push(" --no-gui");
-
-        uninstall_cmd.push(" uninstall all");
+        #[cfg(not(feature = "gui"))]
+        uninstall_cmd.push(" uninstall --remove-self");
 
         let reg_value = RegValue {
             bytes: to_winreg_bytes(uninstall_cmd.encode_wide().collect()),
