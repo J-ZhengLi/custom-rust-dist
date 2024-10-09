@@ -35,6 +35,8 @@ pub(super) fn main() -> Result<()> {
                 "installer_window",
                 tauri::WindowUrl::App("index.html/#/installer".into()),
             )
+            .inner_size(800.0, 600.0)
+            .min_inner_size(640.0, 480.0)
             .title(format!("玄武 Rust 安装工具 v{}", version))
             .build()?;
 
