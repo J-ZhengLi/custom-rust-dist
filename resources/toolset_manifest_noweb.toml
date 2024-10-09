@@ -9,6 +9,12 @@ version = "stable"
 group = "Rust"
 components = ["clippy", "rustfmt", "rust-src", "rust-docs"]
 optional-components = ["llvm-tools", "rustc-dev"]
+offline-dist-server = "packages/" # Must contain a folder named "dist"
+
+[rust.rustup]
+x86_64-pc-windows-msvc = "packages/x86_64-pc-windows-msvc/rustup-init.exe"
+x86_64-pc-windows-gnu = "packages/x86_64-pc-windows-gnu/rustup-init.exe"
+x86_64-unknown-linux-gnu = "packages/x86_64-unknown-linux-gnu/rustup-init"
 
 [rust.profile]
 name = "minimal"
@@ -33,23 +39,23 @@ Prerequisites = ["mingw64"]
 "Dev Tools" = ["grcov", "flamegraph", "cargo-fuzz", "cargo-audit"]
 
 [tools.target.x86_64-pc-windows-msvc]
-vscode = { url = "https://update.code.visualstudio.com/1.94.1/win32-x64-archive/stable", version = "1.94.1" }
-vscode-rust-analyzer = { url = "https://github.com/rust-lang/rust-analyzer/releases/download/2024-10-07/rust-analyzer-win32-x64.vsix", version = "0.3.2137" }
-vscode-codelldb = { url = "https://github.com/vadimcn/codelldb/releases/download/v1.11.0/codelldb-win32-x64.vsix", version = "1.11.0" }
-grcov = { optional = true, url = "https://github.com/mozilla/grcov/releases/download/v0.8.19/grcov-x86_64-pc-windows-msvc.zip", version = "0.8.19" }
+vscode = { path = "packages/x86_64-pc-windows/VSCode-win32-x64-1.94.1.zip", version = "1.94.1" }
+vscode-rust-analyzer = { path = "packages/x86_64-pc-windows/rust-analyzer-win32-x64.vsix", version = "0.3.2137" }
+vscode-codelldb = { path = "packages/x86_64-pc-windows/codelldb-win32-x64.vsix", version = "1.11.0" }
+grcov = { optional = true, path = "packages/x86_64-pc-windows-msvc/grcov-x86_64-pc-windows-msvc.zip", version = "0.8.19" }
 flamegraph = { optional = true, ver = "0.6.4" }
-cargo-fuzz = { optional = true, url = "https://github.com/rust-fuzz/cargo-fuzz/releases/download/0.12.0/cargo-fuzz-0.12.0-x86_64-pc-windows-msvc.zip", version = "0.12.0" }
-cargo-audit = { optional = true, url = "https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv0.20.0/cargo-audit-x86_64-pc-windows-msvc-v0.20.0.zip", version = "0.20.0" }
+cargo-fuzz = { optional = true, path = "packages/x86_64-pc-windows/cargo-fuzz-0.12.0-x86_64-pc-windows-msvc.zip", version = "0.12.0" }
+cargo-audit = { optional = true, path = "packages/x86_64-pc-windows/cargo-audit-x86_64-pc-windows-msvc-v0.20.0.zip", version = "0.20.0" }
 
 [tools.target.x86_64-pc-windows-gnu]
-mingw64 = { required = true, url = "https://github.com/niXman/mingw-builds-binaries/releases/download/14.2.0-rt_v12-rev0/x86_64-14.2.0-release-posix-seh-ucrt-rt_v12-rev0.7z", version = "14.2.0-rt_v12-rev0" }
-vscode = { url = "https://update.code.visualstudio.com/1.94.1/win32-x64-archive/stable", version = "1.94.1" }
-vscode-rust-analyzer = { url = "https://github.com/rust-lang/rust-analyzer/releases/download/2024-10-07/rust-analyzer-win32-x64.vsix", version = "0.3.2137" }
-vscode-codelldb = { url = "https://github.com/vadimcn/codelldb/releases/download/v1.11.0/codelldb-win32-x64.vsix", version = "1.11.0" }
-grcov = { optional = true, ver = "0.8.19" }
-flamegraph = { optional = true, ver = "0.6.4" }
-cargo-fuzz = { optional = true, ver = "0.12.0" }
-cargo-audit = { optional = true, ver = "0.20.0" }
+mingw64 = { required = true, path = "packages/x86_64-pc-windows-gnu/x86_64-14.2.0-release-posix-seh-ucrt-rt_v12-rev0.7z", version = "14.2.0-rt_v12-rev0" }
+vscode = { path = "packages/x86_64-pc-windows/VSCode-win32-x64-1.94.1.zip", version = "1.94.1" }
+vscode-rust-analyzer = { path = "packages/x86_64-pc-windows/rust-analyzer-win32-x64.vsix", version = "0.3.2137" }
+vscode-codelldb = { path = "packages/x86_64-pc-windows/codelldb-win32-x64.vsix", version = "1.11.0" }
+grcov = { optional = true, path = "packages/x86_64-pc-windows-gnu/grcov.exe" }
+flamegraph = { optional = true, path = "packages/x86_64-pc-windows-gnu/flamegraph.zip" }
+cargo-fuzz = { optional = true, path = "packages/x86_64-pc-windows-gnu/cargo-fuzz.exe" }
+cargo-audit = { optional = true, path = "packages/x86_64-pc-windows-gnu/cargo-audit.exe" }
 
 [tools.target.x86_64-unknown-linux-gnu]
 vscode = { url = "https://update.code.visualstudio.com/1.94.1/linux-x64/stable", version = "1.94.1" }

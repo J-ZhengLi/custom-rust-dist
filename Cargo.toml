@@ -6,6 +6,8 @@ description = "An interactive Rust installation manager"
 rust-version = "1.73.0" # Minimal required version to use `zip`
 
 [features]
+default = []
+no-web = []
 gui = []
 
 [[bin]]

@@ -12,7 +12,7 @@ use super::{
 };
 use crate::{
     core::os::add_to_path,
-    toolset_manifest::{baked_in_manifest, Proxy, ToolMap},
+    toolset_manifest::{baked_in_manifest, baked_in_manifest_raw, Proxy, ToolMap},
     utils::{self, Extractable, Progress},
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -110,8 +110,7 @@ impl<'a> InstallConfiguration<'a> {
 
             // Create a copy of the baked manifest which is later used for component management.
             let manifest_out_path = install_dir.join("toolset-manifest.toml");
-            let baked_manfest = include_str!("../../resources/toolset_manifest.toml");
-            utils::write_file(manifest_out_path, baked_manfest, false)?;
+            utils::write_file(manifest_out_path, baked_in_manifest_raw(), false)?;
 
             #[cfg(windows)]
             // Create registry entry to add this program into "installed programs".
