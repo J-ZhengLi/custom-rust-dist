@@ -1,7 +1,8 @@
 {
     "vendor": "玄武",
-    "installer_title": "玄武 Rust 安装工具",
-    "manager_title": "玄武 Rust 管理工具",
+    "product": "玄武 Rust 一站式开发套件",
+    "installer": "安装工具",
+    "manager": "管理工具",
 
     "install": "安装",
     "uninstall": "卸载",
@@ -36,7 +37,8 @@
     "installed": "已安装",
     "reinstall": "已安装，重新安装",
     "description": "描述",
-    "welcome": "欢迎使用 %{vendor} Rust 安装程序.\n\n该程序将指导您安装 Rust 编程语言以及其他可选的第三方工具。",
+    "welcome": "欢迎使用%{product}",
+    "what_this_is": "该程序将指导您安装 Rust 编程语言以及其他可选的第三方工具。",
     "custom_install_help": "请根据提示输入安装选项，或直接按回车键使用默认的值。",
     "question_install_dir": "安装路径？",
     "question_component_choice": "选择要安装的组件: (选择多个组件时请用空格键分隔；必要组件会自动添加，无需额外选择)",

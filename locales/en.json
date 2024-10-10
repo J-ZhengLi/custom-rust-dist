@@ -1,8 +1,9 @@
 {
     "vendor": "XuanWu",
     "vendor_en": "xuanwu-rust",
-    "installer_title": "XuanWu Rust Installer",
-    "manager_title": "XuanWu Rust Manager",
+    "product": "XuanWu Rust Development Kit",
+    "installer": "Installer",
+    "manager": "Manager",
 
     "install": "install",
     "uninstall": "uninstall",
@@ -38,7 +39,8 @@
     "installed": "installed",
     "reinstall": "installed, re-installing",
     "description": "Description",
-    "welcome": "Thanks for using %{vendor} Rust installer.\n\nThis program will guide you through installing the Rust programming language, with additional third party tools of your choice.",
+    "welcome": "Thanks for using %{product}",
+    "what_this_is": "This program will guide you through installing the Rust programming language, with additional third party tools of your choice.",
     "custom_install_help": "Enter the value of each installation options, or just press 'Enter' key to use the default value.",
     "question_install_dir": "Installation path?",
     "question_component_choice": "Choose what to install: (separated by spaces, required tools are automatically selected)",

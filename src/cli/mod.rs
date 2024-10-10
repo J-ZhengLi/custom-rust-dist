@@ -8,10 +8,15 @@ mod tryit;
 mod uninstall;
 mod update;
 
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueHint};
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 use url::Url;
+
+use crate::utils;
 
 /// Install rustup, rust toolchain, and various tools.
 // NOTE: If you changed anything in this struct, or any other child types that related to
@@ -48,6 +53,44 @@ pub struct Installer {
     /// Specify another server to download rustup.
     #[arg(hide = true, long, value_name = "URL", value_hint = ValueHint::Url)]
     rustup_update_root: Option<Url>,
+    /// Specify a path or url of manifest file that contains package source and various configurations.
+    #[arg(long, value_name = "PATH or URL")]
+    manifest: Option<PathOrUrl>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum PathOrUrl {
+    Path(PathBuf),
+    Url(Url),
+}
+
+impl FromStr for PathOrUrl {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self> {
+        if let Ok(abs_path) = utils::to_nomalized_abspath(s, None) {
+            if !abs_path.exists() {
+                bail!("the specified path '{s}' does not exist");
+            }
+            Ok(PathOrUrl::Path(abs_path))
+        } else {
+            Ok(PathOrUrl::Url(Url::parse(s)?))
+        }
+    }
+}
+
+impl PathOrUrl {
+    /// Extract [`Url`] value or convert [`PathBuf`] to [`Url`] with file scheme.
+    ///
+    /// # Error
+    /// This will fail when trying to convert a relative path.
+    fn to_url(&self) -> Result<Url> {
+        match self {
+            Self::Url(url) => Ok(url.clone()),
+            Self::Path(path) => {
+                Url::from_file_path(path).map_err(|_| anyhow!("invalid path '{}'", path.display()))
+            }
+        }
+    }
 }
 
 /// Manage Rust installation, mostly used for uninstalling.
@@ -77,6 +120,10 @@ pub struct Manager {
 impl Installer {
     pub fn install_dir(&self) -> Option<&Path> {
         self.prefix.as_deref()
+    }
+
+    pub fn manifest_url(&self) -> Result<Option<Url>> {
+        self.manifest.as_ref().map(|m| m.to_url()).transpose()
     }
 
     pub fn execute(&self) -> Result<()> {

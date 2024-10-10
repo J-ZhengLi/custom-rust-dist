@@ -1,8 +1,8 @@
 <script lang="ts" setup>
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import { useCustomRouter } from '@/router/index';
 import { message } from '@tauri-apps/api/dialog';
-import { installConf } from '@/utils/index';
+import { installConf, invokeCommand } from '@/utils/index';
 
 const { routerPush } = useCustomRouter();
 const isDialogVisible = ref(false);
@@ -16,6 +16,8 @@ const explainText: string[] = `通过安装 Rustup，您同意以下条款：
 );
 
 const isUserAgree = ref(false);
+const welcomeLabel = ref('');
+const version = computed(() => installConf.version);
 
 function handleDialogOk() {
   isDialogVisible.value = false;
@@ -30,6 +32,12 @@ function handleInstallClick(custom: boolean) {
     message('请先同意许可协议', { title: '提示' });
   }
 }
+
+invokeCommand('welcome_label').then((lb) => {
+  if (typeof lb === 'string') {
+    welcomeLabel.value = lb;
+  }
+})
 </script>
 
 <template>
@@ -44,8 +52,9 @@ function handleInstallClick(custom: boolean) {
         />
       </a>
     </div>
-    <div grow="2">
-      <h1>欢迎使用玄武 Rust 一站式开发套件</h1>
+    <div grow="2" flex="~ col items-center">
+      <h1>{{ welcomeLabel }}</h1>
+      <span>{{ version }}</span>
     </div>
     <div basis="120px" w="full" text="center">
       <div flex="~ items-end justify-center">

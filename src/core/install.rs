@@ -12,7 +12,7 @@ use super::{
 };
 use crate::{
     core::os::add_to_path,
-    toolset_manifest::{baked_in_manifest, baked_in_manifest_raw, Proxy, ToolMap},
+    toolset_manifest::{Proxy, ToolMap},
     utils::{self, Extractable, Progress},
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -75,6 +75,7 @@ pub struct InstallConfiguration<'a> {
     pub cargo_is_installed: bool,
     install_record: InstallationRecord,
     pub(crate) progress_indicator: Option<Progress<'a>>,
+    manifest: &'a ToolsetManifest,
 }
 
 impl RimDir for InstallConfiguration<'_> {
@@ -88,7 +89,12 @@ impl<'a> InstallConfiguration<'a> {
     ///
     /// If `lite` is set to true, this won't make modifications on environment, and
     /// won't write manager binary as well.
-    pub fn init(install_dir: &Path, lite: bool, progress: Option<Progress<'a>>) -> Result<Self> {
+    pub fn init(
+        install_dir: &Path,
+        lite: bool,
+        progress: Option<Progress<'a>>,
+        manifest: &'a ToolsetManifest,
+    ) -> Result<Self> {
         if let Some(prog) = &progress {
             prog.show_msg(t!("install_init", dir = install_dir.display()))?;
         }
@@ -109,9 +115,9 @@ impl<'a> InstallConfiguration<'a> {
             utils::copy_as(self_exe, &manager_exe)?;
             add_to_path(install_dir)?;
 
-            // Create a copy of the baked manifest which is later used for component management.
-            let manifest_out_path = install_dir.join("toolset-manifest.toml");
-            utils::write_file(manifest_out_path, baked_in_manifest_raw(), false)?;
+            // Create a copy of the manifest which is later used for component management.
+            let manifest_out_path = install_dir.join(crate::toolset_manifest::FILENAME);
+            utils::write_file(manifest_out_path, &manifest.to_toml()?, false)?;
 
             #[cfg(windows)]
             // Create registry entry to add this program into "installed programs".
@@ -131,18 +137,16 @@ impl<'a> InstallConfiguration<'a> {
             rustup_update_root: default_rustup_update_root().clone(),
             cargo_is_installed: false,
             progress_indicator: progress,
+            manifest,
         })
     }
 
     pub fn install(mut self, tc_components: Vec<String>, tools: ToolMap) -> Result<()> {
-        // FIXME: Don't use manifest here, instead, load everything we need to `component`
-        let manifest = baked_in_manifest()?;
-
-        self.config_env_vars(&manifest)?;
+        self.config_env_vars(self.manifest)?;
         self.config_cargo()?;
         // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
-        self.install_tools(&manifest, &tools)?;
-        self.install_rust(&manifest, &tc_components)?;
+        self.install_tools(&tools)?;
+        self.install_rust(&tc_components)?;
         // install third-party tools via cargo that got installed by rustup
         self.cargo_install(&tools)?;
         Ok(())
@@ -261,9 +265,9 @@ impl<'a> InstallConfiguration<'a> {
         Ok(())
     }
 
-    pub fn install_tools(&mut self, manifest: &ToolsetManifest, tools: &ToolMap) -> Result<()> {
+    pub fn install_tools(&mut self, tools: &ToolMap) -> Result<()> {
         self.show_progress(t!("install_tools"))?;
-        self.install_tools_(Some(manifest), tools, 30.0)
+        self.install_tools_(Some(self.manifest), tools, 30.0)
     }
 
     pub fn cargo_install(&mut self, tools: &ToolMap) -> Result<()> {
@@ -271,12 +275,10 @@ impl<'a> InstallConfiguration<'a> {
         self.install_tools_(None, tools, 30.0)
     }
 
-    pub fn install_rust(
-        &mut self,
-        manifest: &ToolsetManifest,
-        optional_components: &[String],
-    ) -> Result<()> {
+    pub fn install_rust(&mut self, optional_components: &[String]) -> Result<()> {
         self.show_progress(t!("install_toolchain"))?;
+
+        let manifest = self.manifest;
 
         ToolchainInstaller::init().install(self, manifest, optional_components)?;
         add_to_path(self.cargo_bin())?;
@@ -413,7 +415,7 @@ pub fn default_install_dir() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fingerprint;
+    use crate::{fingerprint, toolset_manifest::get_toolset_manifest};
 
     #[test]
     fn declare_unfallible_url_macro() {
@@ -439,7 +441,9 @@ mod tests {
         std::fs::create_dir_all(&cache_dir).unwrap();
 
         let install_root = tempfile::Builder::new().tempdir_in(&cache_dir).unwrap();
-        let config = InstallConfiguration::init(install_root.path(), true, None).unwrap();
+        let manifest = get_toolset_manifest(None).unwrap();
+        let config =
+            InstallConfiguration::init(install_root.path(), true, None, &manifest).unwrap();
 
         assert!(config.install_record.name.is_none());
         assert!(install_root.path().join(fingerprint::FILENAME).is_file());

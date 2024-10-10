@@ -1,6 +1,6 @@
 //! Separated module to handle installation related behaviors in command line.
 
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use crate::cli::common::{self, Confirm};
@@ -10,7 +10,7 @@ use crate::core::install::{
     DEFAULT_CARGO_REGISTRY,
 };
 use crate::core::try_it;
-use crate::toolset_manifest::{baked_in_manifest, ToolMap};
+use crate::toolset_manifest::{get_toolset_manifest, ToolMap};
 use crate::{components, default_install_dir, utils};
 
 use super::{GlobalOpt, Installer, ManagerSubcommands};
@@ -28,11 +28,12 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         registry_name,
         rustup_dist_server,
         rustup_update_root,
+        manifest: manifest_src,
         ..
     } = installer;
 
-    // TODO: Download manifest form remote server for online build
-    let mut manifest = baked_in_manifest()?;
+    let manifest_url = manifest_src.as_ref().map(|s| s.to_url()).transpose()?;
+    let mut manifest = get_toolset_manifest(manifest_url.as_ref())?;
     manifest.adjust_paths()?;
 
     let component_list = components::get_component_list_from_manifest(&manifest, false)?;
@@ -47,7 +48,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         .unwrap_or(DEFAULT_CARGO_REGISTRY);
     let install_dir = user_opt.prefix;
 
-    InstallConfiguration::init(&install_dir, false, None)?
+    InstallConfiguration::init(&install_dir, false, None, &manifest)?
         .cargo_registry(registry_name, registry_value)
         .rustup_dist_server(
             rustup_dist_server
@@ -97,11 +98,14 @@ impl CustomInstallOpt {
         #[cfg(windows)]
         const CLEAR_SCREEN_SPELL: &str = "";
 
-        println!(
+        let mut stdout = io::stdout();
+        writeln!(
+            &mut stdout,
             "{CLEAR_SCREEN_SPELL}\n\n{}",
-            t!("welcome", vendor = t!("vendor"))
-        );
-        println!("{}\n", t!("custom_install_help"));
+            t!("welcome", product = t!("product"))
+        )?;
+        writeln!(&mut stdout, "\n\n{}", t!("what_this_is"))?;
+        writeln!(&mut stdout, "{}\n", t!("custom_install_help"))?;
 
         let default_install_dir = utils::path_to_str(prefix)?.to_string();
         let component_list = displayed_component_list(components.iter(), false);

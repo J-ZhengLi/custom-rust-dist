@@ -58,6 +58,11 @@ pub fn ensure_parent_dir<P: AsRef<Path>>(path: P) -> Result<()> {
     Ok(())
 }
 
+/// Convert the given path to absolute path without `.` or `..` components.
+///
+/// - If the `path` is already an absolute path, this will just go through each component
+///     and attempt to "remove" `.` and `..` components.
+/// - If the `root` is not specified, this will assume that `path` is related to current directory.
 pub fn to_nomalized_abspath<P: AsRef<Path>>(path: P, root: Option<&Path>) -> Result<PathBuf> {
     let abs_pathbuf = if path.as_ref().is_absolute() {
         path.as_ref().to_path_buf()
