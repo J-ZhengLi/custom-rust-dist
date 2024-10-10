@@ -1,6 +1,8 @@
 {
     "vendor": "XuanWu",
     "vendor_en": "xuanwu-rust",
+    "installer_title": "XuanWu Rust Installer",
+    "manager_title": "XuanWu Rust Manager",
 
     "install": "install",
     "uninstall": "uninstall",

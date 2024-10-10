@@ -1,5 +1,7 @@
 {
     "vendor": "玄武",
+    "installer_title": "玄武 Rust 安装工具",
+    "manager_title": "玄武 Rust 管理工具",
 
     "install": "安装",
     "uninstall": "卸载",
