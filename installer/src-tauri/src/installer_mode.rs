@@ -12,11 +12,12 @@ use tauri::api::dialog::FileDialogBuilder;
 use super::INSTALL_DIR;
 use crate::error::Result;
 use rim::components::{get_component_list_from_manifest, Component};
-use rim::toolset_manifest::{baked_in_manifest, ToolInfo};
+use rim::toolset_manifest::{get_toolset_manifest, ToolInfo, ToolsetManifest};
 use rim::utils::Progress;
 use rim::{try_it, utils, InstallConfiguration};
 
 static LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
+static TOOLSET_MANIFEST: OnceLock<ToolsetManifest> = OnceLock::new();
 
 pub(super) fn main() -> Result<()> {
     tauri::Builder::default()
@@ -69,15 +70,16 @@ fn select_folder(window: tauri::Window) {
     });
 }
 
+/// Get full list of supported components
 #[tauri::command]
 fn get_component_list() -> Result<Vec<Component>> {
-    // 这里可以放置生成组件列表的逻辑
-
-    // TODO: Download manifest form remote server for online build
-    let mut manifest = baked_in_manifest()?;
+    // TODO: Give an option for user to specify another manifest.
+    // note that passing command args currently does not work due to `windows_subsystem = "windows"` attr
+    let mut manifest = get_toolset_manifest(None)?;
     manifest.adjust_paths()?;
 
-    Ok(get_component_list_from_manifest(&manifest, false)?)
+    let m = TOOLSET_MANIFEST.get_or_init(|| manifest);
+    Ok(get_component_list_from_manifest(m, false)?)
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -107,6 +109,7 @@ fn install_toolchain(
     Ok(())
 }
 
+// This spawns a thread that handles installation of user selected components
 fn spawn_install_thread(
     win: Arc<tauri::Window>,
     components: Vec<Component>,
@@ -154,8 +157,11 @@ fn spawn_install_thread(
         let pos_cb = |pos: f32| -> anyhow::Result<()> { Ok(win.emit("install-progress", pos)?) };
         let progress = Progress::new(&msg_cb, &pos_cb);
 
+        let manifest = TOOLSET_MANIFEST
+            .get()
+            .expect("toolset manifest should be loaded by now");
         // TODO: Use continuous progress
-        InstallConfiguration::init(Path::new(&install_dir), false, Some(progress))?
+        InstallConfiguration::init(Path::new(&install_dir), false, Some(progress), manifest)?
             .install(toolchain_components, toolset_components)?;
 
         // Manually drop this, to stop capturing output to file.

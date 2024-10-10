@@ -10,7 +10,7 @@ use crate::core::install::{
     DEFAULT_CARGO_REGISTRY,
 };
 use crate::core::try_it;
-use crate::toolset_manifest::{baked_in_manifest, ToolMap};
+use crate::toolset_manifest::{get_toolset_manifest, ToolMap};
 use crate::{components, default_install_dir, utils};
 
 use super::{GlobalOpt, Installer, ManagerSubcommands};
@@ -28,11 +28,12 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         registry_name,
         rustup_dist_server,
         rustup_update_root,
+        manifest: manifest_src,
         ..
     } = installer;
 
-    // TODO: Download manifest form remote server for online build
-    let mut manifest = baked_in_manifest()?;
+    let manifest_url = manifest_src.as_ref().map(|s| s.to_url()).transpose()?;
+    let mut manifest = get_toolset_manifest(manifest_url.as_ref())?;
     manifest.adjust_paths()?;
 
     let component_list = components::get_component_list_from_manifest(&manifest, false)?;
@@ -47,7 +48,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         .unwrap_or(DEFAULT_CARGO_REGISTRY);
     let install_dir = user_opt.prefix;
 
-    InstallConfiguration::init(&install_dir, false, None)?
+    InstallConfiguration::init(&install_dir, false, None, &manifest)?
         .cargo_registry(registry_name, registry_value)
         .rustup_dist_server(
             rustup_dist_server
