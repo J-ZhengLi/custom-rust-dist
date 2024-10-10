@@ -20,17 +20,17 @@ use url::Url;
 #[command(version, about)]
 pub struct Installer {
     /// Enable verbose output
-    #[arg(short, long, conflicts_with = "quiet")]
+    #[arg(hide = true, short, long, conflicts_with = "quiet")]
     verbose: bool,
     /// Suppress non-critical messages
-    #[arg(short, long, conflicts_with = "verbose")]
+    #[arg(hide = true, short, long, conflicts_with = "verbose")]
     quiet: bool,
     /// Disable interaction and answer 'yes' to all prompts
-    #[arg(short, long = "yes")]
+    #[arg(hide = true, short, long = "yes")]
     yes_to_all: bool,
     #[cfg(feature = "gui")]
     /// Don't show GUI when running the program.
-    #[arg(long)]
+    #[arg(hide = true, long)]
     pub no_gui: bool,
 
     /// Set another path to install Rust.
@@ -58,17 +58,17 @@ pub struct Installer {
 #[cfg_attr(not(feature = "gui"), command(arg_required_else_help(true)))]
 pub struct Manager {
     /// Enable verbose output
-    #[arg(short, long, conflicts_with = "quiet")]
+    #[arg(hide = true, short, long, conflicts_with = "quiet")]
     verbose: bool,
     /// Suppress non-critical messages
-    #[arg(short, long, conflicts_with = "verbose")]
+    #[arg(hide = true, short, long, conflicts_with = "verbose")]
     quiet: bool,
     /// Disable interaction and answer 'yes' to all prompts
-    #[arg(short, long = "yes")]
+    #[arg(hide = true, short, long = "yes")]
     yes_to_all: bool,
     #[cfg(feature = "gui")]
     /// Don't show GUI when running the program.
-    #[arg(long)]
+    #[arg(hide = true, long)]
     pub no_gui: bool,
     #[command(subcommand)]
     command: Option<ManagerSubcommands>,
@@ -103,16 +103,19 @@ impl Manager {
 #[derive(Subcommand, Debug)]
 enum ManagerSubcommands {
     /// Install a specific dist version
+    #[command(hide = true)]
     Install {
         #[arg(value_name = "VERSION")]
         version: String,
     },
+    #[command(hide = true)]
     /// Update the current installed dist suite to the newest version
     Update {
         /// Exclude this manager tool when performing updates
         #[arg(long)]
         no_self_update: bool,
     },
+    #[command(hide = true)]
     /// Show a list of available dist version or components
     List {
         /// Prints the current installed dist version
@@ -121,6 +124,7 @@ enum ManagerSubcommands {
         #[command(subcommand)]
         command: Option<list::ListCommand>,
     },
+    #[command(hide = true)]
     /// Install or uninstall components
     Component {
         #[command(subcommand)]
