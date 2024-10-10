@@ -14,12 +14,6 @@ class InstallConf {
     this.checkComponents = ref(components);
     this.isCustomInstall = true;
     this.version = ref('');
-
-    invokeCommand("load_manifest_and_ret_version").then((ver) => {
-      if (typeof ver === 'string') {
-        this.version.value = ver;
-      }
-    })
   }
 
   setPath(newPath: string) {
@@ -80,6 +74,14 @@ class InstallConf {
           tool_installer: toolInstaller,
         } as TauriComponent;
       });
+  }
+
+  loadManifest() {
+    invokeCommand("load_manifest_and_ret_version").then((ver) => {
+      if (typeof ver === 'string') {
+        this.version.value = ver;
+      }
+    });
   }
 
   async loadPath() {

@@ -11,10 +11,8 @@ pub(super) fn main() -> Result<()> {
             get_installed_kit,
             get_install_dir,
             uninstall_toolkit,
-            footer_label,
         ])
         .setup(|app| {
-            let version = env!("CARGO_PKG_VERSION");
             tauri::WindowBuilder::new(
                 app,
                 "manager_window",
@@ -22,7 +20,11 @@ pub(super) fn main() -> Result<()> {
             )
             .inner_size(800.0, 600.0)
             .min_inner_size(640.0, 480.0)
-            .title(format!("{} v{version}", t!("manager_title")))
+            .title(format!(
+                "{} v{}",
+                t!("manager_title", product = t!("product")),
+                env!("CARGO_PKG_VERSION")
+            ))
             .build()?;
 
             Ok(())
@@ -71,16 +73,6 @@ fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
         gui_thread.join().expect("failed to join GUI thread")?;
     }
     Ok(())
-}
-
-#[tauri::command]
-fn footer_label() -> String {
-    format!(
-        "{}{} v{}",
-        t!("product"),
-        t!("manager"),
-        env!("CARGO_PKG_VERSION")
-    )
 }
 
 fn spawn_gui_update_thread(

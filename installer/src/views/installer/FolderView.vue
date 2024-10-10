@@ -30,7 +30,7 @@ onMounted(() => {
   <div flex="~ col">
     <div flex="1" mx="12px">
       <h4>安装目录</h4>
-      <p>Rust的本体和组件将会一起安装到该路径中。</p>
+      <p>Rust 一站式开发套件将会安装到该路径中。</p>
       <div flex="~ items-center">
         <base-input
           v-bind:value="installConf.path.value"

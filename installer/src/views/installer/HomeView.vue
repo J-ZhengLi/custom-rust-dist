@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { computed, ref } from 'vue';
+import { computed, onBeforeMount, ref } from 'vue';
 import { useCustomRouter } from '@/router/index';
 import { message } from '@tauri-apps/api/dialog';
 import { installConf, invokeCommand } from '@/utils/index';
@@ -33,6 +33,8 @@ function handleInstallClick(custom: boolean) {
   }
 }
 
+onBeforeMount(() => installConf.loadManifest());
+
 invokeCommand('welcome_label').then((lb) => {
   if (typeof lb === 'string') {
     welcomeLabel.value = lb;
@@ -54,7 +56,7 @@ invokeCommand('welcome_label').then((lb) => {
     </div>
     <div grow="2" flex="~ col items-center">
       <h1>{{ welcomeLabel }}</h1>
-      <span>{{ version }}</span>
+      <h2>{{ version }}</h2>
     </div>
     <div basis="120px" w="full" text="center">
       <div flex="~ items-end justify-center">

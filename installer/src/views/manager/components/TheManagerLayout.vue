@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeMount, ref } from 'vue';
-import { invokeCommand, managerConf } from '@/utils';
+import { computed, onBeforeMount } from 'vue';
+import { managerConf } from '@/utils';
 import { useCustomRouter } from '@/router';
 
 const { isBack } = useCustomRouter();
@@ -9,13 +9,6 @@ const transitionName = computed(() => {
   if (isBack.value === true) return 'back';
   if (isBack.value === false) return 'push';
   return '';
-});
-
-const footerLabel = ref('');
-invokeCommand('footer_label').then((f) => {
-  if (typeof f === 'string') {
-    footerLabel.value = f;
-  }
 });
 
 onBeforeMount(() => managerConf.loadConf());
@@ -30,8 +23,5 @@ onBeforeMount(() => managerConf.loadConf());
         </keep-alive>
       </transition>
     </router-view>
-    <footer absolute bottom="0" right="2rem" c="regular">
-      {{ footerLabel }}
-    </footer>
   </main>
 </template>

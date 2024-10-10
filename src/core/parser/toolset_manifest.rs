@@ -990,6 +990,7 @@ offline-dist-server = "packages/"
 version = "1.0.0"
 [rust.rustup]
 x86_64-pc-windows-msvc = "packages/x86_64-pc-windows-msvc/rustup-init.exe"
+x86_64-pc-windows-gnu = "packages/x86_64-pc-windows-gnu/rustup-init.exe"
 x86_64-unknown-linux-gnu = "packages/x86_64-unknown-linux-gnu/rustup-init"
 "#;
         let expected = ToolsetManifest::from_str(input).unwrap();
@@ -997,10 +998,15 @@ x86_64-unknown-linux-gnu = "packages/x86_64-unknown-linux-gnu/rustup-init"
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("resources");
         cfg_if::cfg_if! {
-            if #[cfg(windows)] {
+            if #[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "msvc"))] {
                 path.push("packages/x86_64-pc-windows-msvc/rustup-init.exe");
+            } else if #[cfg(all(target_arch = "x86_64", target_os = "windows", target_env = "gnu"))] {
+                path.push("packages/x86_64-pc-windows-gnu/rustup-init.exe");
             } else if #[cfg(all(target_arch = "x86_64", target_os = "linux", target_env = "gnu"))] {
                 path.push("packages/x86_64-unknown-linux-gnu/rustup-init");
+            } else {
+                assert_eq!(expected.rustup_bin().unwrap(), None);
+                return;
             }
         }
 

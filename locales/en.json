@@ -2,8 +2,8 @@
     "vendor": "XuanWu",
     "vendor_en": "xuanwu-rust",
     "product": "XuanWu Rust Development Kit",
-    "installer": "Installer",
-    "manager": "Manager",
+    "installer_title": "%{product} Installer",
+    "manager_title": "%{product} Manager",
 
     "install": "install",
     "uninstall": "uninstall",

@@ -1,8 +1,8 @@
 {
     "vendor": "玄武",
     "product": "玄武 Rust 一站式开发套件",
-    "installer": "安装工具",
-    "manager": "管理工具",
+    "installer_title": "%{product}安装工具",
+    "manager_title": "%{product}管理工具",
 
     "install": "安装",
     "uninstall": "卸载",
