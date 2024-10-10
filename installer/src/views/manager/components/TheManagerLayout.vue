@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeMount } from 'vue';
-import { managerConf } from '@/utils';
+import { computed, onBeforeMount, ref } from 'vue';
+import { invokeCommand, managerConf } from '@/utils';
 import { useCustomRouter } from '@/router';
 
 const { isBack } = useCustomRouter();
@@ -11,6 +11,13 @@ const transitionName = computed(() => {
   return '';
 });
 
+const footerLabel = ref('');
+invokeCommand('footer_label').then((f) => {
+  if (typeof f === 'string') {
+    footerLabel.value = f;
+  }
+});
+
 onBeforeMount(() => managerConf.loadConf());
 </script>
 
@@ -19,17 +26,12 @@ onBeforeMount(() => managerConf.loadConf());
     <router-view v-slot="{ Component }">
       <transition :name="transitionName">
         <keep-alive>
-          <component
-            :is="Component"
-            absolute
-            w="full"
-            style="height: calc(100% - 2rem)"
-          />
+          <component :is="Component" absolute w="full" style="height: calc(100% - 2rem)" />
         </keep-alive>
       </transition>
     </router-view>
     <footer absolute bottom="0" right="2rem" c="regular">
-      管理工具版本 0.1.0-alpha.4
+      {{ footerLabel }}
     </footer>
   </main>
 </template>

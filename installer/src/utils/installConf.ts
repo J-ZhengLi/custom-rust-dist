@@ -7,11 +7,19 @@ class InstallConf {
   path: Ref<string>;
   checkComponents: Ref<CheckItem<Component>[]>;
   isCustomInstall: boolean;
+  version: Ref<string>;
 
   constructor(path: string, components: CheckItem<Component>[]) {
     this.path = ref(path);
     this.checkComponents = ref(components);
     this.isCustomInstall = true;
+    this.version = ref('');
+
+    invokeCommand("load_manifest_and_ret_version").then((ver) => {
+      if (typeof ver === 'string') {
+        this.version.value = ver;
+      }
+    })
   }
 
   setPath(newPath: string) {

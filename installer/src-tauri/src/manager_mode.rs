@@ -11,6 +11,7 @@ pub(super) fn main() -> Result<()> {
             get_installed_kit,
             get_install_dir,
             uninstall_toolkit,
+            footer_label,
         ])
         .setup(|app| {
             let version = env!("CARGO_PKG_VERSION");
@@ -70,6 +71,16 @@ fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
         gui_thread.join().expect("failed to join GUI thread")?;
     }
     Ok(())
+}
+
+#[tauri::command]
+fn footer_label() -> String {
+    format!(
+        "{}{} v{}",
+        t!("product"),
+        t!("manager"),
+        env!("CARGO_PKG_VERSION")
+    )
 }
 
 fn spawn_gui_update_thread(

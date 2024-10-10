@@ -1,6 +1,6 @@
 //! Separated module to handle installation related behaviors in command line.
 
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use crate::cli::common::{self, Confirm};
@@ -98,11 +98,14 @@ impl CustomInstallOpt {
         #[cfg(windows)]
         const CLEAR_SCREEN_SPELL: &str = "";
 
-        println!(
+        let mut stdout = io::stdout();
+        writeln!(
+            &mut stdout,
             "{CLEAR_SCREEN_SPELL}\n\n{}",
-            t!("welcome", vendor = t!("vendor"))
-        );
-        println!("{}\n", t!("custom_install_help"));
+            t!("welcome", product = t!("product"))
+        )?;
+        writeln!(&mut stdout, "\n\n{}", t!("what_this_is"))?;
+        writeln!(&mut stdout, "{}\n", t!("custom_install_help"))?;
 
         let default_install_dir = utils::path_to_str(prefix)?.to_string();
         let component_list = displayed_component_list(components.iter(), false);

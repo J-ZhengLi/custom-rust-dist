@@ -27,7 +27,9 @@ pub(super) fn main() -> Result<()> {
             select_folder,
             get_component_list,
             install_toolchain,
-            run_app
+            run_app,
+            welcome_label,
+            load_manifest_and_ret_version,
         ])
         .setup(|app| {
             let version = env!("CARGO_PKG_VERSION");
@@ -73,13 +75,25 @@ fn select_folder(window: tauri::Window) {
 /// Get full list of supported components
 #[tauri::command]
 fn get_component_list() -> Result<Vec<Component>> {
+    let manifest = cached_manifest();
+    Ok(get_component_list_from_manifest(manifest, false)?)
+}
+
+#[tauri::command]
+fn welcome_label() -> String {
+    t!("welcome", product = t!("product")).into()
+}
+
+// Make sure this function is called first after launch.
+#[tauri::command]
+fn load_manifest_and_ret_version() -> Result<String> {
     // TODO: Give an option for user to specify another manifest.
     // note that passing command args currently does not work due to `windows_subsystem = "windows"` attr
     let mut manifest = get_toolset_manifest(None)?;
     manifest.adjust_paths()?;
 
     let m = TOOLSET_MANIFEST.get_or_init(|| manifest);
-    Ok(get_component_list_from_manifest(m, false)?)
+    Ok(m.version.clone().unwrap_or_default())
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -157,9 +171,7 @@ fn spawn_install_thread(
         let pos_cb = |pos: f32| -> anyhow::Result<()> { Ok(win.emit("install-progress", pos)?) };
         let progress = Progress::new(&msg_cb, &pos_cb);
 
-        let manifest = TOOLSET_MANIFEST
-            .get()
-            .expect("toolset manifest should be loaded by now");
+        let manifest = cached_manifest();
         // TODO: Use continuous progress
         InstallConfiguration::init(Path::new(&install_dir), false, Some(progress), manifest)?
             .install(toolchain_components, toolset_components)?;
@@ -172,6 +184,16 @@ fn spawn_install_thread(
 
         Ok(())
     }))
+}
+
+/// Retrieve cached toolset manifest.
+///
+/// # Panic
+/// Will panic if the manifest is not cached.
+fn cached_manifest() -> &'static ToolsetManifest {
+    TOOLSET_MANIFEST
+        .get()
+        .expect("toolset manifest should be loaded by now")
 }
 
 fn spawn_gui_update_thread(
