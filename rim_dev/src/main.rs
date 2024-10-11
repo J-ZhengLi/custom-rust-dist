@@ -1,9 +1,13 @@
-use anyhow::{bail, Context, Result};
-use cfg_if::cfg_if;
-use rust_i18n::{i18n, t};
+#[macro_use]
+extern crate rust_i18n;
+
+mod dist;
+
+use anyhow::{Context, Result};
+use dist::{DistMode, DIST_HELP};
 use std::io::{stdout, Write};
 use std::path::PathBuf;
-use std::process::{Command, ExitCode, Stdio};
+use std::process::{Command, ExitCode};
 use std::{env, fs};
 
 i18n!("../locales", fallback = "en");
@@ -18,17 +22,6 @@ Commands:
     dist, d         Generate release binaries
     run-manager     Run with manager mode
     set-vendor      Set binaries' vendor name and the identifier etc
-"#;
-
-const DIST_HELP: &str = r#"
-Generate release binaries
-
-Usage: cargo dev dist [OPTIONS]
-
-Options:
-        --cli       Generate release binary for CLI mode only
-        --gui       Generate release binary for GUI mode only
-    -h, -help       Print this help message
 "#;
 
 const MANAGER_MODE_HELP: &str = r#"
@@ -55,13 +48,6 @@ Options:
 "#;
 
 #[derive(Debug)]
-enum DistMode {
-    Both,
-    Gui,
-    Cli,
-}
-
-#[derive(Debug)]
 enum DevCmd {
     Dist { mode: DistMode },
     RunManager { no_gui: bool, args: Vec<String> },
@@ -71,74 +57,7 @@ enum DevCmd {
 impl DevCmd {
     fn execute(&self) -> Result<()> {
         match self {
-            Self::Dist { mode } => {
-                let x = match mode {
-                    DistMode::Cli => {
-                        vec![(
-                            ["build", "--release", "--locked"].as_slice(),
-                            format!("rim-cli{}", env::consts::EXE_SUFFIX),
-                            format!(
-                                "{}-installer-cli{}",
-                                t!("vendor_en"),
-                                env::consts::EXE_SUFFIX
-                            ),
-                        )]
-                    }
-                    DistMode::Gui => {
-                        vec![(
-                            ["tauri", "build", "-b", "none", "--", "--locked"].as_slice(),
-                            format!("rim-gui{}", env::consts::EXE_SUFFIX),
-                            format!("{}-installer{}", t!("vendor_en"), env::consts::EXE_SUFFIX),
-                        )]
-                    }
-                    DistMode::Both => {
-                        vec![
-                            (
-                                ["build", "--release", "--locked"].as_slice(),
-                                format!("rim-cli{}", env::consts::EXE_SUFFIX),
-                                format!(
-                                    "{}-installer-cli{}",
-                                    t!("vendor_en"),
-                                    env::consts::EXE_SUFFIX
-                                ),
-                            ),
-                            (
-                                ["tauri", "build", "-b", "none", "--", "--locked"].as_slice(),
-                                format!("rim-gui{}", env::consts::EXE_SUFFIX),
-                                format!("{}-installer{}", t!("vendor_en"), env::consts::EXE_SUFFIX),
-                            ),
-                        ]
-                    }
-                };
-
-                if !matches!(mode, DistMode::Cli) {
-                    pnpm_install();
-                }
-
-                let dist_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_file_name("dist");
-                // make sure there is a `dist` folder in root
-                std::fs::create_dir_all(&dist_dir)?;
-
-                // Get the target dir
-                let dev_bin = current_exe()?;
-                let release_dir = dev_bin.parent().unwrap().with_file_name("release");
-
-                // Get additional args
-                let num_to_skip = if let DistMode::Both = mode { 2 } else { 3 };
-                let adt_args = env::args().skip(num_to_skip).collect::<Vec<_>>();
-
-                for (args, orig_name, new_name) in x {
-                    let status = Command::new("cargo").args(args).args(&adt_args).status()?;
-                    if status.success() {
-                        // copy and rename the binary with vendor name
-                        let from = release_dir.join(&orig_name);
-                        let to = dist_dir.join(&new_name);
-                        std::fs::copy(from, to)?;
-                    } else {
-                        bail!("build failed");
-                    }
-                }
-            }
+            Self::Dist { mode } => dist::dist(*mode)?,
             Self::RunManager { no_gui, args } => {
                 let mut cargo_args = if *no_gui {
                     ["run", "--"].to_vec()
@@ -163,38 +82,6 @@ impl DevCmd {
             }
         }
         Ok(())
-    }
-}
-
-fn pnpm_install() {
-    println!("running `pnpm i`");
-    let fail_msg = "unable to run `pnpm i`, \
-            please manually cd to `installer/` then run the command manually";
-
-    let gui_crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_file_name("installer");
-    assert!(gui_crate_dir.exists());
-
-    cfg_if! {
-        if #[cfg(windows)] {
-            let mut status = Command::new("cmd.exe");
-            status.args(["/C", "pnpm", "i"]);
-        } else {
-            let mut status = Command::new("pnpm");
-            status.arg("i");
-        }
-    }
-    status
-        .current_dir(gui_crate_dir)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit());
-
-    let Ok(st) = status.status() else {
-        println!("{fail_msg}");
-        return;
-    };
-
-    if !st.success() {
-        println!("{fail_msg}: {}", st.code().unwrap_or(-1));
     }
 }
 

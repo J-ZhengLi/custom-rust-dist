@@ -1,7 +1,7 @@
 use std::env;
 
 const TARGET_OVERRIDE_ENV: &str = "HOST_TRIPPLE";
-const FILES_TO_TRIGGER_REBUILD: &[&str] = &["locales/en.json", "locales/zh-CN.json"];
+const FILES_TO_TRIGGER_REBUILD: &[&str] = &["../locales/en.json", "../locales/zh-CN.json"];
 
 fn main() {
     println!("cargo:rerun-if-env-changed={TARGET_OVERRIDE_ENV}");
@@ -11,7 +11,4 @@ fn main() {
 
     let target = env::var(TARGET_OVERRIDE_ENV).unwrap_or(env::var("TARGET").unwrap());
     println!("cargo:rustc-env=TARGET={target}");
-
-    let profile = env::var("PROFILE").unwrap();
-    println!("cargo:rustc-env=PROFILE={profile}");
 }
