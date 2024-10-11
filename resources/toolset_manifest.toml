@@ -1,8 +1,5 @@
-name = "XuanWu Rust Distribution"
-version = "stable"
-
-[proxy]
-no-proxy = "localhost,127.0.0.1"
+name = "XuanWu Rust Development Kit"
+version = "stable v1.81.0"
 
 [rust]
 version = "stable"
@@ -19,43 +16,9 @@ description = "Basic set of tools to use Rust properly"
 llvm-tools = "Contains a collection of LLVM tools. Note that this component has not been stabilized and may change in the future and is provided as-is"
 rustc-dev = "Contains the compiler as a library. Most users will not need this; it is only needed for development of tools that link to the compiler, such as making modifications to Clippy."
 mingw64 = "(windows only) Requirement for Windows GNU toolchain"
-vscode = "A free code editor with support for development operations like debugging, task running, and version control."
-vscode-rust-analyzer = "An implementation of Language Server Protocol for the Rust programming language. It provides features like completion and goto definition for VS-Code"
-vscode-codelldb = "A native debugger extension for VSCode based on LLDB"
-grcov = "Rust tool to collect and aggregate code coverage data for multiple source files"
-flamegraph = "A Rust-powered flamegraph generator with additional support for Cargo projects."
-cargo-fuzz = "A cargo subcommand for fuzzing with libFuzzer"
-cargo-audit = "Audit your dependencies for crates with security vulnerabilities reported to the RustSec Advisory Database."
 
 [tools.group]
 Prerequisites = ["mingw64"]
-"IDE & Plugins" = ["vscode", "vscode-rust-analyzer", "vscode-codelldb"]
-"Dev Tools" = ["grcov", "flamegraph", "cargo-fuzz", "cargo-audit"]
-
-[tools.target.x86_64-pc-windows-msvc]
-vscode = { url = "https://update.code.visualstudio.com/1.94.1/win32-x64-archive/stable", version = "1.94.1" }
-vscode-rust-analyzer = { url = "https://github.com/rust-lang/rust-analyzer/releases/download/2024-10-07/rust-analyzer-win32-x64.vsix", version = "0.3.2137" }
-vscode-codelldb = { url = "https://github.com/vadimcn/codelldb/releases/download/v1.11.0/codelldb-win32-x64.vsix", version = "1.11.0" }
-grcov = { optional = true, url = "https://github.com/mozilla/grcov/releases/download/v0.8.19/grcov-x86_64-pc-windows-msvc.zip", version = "0.8.19" }
-flamegraph = { optional = true, ver = "0.6.4" }
-cargo-fuzz = { optional = true, url = "https://github.com/rust-fuzz/cargo-fuzz/releases/download/0.12.0/cargo-fuzz-0.12.0-x86_64-pc-windows-msvc.zip", version = "0.12.0" }
-cargo-audit = { optional = true, url = "https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv0.20.0/cargo-audit-x86_64-pc-windows-msvc-v0.20.0.zip", version = "0.20.0" }
 
 [tools.target.x86_64-pc-windows-gnu]
 mingw64 = { required = true, url = "https://github.com/niXman/mingw-builds-binaries/releases/download/14.2.0-rt_v12-rev0/x86_64-14.2.0-release-posix-seh-ucrt-rt_v12-rev0.7z", version = "14.2.0-rt_v12-rev0" }
-vscode = { url = "https://update.code.visualstudio.com/1.94.1/win32-x64-archive/stable", version = "1.94.1" }
-vscode-rust-analyzer = { url = "https://github.com/rust-lang/rust-analyzer/releases/download/2024-10-07/rust-analyzer-win32-x64.vsix", version = "0.3.2137" }
-vscode-codelldb = { url = "https://github.com/vadimcn/codelldb/releases/download/v1.11.0/codelldb-win32-x64.vsix", version = "1.11.0" }
-grcov = { optional = true, ver = "0.8.19" }
-flamegraph = { optional = true, ver = "0.6.4" }
-cargo-fuzz = { optional = true, ver = "0.12.0" }
-cargo-audit = { optional = true, ver = "0.20.0" }
-
-[tools.target.x86_64-unknown-linux-gnu]
-vscode = { url = "https://update.code.visualstudio.com/1.94.1/linux-x64/stable", version = "1.94.1" }
-vscode-rust-analyzer = { url = "https://github.com/rust-lang/rust-analyzer/releases/download/2024-10-07/rust-analyzer-linux-x64.vsix", version = "0.3.2137" }
-vscode-codelldb = { url = "https://github.com/vadimcn/codelldb/releases/download/v1.11.0/codelldb-linux-x64.vsix", version = "1.11.0" }
-grcov = { optional = true, ver = "0.8.19" }
-flamegraph = { optional = true, ver = "0.6.4" }
-cargo-fuzz = { optional = true, ver = "0.12.0" }
-cargo-audit = { optional = true, ver = "0.20.0" }
