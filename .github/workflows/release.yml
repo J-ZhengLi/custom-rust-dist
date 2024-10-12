@@ -2,9 +2,12 @@ name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: tag name
   push:
     tags:
-      - v*
+      - v*.*.*
 
 jobs:
   release:
@@ -46,13 +49,10 @@ jobs:
       uses: actions/cache@v4
       with:
         path: |
-          ~/.cargo/bin/
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          resources/packages*
+          ~/.cargo/registry
+          resources/packages/
           target/
-        key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
 
     - name: install cargo-tauri-cli
       run: cargo install tauri-cli --version "^1"
@@ -82,11 +82,11 @@ jobs:
       if: matrix.os != 'windows-latest'
       run: |
         set -x
-        NAME=$(grep -Po 'vendor_en": "\K[^"]*' locales/en.json)-installer
+        NAME=$(grep -Po 'vendor_en": "\K[^"]*' locales/en.json)
         mkdir ./dist/binaries/
         mv ./dist/${{ matrix.target }}/$NAME-installer-cli ./dist/binaries/$NAME-installer-cli-${{ matrix.target }}
         mv ./dist/${{ matrix.target }}/$NAME-installer ./dist/binaries/$NAME-installer-${{ matrix.target }}
-        cd ../${{ matrix.target }}
+        cd ./dist/${{ matrix.target }}
         tar cjf ../binaries/$NAME-${{ matrix.target }}.tar.xz $NAME-${{ matrix.target }}
 
     - name: upload release

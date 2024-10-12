@@ -1,5 +1,10 @@
 use anyhow::{bail, Result};
-use std::{fs, path::PathBuf, process::Command, str::FromStr};
+use std::{
+    fs,
+    path::PathBuf,
+    process::{Command, Stdio},
+    str::FromStr,
+};
 
 pub(super) const VENDOR_HELP: &str = r#"
 Download packages that are specified in `resource/packages.txt`
@@ -38,11 +43,17 @@ pub(super) fn vendor() -> Result<()> {
 
         // download missing packages
         if let Some(url) = pkg_src.source {
-            Command::new("curl")
-                .arg("-o")
+            println!("downloading {url}");
+            let status = Command::new("curl")
+                .arg("-Lo")
                 .arg(full_path)
                 .arg(url)
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
                 .status()?;
+            if !status.success() {
+                bail!("download failed");
+            }
         }
     }
 
@@ -64,22 +75,23 @@ impl FromStr for PackageSource {
             bail!("invalid package source, no empty line allowed");
         }
 
+        let normalize = |path_str: &str| -> PathBuf {
+            #[cfg(windows)]
+            let res = path_str.replace('/', "\\").into();
+            #[cfg(not(windows))]
+            let res = path_str.into();
+            res
+        };
         let splited = trimed.split_once('@');
 
-        if let Some((relpath, source)) = splited {
-            let normalized = relpath.replace('/', "\\");
-            Ok(Self {
-                is_dir: false,
-                relpath: normalized.into(),
-                source: Some(source.to_string()),
-            })
-        } else {
-            let normalized = trimed.replace('/', "\\");
-            Ok(Self {
-                is_dir: true,
-                relpath: normalized.into(),
-                source: None,
-            })
-        }
+        let (relpath, source) = splited
+            .map(|(path, url)| (normalize(path), Some(url.into())))
+            .unwrap_or_else(|| (normalize(trimed), None));
+
+        Ok(Self {
+            is_dir: source.is_none(),
+            relpath,
+            source,
+        })
     }
 }

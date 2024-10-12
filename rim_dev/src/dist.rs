@@ -291,6 +291,7 @@ where
         }
     }
 
+    ensure_parent_dir(&to)?;
     fs::copy(&from, &to).with_context(|| {
         format!(
             "could not copy file '{}' to '{}'",
@@ -316,4 +317,23 @@ pub fn walk_dir(dir: &Path, recursive: bool) -> Result<Vec<PathBuf>> {
     let mut paths = vec![];
     collect_paths_(dir, &mut paths, recursive)?;
     Ok(paths)
+}
+
+pub fn ensure_dir<P: AsRef<Path>>(path: P) -> Result<()> {
+    if !path.as_ref().is_dir() {
+        fs::create_dir_all(path.as_ref()).with_context(|| {
+            format!(
+                "unable to create specified directory '{}'",
+                path.as_ref().display()
+            )
+        })?;
+    }
+    Ok(())
+}
+
+pub fn ensure_parent_dir<P: AsRef<Path>>(path: P) -> Result<()> {
+    if let Some(p) = path.as_ref().parent() {
+        ensure_dir(p)?;
+    }
+    Ok(())
 }
