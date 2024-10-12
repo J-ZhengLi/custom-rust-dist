@@ -2,6 +2,7 @@
 extern crate rust_i18n;
 
 mod dist;
+mod vendor;
 
 use anyhow::{Context, Result};
 use dist::{DistMode, DIST_HELP};
@@ -9,6 +10,7 @@ use std::io::{stdout, Write};
 use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 use std::{env, fs};
+use vendor::VENDOR_HELP;
 
 i18n!("../locales", fallback = "en");
 
@@ -21,7 +23,7 @@ Options:
 Commands:
     dist, d         Generate release binaries
     run-manager     Run with manager mode
-    set-vendor      Set binaries' vendor name and the identifier etc
+    vendor          Download packages that are specified in `resource/packages.txt`
 "#;
 
 const MANAGER_MODE_HELP: &str = r#"
@@ -35,23 +37,11 @@ Options:
     -h, -help       Print this help message
 "#;
 
-const SET_VENDOR_HELP: &str = r#"
-Set binaries' vendor name and the identifier etc
-
-Usage: cargo dev set-vendor [OPTIONS] <ARG>
-
-Arguments:
-    NAME:           Name of the vendor to replace
-
-Options:
-    -h, -help       Print this help message
-"#;
-
 #[derive(Debug)]
 enum DevCmd {
     Dist { mode: DistMode, binary_only: bool },
     RunManager { no_gui: bool, args: Vec<String> },
-    SetVendor { vendor: String },
+    Vendor,
 }
 
 impl DevCmd {
@@ -77,9 +67,7 @@ impl DevCmd {
                     status.code().unwrap_or(-1)
                 );
             }
-            Self::SetVendor { vendor } => {
-                todo!("change all the `xuanwu` strings to {vendor}");
-            }
+            Self::Vendor => vendor::vendor()?,
         }
         Ok(())
     }
@@ -144,21 +132,16 @@ fn main() -> Result<ExitCode> {
             };
             DevCmd::Dist { mode, binary_only }
         }
-        "set-vendor" => match args.next().as_deref() {
+        "vendor" => match args.next().as_deref() {
             Some("-h" | "--help") => {
-                writeln!(&mut stdout, "{SET_VENDOR_HELP}")?;
+                writeln!(&mut stdout, "{VENDOR_HELP}")?;
                 return Ok(ExitCode::SUCCESS);
             }
-            Some(n) => DevCmd::SetVendor {
-                vendor: n.to_string(),
-            },
-            None => {
-                writeln!(
-                    &mut stdout,
-                    "no vendor name provided, usage: 'cargo dev set-vendor [Name]'"
-                )?;
+            Some(s) => {
+                writeln!(&mut stdout, "invalid argument '{s}'")?;
                 return Ok(ExitCode::FAILURE);
             }
+            None => DevCmd::Vendor,
         },
         "run-manager" => match args.next().as_deref() {
             Some("-h" | "--help") => {

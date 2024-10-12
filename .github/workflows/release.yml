@@ -42,11 +42,25 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
 
+    - name: configure cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          resources/packages*
+          target/
+        key: ${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+
     - name: install cargo-tauri-cli
       run: cargo install tauri-cli --version "^1"
     
     - name: dist
-      run: cargo dev dist --binary-only
+      run: |
+        cargo dev vendor
+        cargo dev dist
 
     - name: prepare packages (windows)
       if: matrix.os == 'windows-latest'
@@ -54,21 +68,26 @@ jobs:
       run: |
         set -x
         export LANG=C.UTF-8
-        NAME=$(grep -Po 'vendor_en": "\K[^"]*' locales/en.json)-installer
+        NAME=$(grep -Po 'vendor_en": "\K[^"]*' locales/en.json)
         mkdir ./dist/binaries/
-        mv ./dist/${{ matrix.target-gnu }}/net-installer/$NAME-cli.exe ./dist/binaries/$NAME-cli-${{ matrix.target-gnu }}.exe
-        mv ./dist/${{ matrix.target-gnu }}/net-installer/$NAME.exe ./dist/binaries/$NAME-${{ matrix.target-gnu }}.exe
-        mv ./dist/${{ matrix.target }}/net-installer/$NAME-cli.exe ./dist/binaries/$NAME-cli-${{ matrix.target }}.exe
-        mv ./dist/${{ matrix.target }}/net-installer/$NAME.exe ./dist/binaries/$NAME-${{ matrix.target }}.exe
-
+        mv ./dist/${{ matrix.target-gnu }}/$NAME-installer.exe ./dist/binaries/$NAME-installer-${{ matrix.target-gnu }}.exe
+        mv ./dist/${{ matrix.target }}/$NAME-installer.exe ./dist/binaries/$NAME-installer-${{ matrix.target }}.exe
+        cd ./dist/${{ matrix.target-gnu }}
+        rm -f $NAME-${{ matrix.target-gnu }}/$NAME-installer-cli.exe
+        7z a ../binaries/$NAME-${{ matrix.target-gnu }}.zip $NAME-${{ matrix.target-gnu }}
+        cd ../${{ matrix.target }}
+        rm -f $NAME-${{ matrix.target }}/$NAME-installer-cli.exe
+        7z a ../binaries/$NAME-${{ matrix.target }}.zip $NAME-${{ matrix.target }}
     - name: prepare packages (unix)
       if: matrix.os != 'windows-latest'
       run: |
         set -x
         NAME=$(grep -Po 'vendor_en": "\K[^"]*' locales/en.json)-installer
         mkdir ./dist/binaries/
-        mv ./dist/${{ matrix.target }}/net-installer/$NAME-cli ./dist/binaries/$NAME-cli-${{ matrix.target }}
-        mv ./dist/${{ matrix.target }}/net-installer/$NAME ./dist/binaries/$NAME-${{ matrix.target }}
+        mv ./dist/${{ matrix.target }}/$NAME-installer-cli ./dist/binaries/$NAME-installer-cli-${{ matrix.target }}
+        mv ./dist/${{ matrix.target }}/$NAME-installer ./dist/binaries/$NAME-installer-${{ matrix.target }}
+        cd ../${{ matrix.target }}
+        tar cjf ../binaries/$NAME-${{ matrix.target }}.tar.xz $NAME-${{ matrix.target }}
 
     - name: upload release
       uses: ncipollo/release-action@v1
