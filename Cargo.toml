@@ -48,6 +48,7 @@ cfg-if = "1"
 env_proxy = "0.4.1"
 indexmap.workspace = true
 rust-i18n.workspace = true
+sys-locale = "0.3.1"
 
 [target."cfg(windows)".dependencies]
 winreg = "0.52.0"
