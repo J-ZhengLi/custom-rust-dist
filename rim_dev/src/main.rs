@@ -49,7 +49,7 @@ Options:
 
 #[derive(Debug)]
 enum DevCmd {
-    Dist { mode: DistMode },
+    Dist { mode: DistMode, binary_only: bool },
     RunManager { no_gui: bool, args: Vec<String> },
     SetVendor { vendor: String },
 }
@@ -57,7 +57,7 @@ enum DevCmd {
 impl DevCmd {
     fn execute(&self) -> Result<()> {
         match self {
-            Self::Dist { mode } => dist::dist(*mode)?,
+            Self::Dist { mode, binary_only } => dist::dist(*mode, *binary_only)?,
             Self::RunManager { no_gui, args } => {
                 let mut cargo_args = if *no_gui {
                     ["run", "--"].to_vec()
@@ -129,16 +129,20 @@ fn main() -> Result<ExitCode> {
             return Ok(ExitCode::SUCCESS);
         }
         "d" | "dist" => {
-            let mode = match args.next().as_deref() {
+            let mut binary_only = false;
+            let mut mode = DistMode::Both;
+
+            match args.next().as_deref() {
                 Some("-h" | "--help") => {
                     writeln!(&mut stdout, "{DIST_HELP}")?;
                     return Ok(ExitCode::SUCCESS);
                 }
-                Some("--cli") => DistMode::Cli,
-                Some("--gui") => DistMode::Gui,
-                _ => DistMode::Both,
+                Some("--cli") => mode = DistMode::Cli,
+                Some("--gui") => mode = DistMode::Gui,
+                Some("-b" | "--binary-only") => binary_only = true,
+                _ => (),
             };
-            DevCmd::Dist { mode }
+            DevCmd::Dist { mode, binary_only }
         }
         "set-vendor" => match args.next().as_deref() {
             Some("-h" | "--help") => {

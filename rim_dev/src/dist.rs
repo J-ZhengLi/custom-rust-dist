@@ -14,6 +14,8 @@ Usage: cargo dev dist [OPTIONS]
 Options:
         --cli       Generate release binary for CLI mode only
         --gui       Generate release binary for GUI mode only
+    -b, --binary-only
+                    Build binary only (net-installer), skip offline package generation
     -h, -help       Print this help message
 "#;
 
@@ -131,7 +133,7 @@ impl<'a> DistWorker<'a> {
     }
 }
 
-pub fn dist(mode: DistMode) -> Result<()> {
+pub fn dist(mode: DistMode, binary_only: bool) -> Result<()> {
     // Get the target dir
     let dev_bin = env::current_exe()?;
     let release_dir = dev_bin.parent().unwrap().with_file_name("release");
@@ -163,11 +165,15 @@ pub fn dist(mode: DistMode) -> Result<()> {
 
                 worker.dist_net_installer(Some(msvc_target))?;
                 worker.dist_net_installer(Some(gnu_target))?;
-                worker.dist_noweb_installer(Some(msvc_target))?;
-                worker.dist_noweb_installer(Some(gnu_target))?;
+                if !binary_only {
+                    worker.dist_noweb_installer(Some(msvc_target))?;
+                    worker.dist_noweb_installer(Some(gnu_target))?;
+                }
             } else {
                 worker.dist_net_installer(None)?;
-                worker.dist_noweb_installer(None)?;
+                if !binary_only {
+                    worker.dist_noweb_installer(None)?;
+                }
             }
         }
     }
