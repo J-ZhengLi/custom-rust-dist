@@ -62,12 +62,9 @@ impl<'a> DistWorker<'a> {
         cmd.args(self.build_args);
 
         if noweb {
-            dest_dir.push("offline-package");
             dest_dir.push(format!("{}-{target}", t!("vendor_en")));
 
             cmd.args(["--features", "no-web"]);
-        } else {
-            dest_dir.push("net-installer");
         }
         fs::create_dir_all(&dest_dir)?;
 
