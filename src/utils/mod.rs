@@ -75,3 +75,9 @@ pub fn lowercase_program_name() -> Option<String> {
 pub fn to_string_lossy<S: AsRef<OsStr>>(s: S) -> String {
     s.as_ref().to_string_lossy().to_string()
 }
+
+/// Allowing the i18n framework to use the current system locale.
+pub fn use_current_locale() {
+    let locale = sys_locale::get_locale().unwrap_or_else(|| "en".to_string());
+    rust_i18n::set_locale(&locale);
+}
