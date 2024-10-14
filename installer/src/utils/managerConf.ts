@@ -133,6 +133,9 @@ class ManagerConf {
     );
   }
   async loadConf() {
+    // TODO: Complete update detection
+    // await this.checkUpdate();
+
     let dir = await invokeCommand('get_install_dir');
     if (typeof dir === 'string' && dir.trim() !== '') {
       this.path.value = dir;
@@ -140,6 +143,18 @@ class ManagerConf {
 
     await this.loadInstalledKit();
     await this.loadAvailableKit();
+  }
+
+  async checkUpdate() {
+    let update = await invokeCommand('check_manager_version') as boolean;
+
+    if (update) {
+      // TODO: It is up to the user to decide whether to upgrade
+    }
+  }
+
+  async upgradeManager() {
+    await invokeCommand('upgrade_manager');
   }
 
   async loadInstalledKit() {
