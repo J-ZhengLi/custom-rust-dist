@@ -122,7 +122,7 @@ impl ToolsetManifest {
             return vec![];
         };
         map.keys()
-            .filter(|name| custom_instructions::already_installed(name))
+            .filter(|name| custom_instructions::is_installed(name))
             .collect()
     }
 

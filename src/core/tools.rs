@@ -198,7 +198,7 @@ impl<'a> Tool<'a> {
 fn cargo_install_or_uninstall(op: &str, args: &[&str], cargo_home: &Path) -> Result<()> {
     let mut cargo_bin = cargo_home.to_path_buf();
     cargo_bin.push("bin");
-    cargo_bin.push(format!("cargo{}", std::env::consts::EXE_SUFFIX));
+    cargo_bin.push(utils::exe!("cargo"));
 
     utils::Command::new(cargo_bin)
         .arg(op)

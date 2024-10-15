@@ -92,10 +92,10 @@ impl Command {
 }
 
 /// Check if a command/program exist in the `PATH`.
-pub fn cmd_exist(cmd: &str) -> bool {
+pub fn cmd_exist<S: AsRef<str>>(cmd: S) -> bool {
     let path = env::var_os("PATH").unwrap_or_default();
     env::split_paths(&path)
-        .map(|p| p.join(cmd))
+        .map(|p| p.join(cmd.as_ref()))
         .any(|p| p.exists())
 }
 

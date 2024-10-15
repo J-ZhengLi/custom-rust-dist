@@ -23,10 +23,22 @@ pub use progress_bar::{send_and_print, Progress};
 use anyhow::Result;
 use url::Url;
 
-#[cfg(not(windows))]
-pub const EXE_EXT: &str = "";
-#[cfg(windows)]
-pub const EXE_EXT: &str = ".exe";
+/// Mark the given string as an executable's filename.
+///
+/// This will set a `.exe` postfix on Windows, and does nothing if on Unix.
+macro_rules! exe {
+    ($input:expr) => {{
+        #[cfg(windows)]
+        {
+            format!("{}.exe", $input)
+        }
+        #[cfg(not(windows))]
+        {
+            $input
+        }
+    }};
+}
+pub(crate) use exe;
 
 /// Forcefully parsing a `&str` to [`Url`].
 ///
