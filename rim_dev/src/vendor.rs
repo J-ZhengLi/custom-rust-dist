@@ -1,3 +1,4 @@
+use crate::common::{ensure_dir, ensure_parent_dir};
 use anyhow::{bail, Result};
 use std::{
     fs,
@@ -37,9 +38,11 @@ pub(super) fn vendor() -> Result<()> {
         }
 
         if pkg_src.is_dir {
-            fs::create_dir_all(&full_path)?;
+            ensure_dir(&full_path)?;
             continue;
         }
+
+        ensure_parent_dir(&full_path)?;
 
         // download missing packages
         if let Some(url) = pkg_src.source {

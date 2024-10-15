@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate rust_i18n;
 
+mod common;
 mod dist;
 mod vendor;
 
