@@ -179,9 +179,9 @@ enum ManagerSubcommands {
     },
     /// Uninstall individual components or everything.
     Uninstall {
-        /// Remove this manager tool as well
-        #[arg(long)]
-        remove_self: bool,
+        /// Keep this manager tool, only uninstall toolkit
+        #[arg(long, alias = "keep-manager")]
+        keep_self: bool,
     },
     /// A subcommand to create a new Rust project template and let you start coding with it.
     TryIt {

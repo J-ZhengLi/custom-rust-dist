@@ -8,7 +8,7 @@ use anyhow::Result;
 
 /// Execute `uninstall` command.
 pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Result<bool> {
-    let ManagerSubcommands::Uninstall { remove_self } = subcommand else {
+    let ManagerSubcommands::Uninstall { keep_self } = subcommand else {
         return Ok(false);
     };
 
@@ -16,7 +16,7 @@ pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Resul
     let installed = config.install_record.print_installation();
 
     // Ask confirmation
-    let prompt = if *remove_self {
+    let prompt = if !keep_self {
         t!(
             "uninstall_all_confirmation",
             vendor = t!("vendor_en"),
@@ -29,7 +29,7 @@ pub(super) fn execute(subcommand: &ManagerSubcommands, _opt: GlobalOpt) -> Resul
         return Ok(true);
     }
 
-    config.uninstall(*remove_self)?;
+    config.uninstall(!keep_self)?;
 
     Ok(true)
 }

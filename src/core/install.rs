@@ -108,10 +108,10 @@ impl<'a> InstallConfiguration<'a> {
             // Create a copy of this binary
             let self_exe = std::env::current_exe()?;
             // promote this installer to manager
-            let manager_name = format!("{}-manager{}", t!("vendor_en"), utils::EXE_EXT);
+            let manager_name = format!("{}-manager", t!("vendor_en"));
 
             // Add this manager to the `PATH` environment
-            let manager_exe = install_dir.join(manager_name);
+            let manager_exe = install_dir.join(utils::exe!(manager_name));
             utils::copy_as(self_exe, &manager_exe)?;
             add_to_path(install_dir)?;
 
