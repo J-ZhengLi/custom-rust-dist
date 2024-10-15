@@ -119,7 +119,7 @@ pub(crate) mod rustup {
         uninstall_cmd.push("\"");
 
         #[cfg(not(feature = "gui"))]
-        uninstall_cmd.push(" uninstall --remove-self");
+        uninstall_cmd.push(" uninstall");
 
         let reg_value = RegValue {
             bytes: to_winreg_bytes(uninstall_cmd.encode_wide().collect()),
