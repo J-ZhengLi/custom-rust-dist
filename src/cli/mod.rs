@@ -162,9 +162,6 @@ enum ManagerSubcommands {
         /// You can update the Manager using the flag
         #[arg(long)]
         self_update: bool,
-        #[arg(long)]
-        #[arg(conflicts_with = "self_update")]
-        only_manager: bool,
     },
     #[command(hide = true)]
     /// Show a list of available dist version or components

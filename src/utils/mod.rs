@@ -3,6 +3,7 @@
 //! NOTE: Most of these are moved from the `experimental` branch,
 //! some of them might turns out to be unused, so remember to clean those after version `1.0`.
 
+mod detect;
 mod download;
 mod extraction;
 mod file_system;
@@ -14,6 +15,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+pub use detect::*;
 pub use download::download;
 pub use extraction::Extractable;
 pub use file_system::*;

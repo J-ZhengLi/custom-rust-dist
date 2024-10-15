@@ -11,21 +11,16 @@ use crate::{get_installed_dir, utils};
 
 pub struct UpdateConfiguration;
 
-pub(crate) const BASE_OBS_URL: &str = "https://rustup.obs.cn-south-1.myhuaweicloud.com";
+pub(crate) const BASE_OBS_URL: &str = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com";
 pub(crate) const MANAGER_SOURCE_PATH: &str = "/manager/version";
 
 impl UpdateConfiguration {
-    pub fn update(&self, self_udpate: bool, only_manager: bool) -> Result<()> {
-        match only_manager {
-            true => self.upgrade_manager()?,
-            false => {
-                if self_udpate {
-                    self.upgrade_manager()?;
-                }
-                self.update_toolsets()?;
-            }
+    pub fn update(&self, self_udpate: bool) -> Result<()> {
+        if self_udpate {
+            self.upgrade_manager()?;
+        } else {
+            self.update_toolsets()?;
         }
-
         Ok(())
     }
 
@@ -41,8 +36,11 @@ impl UpdateConfiguration {
         // By default, if the version is different from the local version, an update is performed.
         if update {
             let latest_version = latest_version(MANAGER_SOURCE_PATH)?;
-            let download_url =
-                parse_download_url(&format!("/dist/{}/{}", latest_version, full_manager_name()))?;
+            let download_url = parse_download_url(&format!(
+                "/manager/dist/{}/{}",
+                latest_version,
+                full_manager_name()
+            ))?;
 
             let dest = get_installed_dir().join(full_manager_name());
             utils::download(full_manager_name().as_str(), &download_url, &dest, None)?;
@@ -54,6 +52,9 @@ impl UpdateConfiguration {
     }
 
     fn update_toolsets(&self) -> Result<()> {
+        // When updating the tool, it will detect whether
+        // there is a new version of the management tool
+        utils::check_manager_upgrade();
         // TODO: update toolchain via toolsets manifest.
         Ok(())
     }
