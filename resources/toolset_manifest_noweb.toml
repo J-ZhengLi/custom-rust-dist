@@ -1,4 +1,4 @@
-name = "XuanWu Rust Development Kit"
+name = "玄武 Rust 一站式开发套件"
 version = "stable v1.81.0"
 
 [rust]
@@ -6,25 +6,34 @@ version = "stable"
 group = "Rust"
 components = ["clippy", "rustfmt", "rust-src", "rust-docs"]
 optional-components = ["llvm-tools", "rustc-dev"]
-offline-dist-server = "packages/" # Must contain a folder named "dist"
-
-[rust.rustup]
-x86_64-pc-windows-msvc = "packages/x86_64-pc-windows-msvc/rustup-init.exe"
-x86_64-pc-windows-gnu = "packages/x86_64-pc-windows-gnu/rustup-init.exe"
-x86_64-unknown-linux-gnu = "packages/x86_64-unknown-linux-gnu/rustup-init"
 
 [rust.profile]
 name = "minimal"
-verbose-name = "Basic"
-description = "Basic set of tools to use Rust properly"
+verbose-name = "Rust 工具链"
+description = "Rust 官方工具链，包含 rustc (编译器), rust-std (标准库), cargo (包管理) 等工具"
 
 [tools.descriptions]
-llvm-tools = "Contains a collection of LLVM tools. Note that this component has not been stabilized and may change in the future and is provided as-is"
-rustc-dev = "Contains the compiler as a library. Most users will not need this; it is only needed for development of tools that link to the compiler, such as making modifications to Clippy."
-mingw64 = "(windows only) Requirement for Windows GNU toolchain"
+llvm-tools = "包含 LLVM 工具的集合"
+rustc-dev = "将编译器作为库来内部 API。大多数用户不需要这个; 仅当开发链接到编译器的工具时才需要它, 例如对 Clippy 进行修改"
+mingw64 = "编译器在 x86_64 Windows GNU 环境下的依赖组件"
+typos = "源代码拼写检查器，用于查找并纠正源代码中的拼写错误"
+cargo-nextest = "新一代 Rust 项目测试运行程序，相比传统 cargo test 而言更快速，界面更简洁明了"
 
 [tools.group]
-Prerequisites = ["mingw64"]
+"后端编译工具链" = ["mingw64"]
+"优选Rust开发工具" = ["typos", "cargo-nextest"]
 
 [tools.target.x86_64-pc-windows-gnu]
 mingw64 = { required = true, path = "packages/x86_64-pc-windows-gnu/x86_64-14.2.0-release-posix-seh-ucrt-rt_v12-rev0.7z", version = "14.2.0-rt_v12-rev0" }
+# `-msvc` can also be used here as long as these are built.
+cargo-nextest = { optional = true, version = "0.9.81", path = "packages/x86_64-pc-windows/cargo-nextest-0.9.81-x86_64-pc-windows-msvc.zip" }
+typos = { optional = true, version = "1.26.0", path = "packages/x86_64-pc-windows/typos-v1.26.0-x86_64-pc-windows-msvc.zip" }
+
+[tools.target.x86_64-pc-windows-msvc]
+cargo-nextest = { optional = true, version = "0.9.81", path = "packages/x86_64-pc-windows/cargo-nextest-0.9.81-x86_64-pc-windows-msvc.zip" }
+typos = { optional = true, version = "1.26.0", path = "packages/x86_64-pc-windows/typos-v1.26.0-x86_64-pc-windows-msvc.zip" }
+
+[tools.target.x86_64-unknown-linux-gnu]
+cargo-nextest = { optional = true, version = "0.9.81", path = "packages/x86_64-unknown-linux/typos-v1.26.0-x86_64-unknown-linux-musl.tar.gz" }
+# `-musl` target built binary still works here
+typos = { optional = true, version = "1.26.0", path = "packages/x86_64-unknown-linux-gnu/cargo-nextest-0.9.81-x86_64-unknown-linux-gnu.tar.gz" }
