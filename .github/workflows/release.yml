@@ -45,6 +45,21 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
 
+    - name: setup tauri-cli
+      shell: bash
+      run: |
+        mkdir ./cargo_tauri
+        if [[ ${{ matrix.os }} == 'windows-latest' ]]; then
+          curl -OL https://github.com/tauri-apps/tauri/releases/download/tauri-cli-v1.6.3/cargo-tauri-x86_64-pc-windows-msvc.zip
+          unzip cargo-tauri-x86_64-pc-windows-msvc.zip -d ./cargo_tauri
+          mv ./cargo_tauri/cargo-tauri.exe ~/.cargo/bin
+        fi
+        if [[ ${{ matrix.os }} == 'ubuntu-20.04' ]]; then
+          curl -OL https://github.com/tauri-apps/tauri/releases/download/tauri-cli-v1.6.3/cargo-tauri-x86_64-unknown-linux-gnu.tgz
+          tar -xf cargo-tauri-x86_64-unknown-linux-gnu.tgz -C ./cargo_tauri
+          mv ./cargo_tauri/cargo-tauri ~/.cargo/bin
+        fi
+
     - name: configure cache
       uses: actions/cache@v4
       with:
@@ -53,9 +68,6 @@ jobs:
           resources/packages/
           target/
         key: ${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-
-    - name: install cargo-tauri-cli
-      run: cargo install tauri-cli --version "^1"
     
     - name: dist
       run: |
