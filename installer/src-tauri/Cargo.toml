@@ -1,6 +1,6 @@
 [package]
 name = "rim-gui"
-version = "0.2.0"
+version = "0.2.1"
 description = "An interactive Rust installation manager"
 authors = ["you"]
 edition = "2021"
