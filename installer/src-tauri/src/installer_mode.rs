@@ -25,6 +25,7 @@ pub(super) fn main() -> Result<()> {
             super::close_window,
             default_install_dir,
             select_folder,
+            check_install_path,
             get_component_list,
             install_toolchain,
             run_app,
@@ -73,6 +74,21 @@ fn select_folder(window: tauri::Window) {
         // 通过窗口发送事件给前端
         window.emit("folder-selected", folder).unwrap();
     });
+}
+
+/// Check if the given path could be used for installation, and return the reason if not.
+#[tauri::command]
+fn check_install_path(path: String) -> Option<String> {
+    if path.is_empty() {
+        Some(t!("notify_empty_path").to_string())
+    } else if Path::new(&path).is_relative() {
+        // We won't accept relative path because the result might gets a little bit unpredictable
+        Some(t!("notify_relative_path").to_string())
+    } else if utils::is_root_dir(path) {
+        Some(t!("notify_root_dir").to_string())
+    } else {
+        None
+    }
 }
 
 /// Get full list of supported components

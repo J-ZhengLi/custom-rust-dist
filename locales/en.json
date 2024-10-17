@@ -69,5 +69,9 @@
     "uninstall_tool_failed_warn": "warn: unable to uninstall tool '%{tool}', maybe it was already uninstalled, skipping",
 
     "linux_source_hint": "Please restart the current shell or run `%{cmd}` for the environment changes to take effect",
-    "unknown_toolkit": "Unknown Toolkit"
+    "unknown_toolkit": "Unknown Toolkit",
+
+    "notify_empty_path": "Please enter an installation path, or choose one using the button above",
+    "notify_root_dir": "Cannot install in root directory, please select another one",
+    "notify_relative_path": "Please enter the full absolute path"
 }

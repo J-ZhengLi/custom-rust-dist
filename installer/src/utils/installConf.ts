@@ -17,9 +17,6 @@ class InstallConf {
   }
 
   setPath(newPath: string) {
-    if (newPath === this.path.value || newPath === '') {
-      return;
-    }
     this.path.value = newPath;
   }
 
@@ -84,7 +81,7 @@ class InstallConf {
     });
   }
 
-  async loadPath() {
+  async loadDefaultPath() {
     const defaultPath = await invokeCommand('default_install_dir');
     if (typeof defaultPath === 'string' && defaultPath.trim() !== '') {
       this.setPath(defaultPath);
@@ -144,7 +141,7 @@ class InstallConf {
   }
 
   async loadAll() {
-    await this.loadPath();
+    await this.loadDefaultPath();
     await this.loadComponents();
   }
 }

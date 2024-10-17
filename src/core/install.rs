@@ -98,9 +98,6 @@ impl<'a> InstallConfiguration<'a> {
         if let Some(prog) = &progress {
             prog.show_msg(t!("install_init", dir = install_dir.display()))?;
         }
-        if install_dir.parent().is_none() {
-            bail!("unable to install in root directory");
-        }
         // Create a new folder to hold installation
         utils::ensure_dir(install_dir)?;
 

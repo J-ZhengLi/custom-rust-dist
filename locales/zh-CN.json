@@ -53,5 +53,22 @@
     "invalid_input": "无效的输入 '%{actual}'，正确格式应为：%{expect}，请重试",
     "current_install_option": "当前安装选项：",
     "install_dir": "安装路径",
-    "selected_components": "已选组件"
+    "selected_components": "已选组件",
+
+    "uninstall_confirmation": "是否确认卸载以下组件: \n\n%{list}\n",
+    "uninstall_all_confirmation": "是否确认卸载 %{vendor}-manager 及以下组件: \n\n%{list}\n",
+    "uninstall_unknown_tool_warn": "warn: 跳过卸载未知工具 '%{tool}'",
+    "uninstalling_third_party_tools": "正在卸载第三方工具",
+    "uninstalling_for": "正在卸载 '%{name}'",
+    "uninstalling_rust_toolchain": "正在卸载 Rust 官方工具链",
+    "uninstall_env_config": "正在移除环境变量配置...",
+    "uninstall_self": "正在清除此管理程序...",
+    "uninstall_tool_failed_warn": "warn: 工具 '%{tool}' 可能已被卸载, 跳过中...",
+
+    "linux_source_hint": "请重启当前终端窗口或执行 `%{cmd}` 以使环境变更生效",
+    "unknown_toolkit": "未知工具集",
+
+    "notify_empty_path": "请输入安装路径，或点击上方按钮选择一个路径",
+    "notify_root_dir": "无法安装至根目录，请重新选择",
+    "notify_relative_path": "请输入绝对路径"
 }
