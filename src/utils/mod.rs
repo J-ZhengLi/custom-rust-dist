@@ -11,7 +11,7 @@ mod progress_bar;
 
 use std::{
     ffi::OsStr,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf, Prefix},
 };
 
 pub use download::download;
@@ -72,6 +72,17 @@ pub fn path_to_str(path: &Path) -> Result<&str> {
     })
 }
 
+pub fn is_root_dir<P: AsRef<Path>>(path: P) -> bool {
+    // filter out root (`/`) and Windows' disk prefix (i.e. `C:`),
+    // so that only normal or `.`/`..` components are left
+    let mut compoents = path.as_ref().components().filter(|c| match c {
+        Component::RootDir => false,
+        Component::Prefix(p) if matches!(p.kind(), Prefix::Disk(_)) => false,
+        _ => true,
+    });
+    compoents.next().is_none()
+}
+
 /// Get the binary name of current executing binary, a.k.a `arg[0]`.
 pub fn lowercase_program_name() -> Option<String> {
     let program_executable = std::env::args().next().map(PathBuf::from)?;
@@ -92,4 +103,19 @@ pub fn to_string_lossy<S: AsRef<OsStr>>(s: S) -> String {
 pub fn use_current_locale() {
     let locale = sys_locale::get_locale().unwrap_or_else(|| "en".to_string());
     rust_i18n::set_locale(&locale);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_root_dir;
+
+    #[test]
+    fn root_dirs() {
+        assert!(is_root_dir("/"));
+        assert!(is_root_dir("D:\\"));
+        assert!(is_root_dir("C:\\\\"));
+        assert!(!is_root_dir("/bin"));
+        assert!(!is_root_dir("root"));
+        assert!(!is_root_dir("C:\\Windows\\System32"));
+    }
 }
