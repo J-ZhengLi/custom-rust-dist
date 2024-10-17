@@ -1,7 +1,4 @@
-use std::{
-    env,
-    process::{Command, Stdio},
-};
+use std::env;
 
 use anyhow::{Context, Result};
 use reqwest::blocking::Client;
@@ -25,8 +22,10 @@ impl UpdateConfiguration {
     }
 
     pub fn check_upgrade(&self) -> Result<bool> {
-        let local_version = local_version(full_manager_name().as_str())?;
+        let local_version = local_version();
         let latest_version = latest_version(MANAGER_SOURCE_PATH)?;
+
+        println!("{} {}", local_version, latest_version);
 
         Ok(local_version != latest_version)
     }
@@ -54,14 +53,20 @@ impl UpdateConfiguration {
     fn update_toolsets(&self) -> Result<()> {
         // When updating the tool, it will detect whether
         // there is a new version of the management tool
-        utils::check_manager_upgrade();
+        let config: UpdateConfiguration = UpdateConfiguration;
+        let upgradeable = config.check_upgrade().unwrap_or(false);
+        if upgradeable {
+            println!(
+                "A new manager version has been detected. You can update it via using `--self-update`"
+            )
+        };
         // TODO: update toolchain via toolsets manifest.
         Ok(())
     }
 }
 
 fn full_manager_name() -> String {
-    let full_manager_name = format!("xuanwu-manager{}", env::consts::EXE_SUFFIX);
+    let full_manager_name = format!("{}-manager{}", t!("vendor_en"), env::consts::EXE_SUFFIX);
     full_manager_name
 }
 
@@ -72,28 +77,8 @@ fn parse_download_url(source_path: &str) -> Result<Url> {
 }
 
 // Try to get manager version via execute command with `--version`.
-fn local_version(command: &str) -> Result<String> {
-    // execute command
-    let output = Command::new(command) // 使用 manager 的路径
-        .arg("--version")
-        .stdout(Stdio::piped()) // 将标准输出重定向到管道
-        .stderr(Stdio::piped()) // 将标准错误重定向到管道
-        .output()
-        .with_context(|| format!("Failed to execute {}", command))?; // 添加上下文信息
-
-    if output.status.success() {
-        let stdout = String::from_utf8(output.stdout)
-            .with_context(|| "Failed to convert output to UTF-8")?; // 添加上下文信息
-        let content = stdout.trim().to_string(); // 返回输出并去除多余空白
-        let version = content
-            .split(' ')
-            .nth(1)
-            .context("Failed to parse version")?;
-        Ok(version.to_string())
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        Err(anyhow::anyhow!("Command failed with error: {}", stderr)) // 返回错误信息
-    }
+fn local_version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
 }
 
 // Try to get the latest manager version

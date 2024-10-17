@@ -4,6 +4,7 @@ import { ManagerComponent } from './types/Component';
 import { CheckGroup, CheckGroupItem } from './types/CheckBoxGroup';
 import LabelComponent from '@/views/manager/components/Label.vue';
 import { invokeCommand } from './invokeCommand';
+import { ask } from '@tauri-apps/api/dialog';
 
 
 type Target = {
@@ -150,6 +151,7 @@ class ManagerConf {
 
     if (update) {
       // TODO: It is up to the user to decide whether to upgrade
+      await ask("检测到新的可用版本，是否现在更新？");
     }
   }
 
