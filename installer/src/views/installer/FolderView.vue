@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { event } from '@tauri-apps/api';
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useCustomRouter } from '@/router/index';
 import { installConf, invokeCommand } from '@/utils/index';
 
 const { routerPush, routerBack } = useCustomRouter();
 // const diskRequire = ref(33);
+const invalidReason = ref('');
 
 function handleNextClick() {
-  routerPush('/installer/components');
+  // validate folder path input
+  invokeCommand('check_install_path', { path: installConf.path.value as string }).then((res) => {
+    if (typeof res === 'string') {
+      invalidReason.value = res
+    } else {
+      routerPush('/installer/components');
+    }
+  });
 }
 
 function openFolder() {
@@ -49,6 +57,9 @@ onMounted(() => {
         <base-button theme="primary" ml="12px" @click="openFolder"
           >选择文件夹</base-button
         >
+      </div>
+      <div flex="~ items-center">
+        <p style="color:red">{{ invalidReason }}</p>
       </div>
     </div>
     <!-- <div mx="12px">

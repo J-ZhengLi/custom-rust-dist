@@ -15,7 +15,7 @@ use crate::{components, default_install_dir, utils};
 
 use super::{GlobalOpt, Installer, ManagerSubcommands};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use indexmap::IndexSet;
 
 /// Perform installer actions.
@@ -47,6 +47,10 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         .map(|u| (registry_name.as_str(), u))
         .unwrap_or(DEFAULT_CARGO_REGISTRY);
     let install_dir = user_opt.prefix;
+
+    if utils::is_root_dir(&install_dir) {
+        bail!("unable to install in root directory");
+    }
 
     InstallConfiguration::init(&install_dir, false, None, &manifest)?
         .cargo_registry(registry_name, registry_value)

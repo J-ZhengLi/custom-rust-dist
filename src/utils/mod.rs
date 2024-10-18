@@ -72,6 +72,28 @@ pub fn path_to_str(path: &Path) -> Result<&str> {
     })
 }
 
+/// Returns `true` if the `Path` is root directory.
+///
+/// * On Unix, root directory is just `/`.
+///
+/// * On Windows, a path is root if it has a root (check [`has_root`](Path::has_root) for details)
+///     and has no child components.
+pub fn is_root_dir<P: AsRef<Path>>(path: P) -> bool {
+    cfg_if::cfg_if! {
+        if #[cfg(windows)] {
+            use std::path::Component;
+            let has_root = path.as_ref().has_root();
+            let has_children = || path
+                .as_ref()
+                .components()
+                .any(|c| matches!(c, Component::CurDir | Component::ParentDir | Component::Normal(_)));
+            has_root && !has_children()
+        } else {
+            matches!(path.as_ref().to_str(), Some("/"))
+        }
+    }
+}
+
 /// Get the binary name of current executing binary, a.k.a `arg[0]`.
 pub fn lowercase_program_name() -> Option<String> {
     let program_executable = std::env::args().next().map(PathBuf::from)?;
@@ -92,4 +114,24 @@ pub fn to_string_lossy<S: AsRef<OsStr>>(s: S) -> String {
 pub fn use_current_locale() {
     let locale = sys_locale::get_locale().unwrap_or_else(|| "en".to_string());
     rust_i18n::set_locale(&locale);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_root_dir;
+
+    #[test]
+    fn root_dirs() {
+        assert!(is_root_dir("/"));
+        assert!(!is_root_dir("/bin"));
+        assert!(!is_root_dir("root"));
+        assert!(!is_root_dir("C:\\Windows\\System32"));
+
+        // These are considered relative paths in Unix (which can be created using `mkdir`)
+        #[cfg(windows)]
+        {
+            assert!(is_root_dir("D:\\"));
+            assert!(is_root_dir("C:\\\\"));
+        }
+    }
 }
