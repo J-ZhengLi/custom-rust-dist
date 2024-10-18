@@ -158,9 +158,10 @@ enum ManagerSubcommands {
     #[command(hide = true)]
     /// Update the current installed dist suite to the newest version
     Update {
-        /// Exclude this manager tool when performing updates
+        /// We keep the Manager version unchanged by default.
+        /// You can update the Manager using the flag
         #[arg(long)]
-        no_self_update: bool,
+        self_update: bool,
     },
     #[command(hide = true)]
     /// Show a list of available dist version or components
