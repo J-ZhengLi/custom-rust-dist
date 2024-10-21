@@ -24,9 +24,6 @@ impl UpdateConfiguration {
     pub fn check_upgrade(&self) -> Result<bool> {
         let local_version = local_version();
         let latest_version = latest_version(MANAGER_SOURCE_PATH)?;
-
-        println!("{} {}", local_version, latest_version);
-
         Ok(local_version != latest_version)
     }
 

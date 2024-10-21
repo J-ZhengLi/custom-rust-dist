@@ -85,15 +85,13 @@ fn check_manager_version() -> bool {
     });
 
     // Join the thread and capture the result, with a default value in case of failure
-    check_update_thread.join().unwrap_or({
-        false // Default value in case the thread join fails
-    })
+    check_update_thread.join().unwrap_or_default()
 }
 
 #[tauri::command]
 fn upgrade_manager() -> Result<()> {
     let upgrade_thread = thread::spawn(move || -> anyhow::Result<()> {
-        let config = UpdateConfiguration;
+        let config: UpdateConfiguration = UpdateConfiguration;
         config.update(true)
     });
 
