@@ -2,7 +2,7 @@ use std::{sync::Arc, thread, time::Duration};
 
 use crate::{error::Result, toolkit::Toolkit};
 use anyhow::Context;
-use rim::{utils::Progress, UninstallConfiguration};
+use rim::{utils::Progress, UninstallConfiguration, UpdateConfiguration};
 
 pub(super) fn main() -> Result<()> {
     tauri::Builder::default()
@@ -11,6 +11,8 @@ pub(super) fn main() -> Result<()> {
             get_installed_kit,
             get_install_dir,
             uninstall_toolkit,
+            check_manager_version,
+            upgrade_manager,
         ])
         .setup(|app| {
             tauri::WindowBuilder::new(
@@ -72,6 +74,29 @@ fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
     if gui_thread.is_finished() {
         gui_thread.join().expect("failed to join GUI thread")?;
     }
+    Ok(())
+}
+
+#[tauri::command]
+fn check_manager_version() -> bool {
+    let check_update_thread = thread::spawn(|| {
+        let config: UpdateConfiguration = UpdateConfiguration;
+        config.check_upgrade().unwrap_or(false)
+    });
+
+    // Join the thread and capture the result, with a default value in case of failure
+    check_update_thread.join().unwrap_or_default()
+}
+
+#[tauri::command]
+fn upgrade_manager() -> Result<()> {
+    let upgrade_thread = thread::spawn(move || -> anyhow::Result<()> {
+        let config: UpdateConfiguration = UpdateConfiguration;
+        config.update(true)
+    });
+
+    upgrade_thread.join().expect("failed to upgrade manager.")?;
+
     Ok(())
 }
 

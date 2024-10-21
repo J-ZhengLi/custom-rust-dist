@@ -12,6 +12,7 @@ pub(crate) mod rustup;
 pub(crate) mod tools;
 pub mod try_it;
 pub(crate) mod uninstall;
+pub(crate) mod update;
 
 macro_rules! declare_env_vars {
     ($($key:ident),+) => {
