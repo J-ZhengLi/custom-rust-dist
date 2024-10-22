@@ -18,6 +18,8 @@
     "installing_tool_info": "installing '%{name}'",
     "installing_via_cargo_info": "installing '%{name}' using cargo",
     "installing_msvc_info": "running VS BuildTools installer...",
+    "msvc_installed": "VS BuildTools is successfully installed!",
+    "msvc_installed_reboot_required": "VS BuildTools is successfully installed, please reboot your computer after this installation",
     "install_finish_info": "Rust is successfully installed!",
 
     "uninstalling_tool_info": "uninstalling '%{name}'",

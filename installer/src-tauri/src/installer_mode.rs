@@ -1,5 +1,4 @@
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::Receiver;
 use std::sync::{mpsc, Arc, OnceLock};
 use std::thread;
 
@@ -168,7 +167,7 @@ fn spawn_install_thread(
     Ok(thread::spawn(move || -> anyhow::Result<()> {
         // Initialize a progress sender.
         let pos_cb = |pos: f32| -> anyhow::Result<()> { Ok(win.emit("install-progress", pos)?) };
-        let progress = Progress::new(&|_| Ok(()), &pos_cb);
+        let progress = Progress::new(&pos_cb);
 
         let manifest = cached_manifest();
         // TODO: Use continuous progress
@@ -195,7 +194,7 @@ fn cached_manifest() -> &'static ToolsetManifest {
 fn spawn_gui_update_thread(
     win: Arc<tauri::Window>,
     install_handle: thread::JoinHandle<anyhow::Result<()>>,
-    msg_recvr: Receiver<String>,
+    msg_recvr: mpsc::Receiver<String>,
 ) -> thread::JoinHandle<anyhow::Result<()>> {
     thread::spawn(move || loop {
         if let Ok(detail_msg) = msg_recvr.try_recv() {

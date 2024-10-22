@@ -7,11 +7,12 @@ use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
 use crate::toolset_manifest::ToolsetManifest;
 use anyhow::Result;
 
+use log::info;
 pub(crate) use rustup::*;
 
 impl EnvConfig for InstallConfiguration<'_> {
     fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()> {
-        self.show_progress(t!("install_env_config"))?;
+        info!("{}", t!("install_env_config"));
 
         let vars_raw = self.env_vars(manifest)?;
         for (key, val) in vars_raw {

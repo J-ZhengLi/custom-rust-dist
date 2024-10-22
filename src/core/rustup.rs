@@ -51,7 +51,7 @@ impl ToolchainInstaller {
         ];
         utils::Command::new(rustup_init)
             .args(&args)
-            .inherit_stderr()
+            .output_to_file()
             .run()
     }
 
@@ -75,12 +75,12 @@ impl ToolchainInstaller {
             utils::Command::new(rustup)
                 .args(&args)
                 .env(RUSTUP_DIST_SERVER, local_server.as_str())
-                .inherit_stderr()
+                .output_to_file()
                 .run()
         } else {
             utils::Command::new(rustup)
                 .args(&args)
-                .inherit_stderr()
+                .output_to_file()
                 .run()
         }
     }
@@ -141,7 +141,7 @@ impl ToolchainInstaller {
             .args(&["self", "uninstall", "-y"])
             .env(CARGO_HOME, config.cargo_home())
             .env(RUSTUP_HOME, config.rustup_home())
-            .inherit_stderr()
+            .output_to_file()
             .run()
     }
 }

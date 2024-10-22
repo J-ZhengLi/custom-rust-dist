@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use anyhow::Result;
 use cc::windows_registry;
+use log::{info, warn};
 use crate::core::directories::RimDir;
 use crate::core::install::InstallConfiguration;
 
@@ -40,14 +41,14 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<Vec<
     utils::copy_file_to(&buildtools_exe, &installer_dir)?;
 
     // Step 3: Invoke the install command.
-    config.show_progress(t!("installing_msvc_info"))?;
+    info!("{}", t!("installing_msvc_info"));
     let exit_code: VSExitCode = utils::Command::new(buildtools_exe).args(&cmd).run_with_ret_code()?.into();
     match exit_code {
         VSExitCode::Success => {
-            config.show_progress(format!("info: {exit_code}"))?;
+            info!("{}", t!("msvc_installed"));
         }
         VSExitCode::RebootRequired | VSExitCode::RebootInitiated => {
-            config.show_progress(format!("warn: {exit_code}"))?;
+            warn!("{}", t!("msvc_installed_reboot_required"));
         }
         _ => {
             return Err(anyhow!("unable to install VS buildtools: {}", exit_code));

@@ -19,7 +19,6 @@ use anyhow::{anyhow, bail, Context, Result};
 use log::info;
 use std::{
     collections::HashMap,
-    fmt::Display,
     path::{Path, PathBuf},
 };
 use tempfile::TempDir;
@@ -96,9 +95,8 @@ impl<'a> InstallConfiguration<'a> {
         progress: Option<Progress<'a>>,
         manifest: &'a ToolsetManifest,
     ) -> Result<Self> {
-        if let Some(prog) = &progress {
-            prog.show_msg(t!("install_init", dir = install_dir.display()))?;
-        }
+        info!("{}", t!("install_init", dir = install_dir.display()));
+
         // Create a new folder to hold installation
         utils::ensure_dir(install_dir)?;
 
@@ -147,15 +145,6 @@ impl<'a> InstallConfiguration<'a> {
         self.install_rust(&tc_components)?;
         // install third-party tools via cargo that got installed by rustup
         self.cargo_install(&tools)?;
-        Ok(())
-    }
-
-    /// Print message via progress indicator.
-    pub(crate) fn show_progress<S: Display + ToString>(&self, msg: S) -> Result<()> {
-        info!("{msg}");
-        if let Some(prog) = &self.progress_indicator {
-            prog.show_msg(msg)?;
-        }
         Ok(())
     }
 
@@ -251,7 +240,7 @@ impl<'a> InstallConfiguration<'a> {
             } else {
                 t!("installing_tool_info", name = name)
             };
-            self.show_progress(info)?;
+            info!("{info}");
 
             self.install_tool(name, tool, manifest.and_then(|m| m.proxy.as_ref()))?;
 
@@ -264,17 +253,17 @@ impl<'a> InstallConfiguration<'a> {
     }
 
     pub fn install_tools(&mut self, tools: &ToolMap) -> Result<()> {
-        self.show_progress(t!("install_tools"))?;
+        info!("{}", t!("install_tools"));
         self.install_tools_(Some(self.manifest), tools, 30.0)
     }
 
     pub fn cargo_install(&mut self, tools: &ToolMap) -> Result<()> {
-        self.show_progress(t!("install_via_cargo"))?;
+        info!("{}", t!("install_via_cargo"));
         self.install_tools_(None, tools, 30.0)
     }
 
     pub fn install_rust(&mut self, optional_components: &[String]) -> Result<()> {
-        self.show_progress(t!("install_toolchain"))?;
+        info!("{}", t!("install_toolchain"));
 
         let manifest = self.manifest;
 
@@ -365,7 +354,7 @@ impl<'a> InstallConfiguration<'a> {
     ///
     /// This will write a `config.toml` file to `CARGO_HOME`.
     pub fn config_cargo(&self) -> Result<()> {
-        self.show_progress(t!("install_cargo_config"))?;
+        info!("{}", t!("install_cargo_config"));
 
         let mut config = CargoConfig::new();
         if let Some((name, url)) = &self.cargo_registry {
@@ -396,8 +385,7 @@ impl<'a> InstallConfiguration<'a> {
     /// If `maybe_file` is a path to compressed file, this will try to extract it to `dest`;
     /// otherwise this will copy that file into dest.
     fn extract_or_copy_to(&self, maybe_file: &Path, dest: &Path) -> Result<PathBuf> {
-        if let Ok(mut extractable) = Extractable::load(maybe_file, self.progress_indicator.as_ref())
-        {
+        if let Ok(mut extractable) = Extractable::load(maybe_file) {
             extractable.extract_to(dest)?;
             Ok(dest.to_path_buf())
         } else {

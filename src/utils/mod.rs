@@ -18,9 +18,9 @@ use std::{
 pub use download::download;
 pub use extraction::Extractable;
 pub use file_system::*;
-pub use log::Logger;
+pub use log::{log_file_path, Logger};
 pub use process::*;
-pub use progress_bar::{send_and_print, Progress};
+pub use progress_bar::Progress;
 
 use anyhow::Result;
 use url::Url;
@@ -98,7 +98,9 @@ pub fn is_root_dir<P: AsRef<Path>>(path: P) -> bool {
 
 /// Get the binary name of current executing binary, a.k.a `arg[0]`.
 pub fn lowercase_program_name() -> Option<String> {
-    let program_executable = std::env::args().next().map(PathBuf::from)?;
+    let mut program_executable = std::env::args().next().map(PathBuf::from)?;
+    program_executable.set_extension("");
+
     let program_name = program_executable
         .file_name()
         .and_then(|oss| oss.to_str())?;

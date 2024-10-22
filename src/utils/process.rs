@@ -1,7 +1,7 @@
 use std::ffi::OsStr;
 use std::process::Command as StdCommand;
 use std::sync::Mutex;
-use std::{env, io};
+use std::{env, fs, io};
 
 use anyhow::Result;
 
@@ -23,8 +23,7 @@ cfg_if::cfg_if! {
 /// A [`std::process::Command`] wrapper type that supports better error reporting.
 pub struct Command {
     cmd_: StdCommand,
-    out_: Box<dyn std::io::Write>,
-    err_: Box<dyn std::io::Write>,
+    log_output: bool,
 }
 
 impl Command {
@@ -34,8 +33,7 @@ impl Command {
 
         Self {
             cmd_: StdCommand::new(program),
-            out_: Box::new(std::io::stdout()),
-            err_: Box::new(std::io::stderr()),
+            log_output: false,
         }
     }
     /// Create a command that will be execute using a separated shell.
@@ -50,8 +48,7 @@ impl Command {
 
         Self {
             cmd_: inner,
-            out_: Box::new(std::io::stdout()),
-            err_: Box::new(std::io::stderr()),
+            log_output: false,
         }
     }
     pub fn arg<A: AsRef<OsStr>>(&mut self, arg: A) -> &mut Self {
@@ -84,26 +81,10 @@ impl Command {
         self.cmd_.env(key, val);
         self
     }
-    /// Use another writer for standard output.
-    pub fn output_writer<W: io::Write + 'static>(&mut self, out: W) -> &mut Command {
-        self.out_ = Box::new(out);
-        self
-    }
-    /// Use another writer for error output.
-    ///
-    /// Note: for some program, such as `rustup` or `cargo`, putting `info:` messages as `stderr`
-    pub fn err_writer<W: io::Write + 'static>(&mut self, err: W) -> &mut Command {
-        self.err_ = Box::new(err);
-        self
-    }
-    // TODO: Remove this, use custom writers instead
-    /// Use [`Stdio::inherit`] for standard error output.
-    ///
-    /// For some program, such as `rustup` or `cargo`, putting `info:` messages in `stderr` (WHY!!!),
-    /// therefore we can specify this to output those `info` as well, but this will causing
-    /// the actually error not showing when error occurs.
-    pub fn inherit_stderr(&mut self) -> &mut Command {
-        self.cmd_.stderr(std::process::Stdio::inherit());
+    /// Set a flag to write command output (including `stdout` and `stderr`)
+    /// to a [log file](super::log_file_path).
+    pub fn output_to_file(&mut self) -> &mut Command {
+        self.log_output = true;
         self
     }
 
@@ -131,8 +112,18 @@ impl Command {
             }
         }
 
-        io::copy(&mut output.stdout.as_slice(), &mut self.out_)?;
-        io::copy(&mut output.stderr.as_slice(), &mut self.err_)?;
+        // manually copy output to standard pipeline.
+        io::copy(&mut output.stdout.as_slice(), &mut io::stdout())?;
+        io::copy(&mut output.stderr.as_slice(), &mut io::stderr())?;
+
+        if self.log_output {
+            let mut log_file = fs::OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(super::log_file_path()?)?;
+            io::copy(&mut output.stdout.as_slice(), &mut log_file)?;
+            io::copy(&mut output.stderr.as_slice(), &mut log_file)?;
+        }
 
         if expect_success && !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);

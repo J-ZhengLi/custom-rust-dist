@@ -18,7 +18,7 @@ fn extract_to_temp(filename: &str) -> TempDir {
         .tempdir_in(&cache_dir)
         .unwrap();
 
-    let mut extractable = Extractable::load(path.as_path(), None).unwrap();
+    let mut extractable = Extractable::load(path.as_path()).unwrap();
     extractable
         .extract_to(temp_dir.path())
         .expect("failed to extract");
