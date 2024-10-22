@@ -25,6 +25,8 @@ toml = "0.8.15"
 tempfile = "3"
 indexmap = { version = "2.5", features = ["serde"] }
 rust-i18n = "3"
+log = "0.4"
+fern = { version = "0.7", features = ["colored"] }
 
 [dependencies]
 anyhow.workspace = true
@@ -49,6 +51,9 @@ env_proxy = "0.4.1"
 indexmap.workspace = true
 rust-i18n.workspace = true
 sys-locale = "0.3.1"
+log.workspace = true
+fern.workspace = true
+chrono = "0.4.38"
 
 [target."cfg(windows)".dependencies]
 winreg = "0.52.0"

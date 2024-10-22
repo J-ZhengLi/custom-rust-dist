@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use indicatif::{ProgressBar as CliProgressBar, ProgressState, ProgressStyle};
+use log::info;
 
 struct ProgressPos(Mutex<f32>);
 
@@ -68,7 +69,7 @@ impl<'a> Progress<'a> {
 /// Send the message via [`Progress`] and print it on console as well.
 pub fn send_and_print<T: ToString>(msg: T, progress: Option<&Progress<'_>>) -> Result<()> {
     let m = msg.to_string();
-    println!("{m}");
+    info!("{m}");
     if let Some(prog) = progress {
         prog.show_msg(m)?;
     }

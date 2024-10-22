@@ -2,9 +2,9 @@ use anyhow::Result;
 
 use crate::core::update::UpdateConfiguration;
 
-use super::{GlobalOpt, ManagerSubcommands};
+use super::ManagerSubcommands;
 
-pub(super) fn execute(cmd: &ManagerSubcommands, _opt: GlobalOpt) -> Result<bool> {
+pub(super) fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
     let ManagerSubcommands::Update { self_update } = cmd else {
         return Ok(false);
     };

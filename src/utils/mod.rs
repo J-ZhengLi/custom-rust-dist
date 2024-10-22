@@ -6,6 +6,7 @@
 mod download;
 mod extraction;
 mod file_system;
+mod log;
 mod process;
 mod progress_bar;
 
@@ -17,6 +18,7 @@ use std::{
 pub use download::download;
 pub use extraction::Extractable;
 pub use file_system::*;
+pub use log::Logger;
 pub use process::*;
 pub use progress_bar::{send_and_print, Progress};
 

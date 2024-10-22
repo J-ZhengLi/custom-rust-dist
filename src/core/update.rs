@@ -1,6 +1,7 @@
 use std::env;
 
 use anyhow::{Context, Result};
+use log::info;
 use reqwest::blocking::Client;
 use url::Url;
 
@@ -41,7 +42,7 @@ impl UpdateConfiguration {
             let dest = get_installed_dir().join(full_manager_name());
             utils::download(full_manager_name().as_str(), &download_url, &dest, None)?;
         } else {
-            println!("Already latest version.");
+            info!("Already latest version.");
         }
 
         Ok(())
@@ -53,7 +54,7 @@ impl UpdateConfiguration {
         let config: UpdateConfiguration = UpdateConfiguration;
         let upgradeable = config.check_upgrade().unwrap_or(false);
         if upgradeable {
-            println!(
+            info!(
                 "A new manager version has been detected. You can update it via using `--self-update`"
             )
         };

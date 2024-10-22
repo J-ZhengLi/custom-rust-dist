@@ -78,6 +78,7 @@ pub(crate) mod rustup {
     use std::sync::OnceLock;
 
     use anyhow::{anyhow, Context, Result};
+    use log::warn;
     use winapi::shared::minwindef;
     use winapi::um::winuser;
     use winreg::enums::{RegType, HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
@@ -191,7 +192,7 @@ pub(crate) mod rustup {
                 if let Some(s) = from_winreg_value(&val) {
                     Ok(Some(s))
                 } else {
-                    println!("{}", t!("windows_not_modify_path_warn"));
+                    warn!("{}", t!("windows_not_modify_path_warn"));
                     Ok(None)
                 }
             }

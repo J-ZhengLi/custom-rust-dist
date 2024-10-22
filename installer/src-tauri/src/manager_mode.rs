@@ -38,10 +38,7 @@ pub(super) fn main() -> Result<()> {
 
 #[tauri::command]
 fn get_installed_kit() -> Result<Option<Toolkit>> {
-    let toolkit = Toolkit::from_installed()?;
-    println!("installed: {:#?}", &toolkit);
-
-    Ok(toolkit)
+    Toolkit::from_installed()
 }
 
 #[tauri::command]

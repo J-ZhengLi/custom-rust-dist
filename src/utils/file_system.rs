@@ -1,5 +1,6 @@
 use anyhow::bail;
 use anyhow::{anyhow, Context, Result};
+use log::warn;
 use std::env;
 use std::fs;
 use std::io::Write;
@@ -289,7 +290,7 @@ pub fn move_to(src: &Path, dest: &Path, force: bool) -> Result<()> {
     // try copy and delete.
     copy_as(src, dest)?;
     if remove(src).is_err() {
-        println!("{}", t!("remove_path_fail_warn", path = src.display()));
+        warn!("{}", t!("remove_path_fail_warn", path = src.display()));
     }
 
     Ok(())

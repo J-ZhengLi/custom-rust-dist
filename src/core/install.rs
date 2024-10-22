@@ -16,6 +16,7 @@ use crate::{
     utils::{self, Extractable, Progress},
 };
 use anyhow::{anyhow, bail, Context, Result};
+use log::info;
 use std::{
     collections::HashMap,
     fmt::Display,
@@ -151,7 +152,7 @@ impl<'a> InstallConfiguration<'a> {
 
     /// Print message via progress indicator.
     pub(crate) fn show_progress<S: Display + ToString>(&self, msg: S) -> Result<()> {
-        println!("{msg}");
+        info!("{msg}");
         if let Some(prog) = &self.progress_indicator {
             prog.show_msg(msg)?;
         }

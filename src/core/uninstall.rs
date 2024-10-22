@@ -2,6 +2,7 @@ use std::{fmt::Display, path::PathBuf};
 
 use anyhow::Result;
 use indexmap::IndexMap;
+use log::info;
 
 use super::{
     directories::RimDir,
@@ -49,7 +50,7 @@ impl<'a> UninstallConfiguration<'a> {
 
     /// Print message via progress indicator.
     pub(crate) fn show_progress<S: Display + ToString>(&self, msg: S) -> Result<()> {
-        println!("{msg}");
+        info!("{msg}");
         if let Some(prog) = &self.progress_indicator {
             prog.show_msg(msg)?;
         }

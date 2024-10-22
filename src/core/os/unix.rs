@@ -7,6 +7,7 @@ use crate::toolset_manifest::ToolsetManifest;
 use crate::utils;
 use anyhow::{Context, Result};
 use indexmap::IndexSet;
+use log::warn;
 
 impl EnvConfig for InstallConfiguration<'_> {
     // On linux, persistent env vars needs to be written in `.profile`, `.bash_profile`, etc.
@@ -86,7 +87,7 @@ where
         .and_then(|s| utils::write_file(path, &s, false).ok())
         .is_none()
     {
-        println!(
+        warn!(
             "{}",
             t!(
                 "unix_remove_env_fail_warn",
@@ -186,7 +187,7 @@ fn modify_path(path: &Path, remove: bool) -> Result<()> {
                         rc_path = rc.display()
                     )
                 };
-                println!("{warn}");
+                warn!("{warn}");
                 continue;
             };
             utils::write_file(rc, &new_content, false).with_context(|| {
