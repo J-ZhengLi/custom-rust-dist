@@ -12,6 +12,12 @@ pub struct Logger {
     dispatcher_: fern::Dispatch,
 }
 
+impl Default for Logger {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Logger {
     pub fn new() -> Self {
         Self {
