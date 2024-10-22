@@ -1,6 +1,7 @@
 use crate::core::tools::VSCODE_FAMILY;
 use crate::utils;
 use anyhow::Result;
+use log::info;
 use std::{
     env,
     path::{Path, PathBuf},
@@ -17,7 +18,7 @@ pub fn try_it(path: Option<&Path>) -> Result<()> {
     let example_sources = ExampleTemplate::load();
     // Export the example to user selected location
     let example_dir = example_sources.export(&path_to_init)?;
-    println!(
+    info!(
         "{}",
         t!("demo_project_exported", dir = example_dir.display())
     );

@@ -25,20 +25,17 @@ impl ProgressPos {
 pub struct Progress<'a> {
     pos: Arc<ProgressPos>,
     pub len: f32,
-    msg_callback: &'a dyn Fn(String) -> Result<()>,
     pos_callback: &'a dyn Fn(f32) -> Result<()>,
 }
 
 impl<'a> Progress<'a> {
-    pub fn new<M, P>(msg_cb: &'a M, pos_cb: &'a P) -> Self
+    pub fn new<P>(pos_cb: &'a P) -> Self
     where
-        M: Fn(String) -> Result<()>,
         P: Fn(f32) -> Result<()>,
     {
         Self {
             pos: Arc::new(ProgressPos::new(0.0)),
             len: 0.0,
-            msg_callback: msg_cb,
             pos_callback: pos_cb,
         }
     }
@@ -46,10 +43,6 @@ impl<'a> Progress<'a> {
     pub fn with_len(mut self, len: f32) -> Self {
         self.len = len;
         self
-    }
-
-    pub fn show_msg<S: ToString>(&self, msg: S) -> Result<()> {
-        (self.msg_callback)(msg.to_string())
     }
 
     /// Update the position of progress bar by increment a certain value.
@@ -63,16 +56,6 @@ impl<'a> Progress<'a> {
         (self.pos_callback)(self.pos.load())?;
         Ok(())
     }
-}
-
-/// Send the message via [`Progress`] and print it on console as well.
-pub fn send_and_print<T: ToString>(msg: T, progress: Option<&Progress<'_>>) -> Result<()> {
-    let m = msg.to_string();
-    println!("{m}");
-    if let Some(prog) = progress {
-        prog.show_msg(m)?;
-    }
-    Ok(())
 }
 
 /// Convinent struct with methods that are useful to indicate various progress.

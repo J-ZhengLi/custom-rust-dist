@@ -7,6 +7,7 @@ use crate::toolset_manifest::ToolsetManifest;
 use crate::utils;
 use anyhow::{Context, Result};
 use indexmap::IndexSet;
+use log::{info, warn};
 
 impl EnvConfig for InstallConfiguration<'_> {
     // On linux, persistent env vars needs to be written in `.profile`, `.bash_profile`, etc.
@@ -15,7 +16,7 @@ impl EnvConfig for InstallConfiguration<'_> {
     // because rustup will not write those file if a user has choose to pass `--no-modify-path`.
     // Which is not ideal for env vars such as `RUSTUP_DIST_SERVER`.
     fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()> {
-        self.show_progress(t!("install_env_config"))?;
+        info!("{}", t!("install_env_config"));
 
         let vars_raw = self.env_vars(manifest)?;
         let backup_dir = self.install_dir.join("backup");
@@ -86,7 +87,7 @@ where
         .and_then(|s| utils::write_file(path, &s, false).ok())
         .is_none()
     {
-        println!(
+        warn!(
             "{}",
             t!(
                 "unix_remove_env_fail_warn",
@@ -186,7 +187,7 @@ fn modify_path(path: &Path, remove: bool) -> Result<()> {
                         rc_path = rc.display()
                     )
                 };
-                println!("{warn}");
+                warn!("{warn}");
                 continue;
             };
             utils::write_file(rc, &new_content, false).with_context(|| {

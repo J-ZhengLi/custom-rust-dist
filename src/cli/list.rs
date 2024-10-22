@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use super::{GlobalOpt, ManagerSubcommands};
+use super::ManagerSubcommands;
 
 #[derive(Subcommand, Debug)]
 pub(super) enum ListCommand {
@@ -15,7 +15,7 @@ impl ListCommand {
     }
 }
 
-pub(super) fn execute(cmd: &ManagerSubcommands, _opt: GlobalOpt) -> Result<bool> {
+pub(super) fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
     let ManagerSubcommands::List {
         installed: _,
         command,

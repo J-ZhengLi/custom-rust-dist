@@ -7,11 +7,12 @@ use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
 use crate::toolset_manifest::ToolsetManifest;
 use anyhow::Result;
 
+use log::info;
 pub(crate) use rustup::*;
 
 impl EnvConfig for InstallConfiguration<'_> {
     fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()> {
-        self.show_progress(t!("install_env_config"))?;
+        info!("{}", t!("install_env_config"));
 
         let vars_raw = self.env_vars(manifest)?;
         for (key, val) in vars_raw {
@@ -78,6 +79,7 @@ pub(crate) mod rustup {
     use std::sync::OnceLock;
 
     use anyhow::{anyhow, Context, Result};
+    use log::warn;
     use winapi::shared::minwindef;
     use winapi::um::winuser;
     use winreg::enums::{RegType, HKEY_CURRENT_USER, KEY_READ, KEY_WRITE};
@@ -191,7 +193,7 @@ pub(crate) mod rustup {
                 if let Some(s) = from_winreg_value(&val) {
                     Ok(Some(s))
                 } else {
-                    println!("{}", t!("windows_not_modify_path_warn"));
+                    warn!("{}", t!("windows_not_modify_path_warn"));
                     Ok(None)
                 }
             }

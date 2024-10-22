@@ -1,8 +1,14 @@
-use std::{sync::Arc, thread, time::Duration};
+use std::{
+    sync::{mpsc, Arc},
+    thread,
+};
 
 use crate::{error::Result, toolkit::Toolkit};
 use anyhow::Context;
-use rim::{utils::Progress, UninstallConfiguration, UpdateConfiguration};
+use rim::{
+    utils::{self, Progress},
+    UninstallConfiguration, UpdateConfiguration,
+};
 
 pub(super) fn main() -> Result<()> {
     tauri::Builder::default()
@@ -38,10 +44,7 @@ pub(super) fn main() -> Result<()> {
 
 #[tauri::command]
 fn get_installed_kit() -> Result<Option<Toolkit>> {
-    let toolkit = Toolkit::from_installed()?;
-    println!("installed: {:#?}", &toolkit);
-
-    Ok(toolkit)
+    Toolkit::from_installed()
 }
 
 #[tauri::command]
@@ -51,25 +54,23 @@ fn get_install_dir() -> String {
 
 #[tauri::command(rename_all = "snake_case")]
 fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
+    let (msg_sendr, msg_recvr) = mpsc::channel::<String>();
+    // config logger to use the `msg_sendr` we just created
+    utils::Logger::new().sender(msg_sendr).setup()?;
+
     let window = Arc::new(window);
     let window_clone = Arc::clone(&window);
 
     let uninstall_thread = thread::spawn(move || -> anyhow::Result<()> {
-        // Initialize a progress sender.
-        let msg_cb = |msg: String| -> anyhow::Result<()> {
-            // Note: a small timeout to make sure the message are emitted properly.
-            thread::sleep(Duration::from_millis(100));
-            Ok(window.emit("update-output", msg)?)
-        };
         let pos_cb = |pos: f32| -> anyhow::Result<()> { Ok(window.emit("update-progress", pos)?) };
-        let progress = Progress::new(&msg_cb, &pos_cb);
+        let progress = Progress::new(&pos_cb);
 
         let config = UninstallConfiguration::init(Some(progress))?;
         config.uninstall(remove_self)?;
         Ok(())
     });
 
-    let gui_thread = spawn_gui_update_thread(window_clone, uninstall_thread);
+    let gui_thread = spawn_gui_update_thread(window_clone, uninstall_thread, msg_recvr);
 
     if gui_thread.is_finished() {
         gui_thread.join().expect("failed to join GUI thread")?;
@@ -103,8 +104,13 @@ fn upgrade_manager() -> Result<()> {
 fn spawn_gui_update_thread(
     win: Arc<tauri::Window>,
     core_thread: thread::JoinHandle<anyhow::Result<()>>,
+    msg_recvr: mpsc::Receiver<String>,
 ) -> thread::JoinHandle<anyhow::Result<()>> {
     thread::spawn(move || loop {
+        if let Ok(detail_msg) = msg_recvr.try_recv() {
+            win.emit("install-details", detail_msg)?;
+        }
+
         if core_thread.is_finished() {
             return if let Err(known_error) = core_thread
                 .join()

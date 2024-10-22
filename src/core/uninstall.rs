@@ -1,7 +1,8 @@
-use std::{fmt::Display, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use indexmap::IndexMap;
+use log::info;
 
 use super::{
     directories::RimDir,
@@ -47,15 +48,6 @@ impl<'a> UninstallConfiguration<'a> {
         })
     }
 
-    /// Print message via progress indicator.
-    pub(crate) fn show_progress<S: Display + ToString>(&self, msg: S) -> Result<()> {
-        println!("{msg}");
-        if let Some(prog) = &self.progress_indicator {
-            prog.show_msg(msg)?;
-        }
-        Ok(())
-    }
-
     pub(crate) fn inc_progress(&self, val: f32) -> Result<()> {
         if let Some(prog) = &self.progress_indicator {
             prog.inc(Some(val))?;
@@ -65,12 +57,12 @@ impl<'a> UninstallConfiguration<'a> {
 
     pub fn uninstall(mut self, remove_self: bool) -> Result<()> {
         // remove all tools.
-        self.show_progress(t!("uninstalling_third_party_tools"))?;
+        info!("{}", t!("uninstalling_third_party_tools"));
         self.remove_tools(installed_tools_fresh(&self.install_dir)?, 40.0)?;
 
         // Remove rust toolchain via rustup.
         if self.install_record.rust.is_some() {
-            self.show_progress(t!("uninstalling_rust_toolchain"))?;
+            info!("{}", t!("uninstalling_rust_toolchain"));
             ToolchainInstaller::init().remove_self(&self)?;
             self.install_record.remove_rust_record();
             self.install_record.write()?;
@@ -78,13 +70,13 @@ impl<'a> UninstallConfiguration<'a> {
         self.inc_progress(40.0)?;
 
         // remove all env configuration.
-        self.show_progress(t!("uninstall_env_config"))?;
+        info!("{}", t!("uninstall_env_config"));
         self.remove_rustup_env_vars()?;
         self.inc_progress(10.0)?;
 
         // remove the manager binary itself or update install record
         if remove_self {
-            self.show_progress(t!("uninstall_self"))?;
+            info!("{}", t!("uninstall_self"));
             self.remove_self()?;
         } else {
             self.install_record.remove_toolkit_meta();
@@ -106,7 +98,7 @@ impl<'a> UninstallConfiguration<'a> {
             } else if !tool_detail.paths.is_empty() {
                 Tool::Executables(name.into(), tool_detail.paths.clone())
             } else {
-                self.show_progress(t!("uninstall_unknown_tool_warn", tool = name))?;
+                info!("{}", t!("uninstall_unknown_tool_warn", tool = name));
                 continue;
             };
             tools_to_uninstall.push(tool);
@@ -120,9 +112,9 @@ impl<'a> UninstallConfiguration<'a> {
         tools_to_uninstall.sort_by(|a, b| b.cmp(a));
 
         for tool in tools_to_uninstall {
-            self.show_progress(t!("uninstalling_for", name = tool.name()))?;
+            info!("{}", t!("uninstalling_for", name = tool.name()));
             if tool.uninstall(self).is_err() {
-                self.show_progress(t!("uninstall_tool_failed_warn", tool = tool.name()))?;
+                info!("{}", t!("uninstall_tool_failed_warn", tool = tool.name()));
             }
             self.install_record.remove_tool_record(tool.name());
             self.install_record.write()?;

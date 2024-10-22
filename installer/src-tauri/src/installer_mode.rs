@@ -1,9 +1,6 @@
-use std::fs::{self, File};
-use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock};
+use std::sync::{mpsc, Arc, OnceLock};
 use std::thread;
-use std::time::Duration;
 
 use anyhow::Context;
 use indexmap::IndexMap;
@@ -16,7 +13,6 @@ use rim::toolset_manifest::{get_toolset_manifest, ToolInfo, ToolsetManifest};
 use rim::utils::Progress;
 use rim::{try_it, utils, InstallConfiguration};
 
-static LOG_FILE: OnceLock<PathBuf> = OnceLock::new();
 static TOOLSET_MANIFEST: OnceLock<ToolsetManifest> = OnceLock::new();
 
 pub(super) fn main() -> Result<()> {
@@ -121,20 +117,18 @@ fn install_toolchain(
     components_list: Vec<Component>,
     install_dir: String,
 ) -> Result<()> {
+    let (msg_sendr, msg_recvr) = mpsc::channel::<String>();
+    // config logger to use the `msg_sendr` we just created
+    utils::Logger::new().sender(msg_sendr).setup()?;
+
     // 使用 Arc 来共享 window
     let window = Arc::new(window);
     let window_clone = Arc::clone(&window);
-    let log_path = log_file_path(&install_dir);
-    // FIXME: for some reason, having an existin log file makes other thread fails to read the log,
-    // find the cause of it. Until then, let's just remove the existing file for now.
-    if log_path.is_file() {
-        _ = utils::remove(log_path);
-    }
 
     // 在一个新线程中执行安装过程
-    let install_thread = spawn_install_thread(window, components_list, install_dir, log_path)?;
+    let install_thread = spawn_install_thread(window, components_list, install_dir)?;
     // 在主线程中接收进度并发送事件
-    let gui_thread = spawn_gui_update_thread(window_clone, install_thread, log_path);
+    let gui_thread = spawn_gui_update_thread(window_clone, install_thread, msg_recvr);
 
     if gui_thread.is_finished() {
         gui_thread.join().expect("unable to join GUI thread")?;
@@ -147,7 +141,6 @@ fn spawn_install_thread(
     win: Arc<tauri::Window>,
     components: Vec<Component>,
     install_dir: String,
-    log_path: &'static Path,
 ) -> Result<thread::JoinHandle<anyhow::Result<()>>> {
     // Split components list to `toolchain_components` and `toolset_components`,
     // as we are running `rustup` to install toolchain components.
@@ -172,31 +165,14 @@ fn spawn_install_thread(
         .collect();
 
     Ok(thread::spawn(move || -> anyhow::Result<()> {
-        let file = std::fs::OpenOptions::new()
-            .truncate(true)
-            .create(true)
-            .write(true)
-            .open(log_path)?;
-        // Here we redirect all console output during installation to a buffer
-        // Note that `rustup` collect `info:` strings in stderr.
-        let drop_with_care = capture_output_to_file(file)?;
-
         // Initialize a progress sender.
-        let msg_cb = |msg: String| -> anyhow::Result<()> {
-            // Note: a small timeout to make sure the message are emitted properly.
-            thread::sleep(Duration::from_millis(100));
-            Ok(win.emit("install-details", msg)?)
-        };
         let pos_cb = |pos: f32| -> anyhow::Result<()> { Ok(win.emit("install-progress", pos)?) };
-        let progress = Progress::new(&msg_cb, &pos_cb);
+        let progress = Progress::new(&pos_cb);
 
         let manifest = cached_manifest();
         // TODO: Use continuous progress
         InstallConfiguration::init(Path::new(&install_dir), false, Some(progress), manifest)?
             .install(toolchain_components, toolset_components)?;
-
-        // Manually drop this, to stop capturing output to file.
-        drop(drop_with_care);
 
         // 安装完成后，发送安装完成事件
         win.emit("install-complete", ())?;
@@ -218,77 +194,26 @@ fn cached_manifest() -> &'static ToolsetManifest {
 fn spawn_gui_update_thread(
     win: Arc<tauri::Window>,
     install_handle: thread::JoinHandle<anyhow::Result<()>>,
-    log_path: &'static Path,
+    msg_recvr: mpsc::Receiver<String>,
 ) -> thread::JoinHandle<anyhow::Result<()>> {
-    let mut existing_log = String::new();
-    thread::spawn(move || {
-        loop {
-            // Install log should be created once the install thread starts running,
-            // otherwise we'll keep waiting.
-            let mut log_file = if log_path.is_file() {
-                fs::OpenOptions::new().read(true).open(log_path)?
+    thread::spawn(move || loop {
+        if let Ok(detail_msg) = msg_recvr.try_recv() {
+            win.emit("install-details", detail_msg)?;
+        }
+
+        if install_handle.is_finished() {
+            return if let Err(known_error) = install_handle
+                .join()
+                .expect("unexpected error occurs when running installation thread.")
+            {
+                let error_str = known_error.to_string();
+                win.emit("install-failed", error_str.clone())?;
+                Err(known_error)
             } else {
-                continue;
+                Ok(())
             };
-
-            if let Some(new_content) = get_new_log_content(&mut existing_log, &mut log_file) {
-                win.emit("install-details", new_content)?;
-            }
-
-            if install_handle.is_finished() {
-                return if let Err(known_error) = install_handle
-                    .join()
-                    .expect("unexpected error occurs when running installation thread.")
-                {
-                    let error_str = known_error.to_string();
-                    win.emit("install-failed", error_str.clone())?;
-                    Err(known_error)
-                } else {
-                    Ok(())
-                };
-            }
-
-            thread::sleep(Duration::from_millis(50));
         }
     })
-}
-
-fn log_file_path(install_dir: &str) -> &'static Path {
-    LOG_FILE.get_or_init(|| {
-        utils::ensure_dir(install_dir).expect("unable to create install dir");
-        PathBuf::from(install_dir).join("install.log")
-    })
-}
-
-fn get_new_log_content(old_content: &mut String, file: &mut File) -> Option<String> {
-    let mut new_content = String::new();
-    file.read_to_string(&mut new_content).ok()?;
-
-    if new_content.len() > old_content.len() {
-        let new_stuff = new_content[old_content.len()..].to_string();
-        *old_content = new_content;
-        // TODO: We need some advance rule to filter irrelevant infomation instead.
-        let headers = ["info", "warn", "error"];
-        let filtered = new_stuff
-            .lines()
-            .filter(|line| headers.iter().any(|h| line.starts_with(h)))
-            .collect::<Vec<_>>()
-            .join("\n");
-        if !filtered.is_empty() {
-            return Some(filtered);
-        }
-    }
-
-    None
-}
-
-fn capture_output_to_file(
-    file: File,
-) -> anyhow::Result<(gag::Redirect<File>, gag::Redirect<File>)> {
-    Ok((
-        gag::Redirect::stdout(file.try_clone()?)?,
-        gag::Redirect::stderr(file)?,
-    ))
 }
 
 #[tauri::command(rename_all = "snake_case")]

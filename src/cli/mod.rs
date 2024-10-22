@@ -26,10 +26,10 @@ use crate::utils;
 pub struct Installer {
     /// Enable verbose output
     #[arg(hide = true, short, long, conflicts_with = "quiet")]
-    verbose: bool,
+    pub verbose: bool,
     /// Suppress non-critical messages
     #[arg(hide = true, short, long, conflicts_with = "verbose")]
-    quiet: bool,
+    pub quiet: bool,
     /// Disable interaction and answer 'yes' to all prompts
     #[arg(hide = true, short, long = "yes")]
     yes_to_all: bool,
@@ -102,10 +102,10 @@ impl PathOrUrl {
 pub struct Manager {
     /// Enable verbose output
     #[arg(hide = true, short, long, conflicts_with = "quiet")]
-    verbose: bool,
+    pub verbose: bool,
     /// Suppress non-critical messages
     #[arg(hide = true, short, long, conflicts_with = "verbose")]
-    quiet: bool,
+    pub quiet: bool,
     /// Disable interaction and answer 'yes' to all prompts
     #[arg(hide = true, short, long = "yes")]
     yes_to_all: bool,
@@ -127,22 +127,28 @@ impl Installer {
     }
 
     pub fn execute(&self) -> Result<()> {
+        // Setup logger
+        utils::Logger::new()
+            .verbose(self.verbose)
+            .quiet(self.quiet)
+            .setup()?;
+
         install::execute_installer(self)
     }
 }
 
 impl Manager {
     pub fn execute(&self) -> Result<()> {
-        let global_opt = GlobalOpt {
-            verbose: self.verbose,
-            quiet: self.quiet,
-            yes: self.yes_to_all,
-        };
+        // Setup logger
+        utils::Logger::new()
+            .verbose(self.verbose)
+            .quiet(self.quiet)
+            .setup()?;
 
         let Some(subcmd) = &self.command else {
             return Ok(());
         };
-        subcmd.execute(global_opt)
+        subcmd.execute()
     }
 }
 
@@ -203,28 +209,17 @@ macro_rules! return_if_executed {
 }
 
 impl ManagerSubcommands {
-    pub(crate) fn execute(&self, opt: GlobalOpt) -> Result<()> {
+    pub(crate) fn execute(&self) -> Result<()> {
         return_if_executed! {
-            install::execute_manager(self, opt)?,
-            update::execute(self, opt)?,
-            list::execute(self, opt)?,
-            component::execute(self, opt)?,
-            uninstall::execute(self, opt)?,
-            tryit::execute(self, opt)?
+            install::execute_manager(self)?,
+            update::execute(self)?,
+            list::execute(self)?,
+            component::execute(self)?,
+            uninstall::execute(self)?,
+            tryit::execute(self)?
         }
         Ok(())
     }
-}
-
-/// Contain options that are accessed globally.
-///
-/// Such as `--verbose`, `--quiet`, `--yes`.
-#[allow(unused)]
-#[derive(Debug, Clone, Copy, Default)]
-struct GlobalOpt {
-    verbose: bool,
-    quiet: bool,
-    yes: bool,
 }
 
 pub fn parse_installer_cli() -> Installer {

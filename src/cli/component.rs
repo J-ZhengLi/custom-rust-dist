@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Subcommand;
 
-use super::{GlobalOpt, ManagerSubcommands};
+use super::ManagerSubcommands;
 
 #[derive(Subcommand, Debug)]
 pub(super) enum ComponentCommand {
@@ -22,7 +22,7 @@ pub(super) enum ComponentCommand {
 }
 
 impl ComponentCommand {
-    fn execute(&self, _opt: GlobalOpt) -> Result<()> {
+    fn execute(&self) -> Result<()> {
         match self {
             Self::Install { components } => todo!("install components: {components:?}"),
             Self::Uninstall { components } => todo!("uninstall components: {components:?}"),
@@ -30,12 +30,12 @@ impl ComponentCommand {
     }
 }
 
-pub(super) fn execute(cmd: &ManagerSubcommands, opt: GlobalOpt) -> Result<bool> {
+pub(super) fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
     let ManagerSubcommands::Component { command } = cmd else {
         return Ok(false);
     };
 
-    command.execute(opt)?;
+    command.execute()?;
 
     Ok(true)
 }

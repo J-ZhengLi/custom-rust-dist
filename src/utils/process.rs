@@ -1,12 +1,13 @@
-use std::env;
 use std::ffi::OsStr;
-use std::process::{Command as StdCommand, Stdio};
+use std::process::Command as StdCommand;
 use std::sync::Mutex;
+use std::{env, fs, io};
 
 use anyhow::Result;
 
 use super::to_string_lossy;
 
+/// The complete commands in string form, used in error output.
 static COMMAND_STRING: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
 cfg_if::cfg_if! {
@@ -20,14 +21,20 @@ cfg_if::cfg_if! {
 }
 
 /// A [`std::process::Command`] wrapper type that supports better error reporting.
-pub struct Command(StdCommand);
+pub struct Command {
+    cmd_: StdCommand,
+    log_output: bool,
+}
 
 impl Command {
     pub fn new<P: AsRef<OsStr>>(program: P) -> Self {
         let mut guard = COMMAND_STRING.lock().unwrap();
         *guard = vec![to_string_lossy(&program)];
 
-        Self(StdCommand::new(program))
+        Self {
+            cmd_: StdCommand::new(program),
+            log_output: false,
+        }
     }
     /// Create a command that will be execute using a separated shell.
     ///
@@ -39,13 +46,16 @@ impl Command {
         let mut inner = StdCommand::new(SHELL);
         inner.arg(START_ARG).arg(program);
 
-        Self(inner)
+        Self {
+            cmd_: inner,
+            log_output: false,
+        }
     }
     pub fn arg<A: AsRef<OsStr>>(&mut self, arg: A) -> &mut Self {
         let mut guard = COMMAND_STRING.lock().unwrap();
         (*guard).push(to_string_lossy(&arg));
 
-        self.0.arg(arg);
+        self.cmd_.arg(arg);
         self
     }
     pub fn args<S: AsRef<OsStr>>(&mut self, args: &[S]) -> &mut Self {
@@ -54,7 +64,7 @@ impl Command {
             (*guard).push(to_string_lossy(arg));
         }
 
-        self.0.args(args);
+        self.cmd_.args(args);
         self
     }
     pub fn env<K, V>(&mut self, key: K, val: V) -> &mut Self
@@ -68,26 +78,71 @@ impl Command {
             format!("{}={}", to_string_lossy(&key), to_string_lossy(&val)),
         );
 
-        self.0.env(key, val);
+        self.cmd_.env(key, val);
         self
     }
-    /// Use [`Stdio::inherit`] for standard error output.
-    ///
-    /// For some program, such as `rustup` or `cargo`, putting `info:` messages in `stderr` (WHY!!!),
-    /// therefore we can specify this to output those `info` as well, but this will causing
-    /// the actually error not showing when error occurs.
-    pub fn inherit_stderr(&mut self) -> &mut Command {
-        self.0.stderr(Stdio::inherit());
+    /// Set a flag to write command output (including `stdout` and `stderr`)
+    /// to a [log file](super::log_file_path).
+    pub fn output_to_file(&mut self) -> &mut Command {
+        self.log_output = true;
         self
     }
 
     pub fn run(&mut self) -> Result<()> {
-        execute_command(&mut self.0, true)?;
+        self.execute_command(true)?;
         Ok(())
     }
 
     pub fn run_with_ret_code(&mut self) -> Result<i32> {
-        execute_command(&mut self.0, false)
+        self.execute_command(false)
+    }
+
+    fn execute_command(&mut self, expect_success: bool) -> Result<i32> {
+        cfg_if::cfg_if! {
+            if #[cfg(windows)] {
+                use std::os::windows::process::CommandExt;
+                use winapi::um::winbase::CREATE_NO_WINDOW;
+                // Prevent CMD window popup
+                let output = self.cmd_.creation_flags(CREATE_NO_WINDOW).output()?;
+                let ret_code = output.status.code().unwrap();
+            } else {
+                use std::os::unix::process::ExitStatusExt;
+                let output = self.cmd_.output()?;
+                let ret_code = output.status.into_raw();
+            }
+        }
+
+        // manually copy output to standard pipeline.
+        io::copy(&mut output.stdout.as_slice(), &mut io::stdout())?;
+        io::copy(&mut output.stderr.as_slice(), &mut io::stderr())?;
+
+        if self.log_output {
+            let mut log_file = fs::OpenOptions::new()
+                .append(true)
+                .create(true)
+                .open(super::log_file_path()?)?;
+            io::copy(&mut output.stdout.as_slice(), &mut log_file)?;
+            io::copy(&mut output.stderr.as_slice(), &mut log_file)?;
+        }
+
+        if expect_success && !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            // stderr might be empty if using `Stdio::inherit()`
+            let err = if stderr.is_empty() {
+                "Undocumented error, check log for more details"
+            } else {
+                &*stderr
+            };
+            let command = COMMAND_STRING.lock().unwrap();
+            anyhow::bail!(
+                "programm exited with code {ret_code}. \n\
+                Command: {}
+                Error output: {err}",
+                (*command).join(" "),
+            );
+        } else {
+            Ok(ret_code)
+        }
     }
 }
 
@@ -97,41 +152,4 @@ pub fn cmd_exist<S: AsRef<str>>(cmd: S) -> bool {
     env::split_paths(&path)
         .map(|p| p.join(cmd.as_ref()))
         .any(|p| p.exists())
-}
-
-fn execute_command(command: &mut StdCommand, expect_success: bool) -> Result<i32> {
-    command.stdout(Stdio::inherit());
-
-    cfg_if::cfg_if! {
-        if #[cfg(windows)] {
-            use std::os::windows::process::CommandExt;
-            use winapi::um::winbase::CREATE_NO_WINDOW;
-            // Prevent CMD window popup
-            let output = command.creation_flags(CREATE_NO_WINDOW).output()?;
-            let ret_code = output.status.code().unwrap();
-        } else {
-            use std::os::unix::process::ExitStatusExt;
-            let output = command.output()?;
-            let ret_code = output.status.into_raw();
-        }
-    }
-
-    if expect_success && !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        // stderr might be empty if using `Stdio::inherit()`
-        let err = if stderr.is_empty() {
-            "Undocumented error, check log for more details"
-        } else {
-            &*stderr
-        };
-        let command = COMMAND_STRING.lock().unwrap();
-        anyhow::bail!(
-            "programm exited with code {ret_code}. \n\
-            Command: {}
-            Error output: {err}",
-            (*command).join(" "),
-        );
-    } else {
-        Ok(ret_code)
-    }
 }
