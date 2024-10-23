@@ -113,16 +113,16 @@ impl Command {
         }
 
         // manually copy output to standard pipeline.
-        io::copy(&mut output.stdout.as_slice(), &mut io::stdout())?;
         io::copy(&mut output.stderr.as_slice(), &mut io::stderr())?;
+        io::copy(&mut output.stdout.as_slice(), &mut io::stdout())?;
 
         if self.log_output {
             let mut log_file = fs::OpenOptions::new()
                 .append(true)
                 .create(true)
                 .open(super::log_file_path()?)?;
-            io::copy(&mut output.stdout.as_slice(), &mut log_file)?;
             io::copy(&mut output.stderr.as_slice(), &mut log_file)?;
+            io::copy(&mut output.stdout.as_slice(), &mut log_file)?;
         }
 
         if expect_success && !output.status.success() {

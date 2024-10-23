@@ -1,6 +1,7 @@
 use std::{
     sync::{mpsc, Arc},
     thread,
+    time::Duration,
 };
 
 use crate::{error::Result, toolkit::Toolkit};
@@ -62,6 +63,10 @@ fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
     let window_clone = Arc::clone(&window);
 
     let uninstall_thread = thread::spawn(move || -> anyhow::Result<()> {
+        // FIXME: this is needed to make sure the other thread could recieve the first couple messages
+        // we sent in this thread. But it feels very wrong, there has to be better way.
+        thread::sleep(Duration::from_millis(500));
+
         let pos_cb = |pos: f32| -> anyhow::Result<()> { Ok(window.emit("update-progress", pos)?) };
         let progress = Progress::new(&pos_cb);
 
@@ -107,8 +112,8 @@ fn spawn_gui_update_thread(
     msg_recvr: mpsc::Receiver<String>,
 ) -> thread::JoinHandle<anyhow::Result<()>> {
     thread::spawn(move || loop {
-        if let Ok(detail_msg) = msg_recvr.try_recv() {
-            win.emit("install-details", detail_msg)?;
+        for pending_message in msg_recvr.try_iter() {
+            win.emit("update-output", pending_message)?;
         }
 
         if core_thread.is_finished() {

@@ -49,12 +49,10 @@ impl Logger {
     /// Setup logger using [`log`] and [`fern`], this must be called first before
     /// any of the `info!`, `warn!`, `trace!`, `debug!`, `error!` macros.
     ///
-    /// - If [`log_dir`](Logger::log_dir) was called with a valid directory path, this will attempt
-    ///     to create a log file under that directory, and output log messages there.
     /// - If [`verbose`](Logger::verbose) was called with `true`, this will output more
     ///     detailed log messages including `debug!`.
     /// - If [`quiet`](Logger::quiet) was called with `true`, this will not output any message
-    ///     on `stdout`, but may output them into log file instead.
+    ///     on `stdout`, but will still output them into log file.
     pub fn setup(self) -> Result<()> {
         // decide if `Sender` or `Stdout` should be used as message medium.
         let output = if let Some(sender) = self.output_sender {
