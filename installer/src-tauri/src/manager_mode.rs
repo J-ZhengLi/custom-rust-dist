@@ -4,8 +4,9 @@ use std::{
     time::Duration,
 };
 
-use crate::{error::Result, toolkit::Toolkit};
+use crate::error::Result;
 use anyhow::Context;
+use rim::toolkit::{get_available_kits_from_server, Toolkit};
 use rim::{
     utils::{self, Progress},
     UninstallConfiguration, UpdateConfiguration,
@@ -16,6 +17,7 @@ pub(super) fn main() -> Result<()> {
         .invoke_handler(tauri::generate_handler![
             super::close_window,
             get_installed_kit,
+            get_available_kits,
             get_install_dir,
             uninstall_toolkit,
             check_manager_version,
@@ -45,7 +47,14 @@ pub(super) fn main() -> Result<()> {
 
 #[tauri::command]
 fn get_installed_kit() -> Result<Option<Toolkit>> {
-    Toolkit::from_installed()
+    Ok(Toolkit::from_installed()?)
+}
+
+#[tauri::command]
+fn get_available_kits() -> Result<Vec<Toolkit>> {
+    let res = get_available_kits_from_server()?;
+    println!("available kits: {:#?}", res);
+    Ok(res)
 }
 
 #[tauri::command]

@@ -9,7 +9,6 @@ use crate::{get_installed_dir, utils};
 
 pub struct UpdateConfiguration;
 
-pub(crate) const BASE_OBS_URL: &str = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com";
 pub(crate) const MANAGER_SOURCE_PATH: &str = "/manager/version";
 
 impl UpdateConfiguration {
@@ -69,7 +68,8 @@ fn full_manager_name() -> String {
 }
 
 fn parse_download_url(source_path: &str) -> Result<Url> {
-    let base_obs_server = env::var("OBS_DIST_SERVER").unwrap_or_else(|_| BASE_OBS_URL.to_string());
+    let base_obs_server =
+        env::var("OBS_DIST_SERVER").unwrap_or_else(|_| super::RIM_DIST_SERVER.to_string());
 
     Ok(Url::parse(&base_obs_server)?.join(source_path)?)
 }

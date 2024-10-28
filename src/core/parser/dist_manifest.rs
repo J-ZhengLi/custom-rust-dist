@@ -11,6 +11,7 @@ use super::TomlParser;
 #[derive(Debug, Deserialize)]
 /// Represent a list of dist packages which user can download from the server.
 pub struct DistManifest {
+    #[serde(alias = "package")]
     pub packages: Vec<DistPackage>,
 }
 

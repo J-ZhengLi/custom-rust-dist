@@ -28,19 +28,22 @@ pub struct DownloadOpt<T: Sized> {
 }
 
 impl<T: Sized> DownloadOpt<T> {
-    pub fn new(
-        name: String,
-        proxy: Option<Proxy>,
-        handler: Option<CliProgress<T>>,
-    ) -> Result<Self> {
-        let client = client_builder()
+    pub fn new<S: ToString>(name: S) -> Result<Self> {
+        Ok(Self {
+            name: name.to_string(),
+            client: client_builder().build()?,
+            handler: None,
+        })
+    }
+    pub fn proxy(&mut self, proxy: Option<Proxy>) -> Result<&mut Self> {
+        self.client = client_builder()
             .proxy(proxy.unwrap_or_default().try_into()?)
             .build()?;
-        Ok(Self {
-            name,
-            client,
-            handler,
-        })
+        Ok(self)
+    }
+    pub fn handler(&mut self, progress_handler: Option<CliProgress<T>>) -> &mut Self {
+        self.handler = progress_handler;
+        self
     }
     // TODO: make local file download fancier
     pub fn download_file(&self, url: &Url, path: &Path, resume: bool) -> Result<()> {
@@ -127,6 +130,8 @@ impl<T: Sized> DownloadOpt<T> {
 
 /// Download a file without resuming, with proxy settings.
 pub fn download<S: ToString>(name: S, url: &Url, dest: &Path, proxy: Option<&Proxy>) -> Result<()> {
-    let dl_opt = DownloadOpt::new(name.to_string(), proxy.cloned(), Some(CliProgress::new()))?;
-    dl_opt.download_file(url, dest, false)
+    DownloadOpt::new(name)?
+        .proxy(proxy.cloned())?
+        .handler(Some(CliProgress::new()))
+        .download_file(url, dest, false)
 }

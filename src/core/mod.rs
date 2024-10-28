@@ -9,6 +9,7 @@ pub mod install;
 pub(crate) mod os;
 pub(crate) mod parser;
 pub(crate) mod rustup;
+pub mod toolkit;
 pub(crate) mod tools;
 pub mod try_it;
 pub(crate) mod uninstall;
@@ -28,3 +29,5 @@ declare_env_vars!(
     RUSTUP_DIST_SERVER,
     RUSTUP_UPDATE_ROOT
 );
+
+pub(crate) const RIM_DIST_SERVER: &str = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com";

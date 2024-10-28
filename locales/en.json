@@ -74,5 +74,7 @@
 
     "notify_empty_path": "Please enter an installation path, or choose one using the button above",
     "notify_root_dir": "Cannot install in root directory, please select another one",
-    "notify_relative_path": "Please enter the full absolute path"
+    "notify_relative_path": "Please enter the full absolute path",
+
+    "fetching": "fetching"
 }

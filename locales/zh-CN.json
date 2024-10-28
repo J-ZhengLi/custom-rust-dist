@@ -69,5 +69,7 @@
 
     "notify_empty_path": "请输入安装路径，或点击上方按钮选择一个路径",
     "notify_root_dir": "无法安装至根目录，请重新选择",
-    "notify_relative_path": "请输入绝对路径"
+    "notify_relative_path": "请输入绝对路径",
+
+    "fetching": "正在获取"
 }

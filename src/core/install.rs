@@ -40,8 +40,8 @@ macro_rules! declare_unfallible_url {
 }
 
 declare_unfallible_url!(
-    default_rustup_dist_server(DEFAULT_RUSTUP_DIST_SERVER) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup";
-    default_rustup_update_root(DEFAULT_RUSTUP_UPDATE_ROOT) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
+    default_rustup_dist_server(DEFAULT_RUSTUP_DIST_SERVER) -> "http://xuanwu.base.atomgit.com";
+    default_rustup_update_root(DEFAULT_RUSTUP_UPDATE_ROOT) -> "http://xuanwu.base.atomgit.com/rustup"
 );
 
 pub(crate) const DEFAULT_CARGO_REGISTRY: (&str, &str) =

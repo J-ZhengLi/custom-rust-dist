@@ -1,8 +1,17 @@
 use std::collections::HashSet;
 
-use crate::Result;
-use rim::{components, fingerprint::InstallationRecord, toolset_manifest::ToolsetManifest};
+use crate::core::parser::dist_manifest::DistManifest;
+use crate::core::parser::TomlParser;
+use crate::{components, utils};
+use crate::{fingerprint::InstallationRecord, toolset_manifest::ToolsetManifest};
+use anyhow::Result;
+use log::info;
 use serde::Serialize;
+use url::Url;
+
+use super::parser::dist_manifest::DistPackage;
+
+pub(crate) const DIST_MANIFEST_TOML: &str = "distribution-manifest.toml";
 
 #[derive(Debug, Serialize)]
 pub struct Toolkit {
@@ -65,4 +74,47 @@ impl Toolkit {
 
         Ok(Some(tk))
     }
+}
+
+impl From<DistPackage> for Toolkit {
+    fn from(value: DistPackage) -> Self {
+        Self {
+            name: value.name,
+            version: value.version,
+            desc: value.desc,
+            info: value.info,
+            manifest_url: Some(value.manifest_url.to_string()),
+            components: vec![],
+        }
+    }
+}
+
+pub fn get_available_kits_from_server() -> Result<Vec<Toolkit>> {
+    let dist_server_env_ovr = std::env::var("RIM_DIST_SERVER");
+    let dist_server = dist_server_env_ovr
+        .as_deref()
+        .unwrap_or(super::RIM_DIST_SERVER);
+
+    // download dist manifest from server
+    info!("{} {DIST_MANIFEST_TOML}", t!("fetching"));
+    let dist_m_url = Url::parse(&format!("{dist_server}/dist/{DIST_MANIFEST_TOML}"))?;
+    let dist_m_file = utils::make_temp_file("dist-manifest-", None)?;
+    utils::DownloadOpt::<()>::new("distribution manifest")?.download_file(
+        &dist_m_url,
+        dist_m_file.path(),
+        false,
+    )?;
+
+    // process place-holder text in debug mode
+    #[cfg(debug_assertions)]
+    {
+        use std::fs;
+        let mut dist_m_content = fs::read_to_string(dist_m_file.path())?;
+        dist_m_content = dist_m_content.replace("{{SERVER}}", Url::parse(dist_server)?.as_str());
+        fs::write(dist_m_file.path(), dist_m_content)?;
+    }
+
+    // load dist "pacakges" then convert them into `toolkit`s
+    let packages = DistManifest::load(dist_m_file.path())?.packages;
+    Ok(packages.into_iter().rev().map(Toolkit::from).collect())
 }

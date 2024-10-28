@@ -34,7 +34,8 @@ const handleInstall = () => {
         </p>
         <p ml="3rem">{{ props.kit.version }}</p>
         <p ml="3rem">{{ props.kit.desc }}</p>
-        <a m="l-3rem t-0.5rem">{{ props.kit.info }}</a>
+        <!-- TODO: There should a button labeled as "Changelog" that shows `kit.info` in a pop-up when clicked -->
+        <!-- <a m="l-3rem t-0.5rem">{{ props.kit.info }}</a> -->
       </div>
     </div>
     <div v-if="props.installed" flex="~ col justify-around">

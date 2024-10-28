@@ -6,6 +6,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::time::Duration;
+use tempfile::NamedTempFile;
 
 /// Get a path to user's "home" directory.
 ///
@@ -307,4 +308,20 @@ pub fn parent_dir_of_cur_exe() -> Result<PathBuf> {
         .unwrap_or_else(|| unreachable!("executable should always have a parent directory"))
         .to_path_buf();
     Ok(maybe_install_dir)
+}
+
+/// Create temporary file with or without specific directory as root.
+pub fn make_temp_file(prefix: &str, root: Option<&Path>) -> Result<NamedTempFile> {
+    let mut builder = tempfile::Builder::new();
+    builder.prefix(prefix);
+
+    if let Some(r) = root {
+        builder
+            .tempfile_in(r)
+            .with_context(|| format!("unable to create temporary file under {}", r.display()))
+    } else {
+        builder
+            .tempfile()
+            .with_context(|| format!("unable to create temporary file"))
+    }
 }

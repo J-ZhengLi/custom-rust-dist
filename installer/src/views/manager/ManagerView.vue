@@ -5,6 +5,7 @@ import { computed } from 'vue';
 import Pagination from '@/components/Pagination.vue';
 import { usePagination } from '@/utils/pagination';
 
+const installedKit = computed(() => managerConf.getInstalled())
 const kits = computed(() => managerConf.getKits());
 const { current, size, total, list } = usePagination({
   data: kits.value,
@@ -13,13 +14,22 @@ const { current, size, total, list } = usePagination({
 </script>
 
 <template>
+  <h2 mx="12px">更新和卸载</h2>
+  <h3 mx="12px">已安装</h3>
+  <kit-card
+    v-if="installedKit"
+    :key="installedKit.name"
+    :kit="installedKit"
+    :installed="true"
+    mt="1rem"
+  ></kit-card>
   <section overflow-auto flex="~ col">
-    <h1 mx="12px">更新和卸载</h1>
+    <h3 mx="12px" v-if="kits.length > 0">可用版本</h3>
     <kit-card
-      v-for="(kit, index) in list"
+      v-for="kit in list"
       :key="kit.name"
       :kit="kit"
-      :installed="index === 0"
+      :installed="false"
       mt="1rem"
     ></kit-card>
     <div flex="1"></div>
