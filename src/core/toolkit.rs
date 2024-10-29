@@ -1,11 +1,12 @@
 use std::collections::HashSet;
+use std::sync::OnceLock;
 
 use crate::core::parser::dist_manifest::DistManifest;
 use crate::core::parser::TomlParser;
 use crate::{components, utils};
 use crate::{fingerprint::InstallationRecord, toolset_manifest::ToolsetManifest};
 use anyhow::Result;
-use log::info;
+use log::{info, warn};
 use serde::Serialize;
 use url::Url;
 
@@ -13,10 +14,14 @@ use super::parser::dist_manifest::DistPackage;
 
 pub(crate) const DIST_MANIFEST_TOML: &str = "distribution-manifest.toml";
 
-#[derive(Debug, Serialize)]
+/// A cached installed [`Toolkit`] struct to prevent the program doing
+/// excessive IO operations as in [`from_installed`](Toolkit::from_installed).
+static INSTALLED_KIT: OnceLock<Toolkit> = OnceLock::new();
+
+#[derive(Clone, Debug, Serialize)]
 pub struct Toolkit {
-    name: String,
-    version: String,
+    pub name: String,
+    pub version: String,
     desc: Option<String>,
     #[serde(alias = "notes")]
     info: Option<String>,
@@ -31,6 +36,10 @@ impl Toolkit {
     /// We need the manifest because it contains the details of the toolkit along with
     /// what components it has.
     pub fn from_installed() -> Result<Option<Self>> {
+        if let Some(cached) = INSTALLED_KIT.get() {
+            return Ok(Some(cached.clone()));
+        }
+
         if !InstallationRecord::exists()? {
             // No toolkit installed, return None
             return Ok(None);
@@ -71,6 +80,11 @@ impl Toolkit {
             }
             tk.components = components;
         }
+
+        // Make a clone and cache the final result
+        INSTALLED_KIT
+            .set(tk.clone())
+            .unwrap_or_else(|_| warn!("unable to cache the installed toolkit"));
 
         Ok(Some(tk))
     }

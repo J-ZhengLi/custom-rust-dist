@@ -123,6 +123,12 @@ impl CliProgress<CliProgressBar> {
     }
 }
 
+impl Default for CliProgress<CliProgressBar> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::ProgressPos;

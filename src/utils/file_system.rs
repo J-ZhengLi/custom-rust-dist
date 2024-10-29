@@ -322,6 +322,6 @@ pub fn make_temp_file(prefix: &str, root: Option<&Path>) -> Result<NamedTempFile
     } else {
         builder
             .tempfile()
-            .with_context(|| format!("unable to create temporary file"))
+            .context("unable to create temporary file")
     }
 }

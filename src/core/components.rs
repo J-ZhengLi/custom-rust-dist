@@ -6,11 +6,12 @@ use crate::toolset_manifest::{ToolInfo, ToolsetManifest};
 
 static COMPONENTS_COUNTER: AtomicU32 = AtomicU32::new(0);
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Component {
     pub id: u32,
     pub group_name: Option<String>,
     pub name: String,
+    pub version: Option<String>,
     pub desc: String,
     pub required: bool,
     pub optional: bool,
@@ -43,6 +44,7 @@ impl Component {
             id: COMPONENTS_COUNTER.load(Ordering::Relaxed),
             group_name: None,
             name: name.into(),
+            version: None,
             desc: desc.into(),
             required: false,
             optional: false,
@@ -61,6 +63,7 @@ impl Component {
     setter!(is_toolchain_component(self, bool));
     setter!(group_name(self, group: Option<&str>) { group.map(ToOwned::to_owned) });
     setter!(tool_installer(self, installer: &ToolInfo) { Some(installer.clone()) });
+    setter!(version(self, version: Option<&str>) { version.map(ToOwned::to_owned) });
 }
 
 pub fn get_component_list_from_manifest(
@@ -76,7 +79,8 @@ pub fn get_component_list_from_manifest(
     )
     .group_name(Some(manifest.toolchain_group_name()))
     .is_toolchain_component(true)
-    .required(true)];
+    .required(true)
+    .version(Some(manifest.rust_version()))];
 
     for component in manifest.optional_toolchain_components() {
         components.push(
@@ -86,7 +90,8 @@ pub fn get_component_list_from_manifest(
             )
             .group_name(Some(manifest.toolchain_group_name()))
             .optional(true)
-            .is_toolchain_component(true),
+            .is_toolchain_component(true)
+            .version(Some(manifest.rust_version())),
         );
     }
 
@@ -106,7 +111,8 @@ pub fn get_component_list_from_manifest(
                 .tool_installer(tool_info)
                 .required(tool_info.is_required())
                 .optional(tool_info.is_optional())
-                .installed(already_installed_tools.contains(&tool_name)),
+                .installed(already_installed_tools.contains(&tool_name))
+                .version(tool_info.version()),
             );
         }
     }

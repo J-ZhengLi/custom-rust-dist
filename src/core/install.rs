@@ -410,11 +410,11 @@ mod tests {
 
         assert_eq!(
             default_dist_server.as_str(),
-            "https://mirrors.tuna.tsinghua.edu.cn/rustup"
+            "http://xuanwu.base.atomgit.com/"
         );
         assert_eq!(
             default_update_root.as_str(),
-            "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
+            "http://xuanwu.base.atomgit.com/rustup"
         );
     }
 

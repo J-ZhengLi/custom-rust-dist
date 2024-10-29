@@ -1,5 +1,4 @@
-import { ManagerComponent, TauriComponent } from './Component';
-
+import { Component } from './Component';
 
 interface BaseKitItem {
     /**
@@ -26,9 +25,5 @@ interface BaseKitItem {
 }
 
 export interface KitItem extends BaseKitItem {
-  components: ManagerComponent[];
-}
-
-export interface OriginKitItem extends BaseKitItem {
-  components: TauriComponent[];
+  components: Component[];
 }

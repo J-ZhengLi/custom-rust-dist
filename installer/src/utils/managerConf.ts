@@ -1,6 +1,6 @@
 import { ref, Ref, shallowRef } from 'vue';
-import { KitItem, OriginKitItem } from './types/KitItem';
-import { ManagerComponent } from './types/Component';
+import { KitItem } from './types/KitItem';
+import { Component } from './types/Component';
 import { CheckGroup, CheckGroupItem } from './types/CheckBoxGroup';
 import LabelComponent from '@/views/manager/components/Label.vue';
 import { invokeCommand } from './invokeCommand';
@@ -9,7 +9,7 @@ import { ask } from '@tauri-apps/api/dialog';
 
 type Target = {
   operation: 'update' | 'uninstall';
-  components: ManagerComponent[];
+  components: Component[];
 };
 
 class ManagerConf {
@@ -35,12 +35,12 @@ class ManagerConf {
     return this._installedKit.value;
   }
 
-  public getInstalledComponents(): ManagerComponent[] | undefined {
+  public getInstalledComponents(): Component[] | undefined {
     return this._installedKit.value?.components;
   }
 
-  public getGroups(): CheckGroup<ManagerComponent>[] {
-    const checkItems: CheckGroupItem<ManagerComponent>[] =
+  public getGroups(): CheckGroup<Component>[] {
+    const checkItems: CheckGroupItem<Component>[] =
       this._current.value?.components.map((item) => {
         const installedItem = this._installedKit.value?.components.find(
           (c) => c.name === item.name
@@ -85,7 +85,7 @@ class ManagerConf {
 
         return acc;
       },
-      {} as Record<string, CheckGroup<ManagerComponent>>
+      {} as Record<string, CheckGroup<Component>>
     );
 
     return Object.values(groups);
@@ -95,7 +95,7 @@ class ManagerConf {
     return this._current;
   }
 
-  public getCurrentComponents(): ManagerComponent[] | undefined {
+  public getCurrentComponents(): Component[] | undefined {
     return this._current.value?.components;
   }
 
@@ -143,7 +143,7 @@ class ManagerConf {
     }
 
     await this.loadInstalledKit();
-    await this.loadAvailableKit();
+    await this.loadAvailableKits();
   }
 
   async checkUpdate() {
@@ -162,27 +162,13 @@ class ManagerConf {
   async loadInstalledKit() {
     const tauriInstalled = (await invokeCommand(
       'get_installed_kit'
-    )) as OriginKitItem | undefined;
+    )) as KitItem | undefined;
     if (tauriInstalled) {
       const installed = {
         ...tauriInstalled, components: tauriInstalled.components.filter((c) => c.installed).map((item) => {
 
-          const {
-            group_name,
-            is_toolchain_component,
-            tool_installer,
-            desc,
-            ...rest
-          } = item;
-          return {
-            ...rest,
-            desc: desc.split('\n'),
-            groupName: group_name,
-            isToolchainComponent: is_toolchain_component,
-            toolInstaller: tool_installer,
-            version: tool_installer?.version || 'no version'
-
-          } as ManagerComponent;
+          item.version = item.version || 'no version';
+          return item as Component;
         })
       };
       this.setInstalled(installed);
@@ -190,45 +176,11 @@ class ManagerConf {
     }
   }
 
-  // TODO: Separate `installed` and `available` toolkit list.
-  // something like:
-  //
-  // Installed
-  //   - xxx
-  // Available
-  //   - xxxx
-  //   - xxxxx
-  //
-  // but we'll need to download `DistManifest` from server fot it at first.
-  async loadAvailableKit() {
+  async loadAvailableKits() {
     const availableKits = (await invokeCommand(
       'get_available_kits'
     )) as KitItem[];
 
-    // if (availableKits.length > 0) {
-      // const installed = {
-      //   ...tauriInstalled, components: tauriInstalled.components.filter((c) => c.installed).map((item) => {
-
-      //     const {
-      //       group_name,
-      //       is_toolchain_component,
-      //       tool_installer,
-      //       desc,
-      //       ...rest
-      //     } = item;
-      //     return {
-      //       ...rest,
-      //       desc: desc.split('\n'),
-      //       groupName: group_name,
-      //       isToolchainComponent: is_toolchain_component,
-      //       toolInstaller: tool_installer,
-      //       version: tool_installer?.version || 'no version'
-
-      //     } as ManagerComponent;
-      //   })
-      // };
-      
-    // }
     this.setKits(availableKits);
   }
 }

@@ -19,7 +19,7 @@ pub type ToolMap = IndexMap<String, ToolInfo>;
 
 pub const FILENAME: &str = "toolset-manifest.toml";
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Default, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToolsetManifest {
     /// Product name to be cached after installation, so that we can show it as `installed`
@@ -208,7 +208,7 @@ impl TryFrom<Proxy> for reqwest::Proxy {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Default, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct RustToolchain {
     pub(crate) version: String,
@@ -266,7 +266,7 @@ impl From<&str> for ToolchainProfile {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Default, Clone)]
 pub(crate) struct Tools {
     #[serde(default)]
     descriptions: BTreeMap<String, String>,
@@ -344,6 +344,15 @@ impl ToolInfo {
         }
     }
 
+    pub fn version(&self) -> Option<&str> {
+        match self {
+            Self::PlainVersion(ver) => Some(ver),
+            Self::DetailedVersion { ver, .. } => Some(ver),
+            Self::Git { tag, .. } => tag.as_deref(),
+            Self::Path { version, .. } | Self::Url { version, .. } => version.as_deref(),
+        }
+    }
+
     pub fn is_optional(&self) -> bool {
         match self {
             Self::PlainVersion(_) => false,
@@ -417,7 +426,7 @@ impl ToolInfo {
 }
 
 /// Get the content of baked-in toolset manifest as `str`.
-pub fn baked_in_manifest_raw() -> &'static str {
+fn baked_in_manifest_raw() -> &'static str {
     cfg_if::cfg_if! {
         if #[cfg(feature = "no-web")] {
             include_str!("../../../resources/toolset_manifest_noweb.toml")
@@ -435,11 +444,13 @@ pub fn baked_in_manifest_raw() -> &'static str {
 /// Note that `proxy` is unused if `url` is not provided.
 pub fn get_toolset_manifest(url: Option<&Url>) -> Result<ToolsetManifest> {
     if let Some(url) = url {
-        let temp = tempfile::Builder::new()
-            .prefix("toolset_manifest-")
-            .tempfile()?;
+        let temp = utils::make_temp_file("toolset-manifest-", None)?;
         // NB: This might fail if the url requires certain proxy setup
-        utils::download("toolset manifest", url, temp.path(), None)?;
+        utils::DownloadOpt::<()>::new("toolset manifest")?.download_file(
+            url,
+            temp.path(),
+            false,
+        )?;
         ToolsetManifest::load(temp.path())
     } else {
         ToolsetManifest::from_str(baked_in_manifest_raw())

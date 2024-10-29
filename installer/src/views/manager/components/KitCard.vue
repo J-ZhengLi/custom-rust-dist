@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { KitItem, managerConf } from '@/utils/index';
+import { invokeCommand, KitItem, managerConf, Component } from '@/utils/index';
 import { useCustomRouter } from '@/router/index';
 
 const { routerPush } = useCustomRouter();
@@ -20,8 +20,15 @@ const handleUninstall = () => {
 };
 
 const handleInstall = () => {
-  managerConf.setOperation('update');
-  routerPush('/manager/change');
+  invokeCommand('handle_toolkit_install_click', {
+    url: props.kit.manifestURL as string,
+  }).then((components) => {
+    const comps = components as Component[];
+    props.kit.components = comps;
+    managerConf.setCurrent(props.kit);
+    managerConf.setOperation('update');
+    routerPush('/manager/change');
+  });
 };
 </script>
 <template>

@@ -69,7 +69,7 @@ fn full_manager_name() -> String {
 
 fn parse_download_url(source_path: &str) -> Result<Url> {
     let base_obs_server =
-        env::var("OBS_DIST_SERVER").unwrap_or_else(|_| super::RIM_DIST_SERVER.to_string());
+        env::var("RIM_DIST_SERVER").unwrap_or_else(|_| super::RIM_DIST_SERVER.to_string());
 
     Ok(Url::parse(&base_obs_server)?.join(source_path)?)
 }

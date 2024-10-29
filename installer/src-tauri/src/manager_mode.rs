@@ -1,16 +1,22 @@
 use std::{
-    sync::{mpsc, Arc},
+    sync::{mpsc, Arc, Mutex},
     thread,
     time::Duration,
 };
 
 use crate::error::Result;
 use anyhow::Context;
-use rim::toolkit::{get_available_kits_from_server, Toolkit};
+use rim::{
+    components::{self, Component},
+    toolkit::{get_available_kits_from_server, Toolkit},
+    toolset_manifest::{get_toolset_manifest, ToolsetManifest},
+};
 use rim::{
     utils::{self, Progress},
     UninstallConfiguration, UpdateConfiguration,
 };
+
+static SELECTED_TOOLSET: Mutex<Option<ToolsetManifest>> = Mutex::new(None);
 
 pub(super) fn main() -> Result<()> {
     tauri::Builder::default()
@@ -22,6 +28,7 @@ pub(super) fn main() -> Result<()> {
             uninstall_toolkit,
             check_manager_version,
             upgrade_manager,
+            handle_toolkit_install_click,
         ])
         .setup(|app| {
             tauri::WindowBuilder::new(
@@ -52,8 +59,16 @@ fn get_installed_kit() -> Result<Option<Toolkit>> {
 
 #[tauri::command]
 fn get_available_kits() -> Result<Vec<Toolkit>> {
-    let res = get_available_kits_from_server()?;
-    println!("available kits: {:#?}", res);
+    let available_kits = get_available_kits_from_server()?;
+    // filter out the one that was already installed
+    let res = if let Some(installed) = Toolkit::from_installed()? {
+        available_kits
+            .into_iter()
+            .filter(|tk| tk.name != installed.name && tk.version != installed.version)
+            .collect::<Vec<_>>()
+    } else {
+        available_kits
+    };
     Ok(res)
 }
 
@@ -113,6 +128,26 @@ fn upgrade_manager() -> Result<()> {
     upgrade_thread.join().expect("failed to upgrade manager.")?;
 
     Ok(())
+}
+
+#[tauri::command]
+fn handle_toolkit_install_click(url: String) -> Result<Vec<Component>> {
+    // the `url` input was converted from `Url`, so it will definitely be convert back without issue,
+    // thus the below line should never panic
+    let url_ = utils::force_parse_url(&url);
+
+    // load the manifest for content
+    let manifest = get_toolset_manifest(Some(&url_))?;
+
+    let components = components::get_component_list_from_manifest(&manifest, true)?;
+
+    // cache the selected toolset manifest
+    let mut guard = SELECTED_TOOLSET
+        .lock()
+        .expect("unable to lock global mutex");
+    *guard = Some(manifest);
+
+    Ok(components)
 }
 
 fn spawn_gui_update_thread(
