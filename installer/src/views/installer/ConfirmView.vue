@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { installConf, invokeCommand, TauriComponent } from '@/utils/index';
+import { installConf, invokeCommand, Component } from '@/utils/index';
 import { useCustomRouter } from '@/router/index';
 import ScrollBox from '@/components/ScrollBox.vue';
 import { computed } from 'vue';
@@ -15,7 +15,7 @@ const components = computed(() => {
 
 function handleNextClick() {
   invokeCommand('install_toolchain', {
-    components_list: components.value as TauriComponent[],
+    components_list: components.value as Component[],
     install_dir: path.value as string,
   }).then(() => routerPush('/installer/install'));
 }

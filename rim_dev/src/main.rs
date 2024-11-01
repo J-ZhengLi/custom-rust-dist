@@ -98,7 +98,11 @@ fn gen_mocked_files() -> Result<()> {
             "
 name = 'XuanWu Rust Distribution (Community)'
 version = '1.80.1'
-root = '{}'",
+root = '{}'
+
+[rust]
+version = '1.80.1'
+components = []",
             debug_dir.display()
         ),
     )?;

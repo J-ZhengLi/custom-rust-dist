@@ -90,7 +90,7 @@ impl<'a> InstallConfiguration<'a> {
     /// If `lite` is set to true, this won't make modifications on environment, and
     /// won't write manager binary as well.
     pub fn init(
-        install_dir: &Path,
+        install_dir: &'a Path,
         lite: bool,
         progress: Option<Progress<'a>>,
         manifest: &'a ToolsetManifest,

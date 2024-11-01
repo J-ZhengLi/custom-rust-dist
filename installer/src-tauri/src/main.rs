@@ -3,6 +3,7 @@
 #[macro_use]
 extern crate rust_i18n;
 
+mod common;
 mod error;
 mod installer_mode;
 mod manager_mode;

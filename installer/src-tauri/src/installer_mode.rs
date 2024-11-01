@@ -1,20 +1,16 @@
 use std::path::{Path, PathBuf};
-use std::sync::{mpsc, Arc, OnceLock};
-use std::thread;
-use std::time::Duration;
+use std::sync::{Arc, OnceLock};
 
 use anyhow::Context;
-use indexmap::IndexMap;
 use tauri::api::dialog::FileDialogBuilder;
 
 use super::INSTALL_DIR;
 use crate::error::Result;
 use rim::components::{get_component_list_from_manifest, Component};
-use rim::toolset_manifest::{get_toolset_manifest, ToolInfo, ToolsetManifest};
-use rim::utils::Progress;
-use rim::{try_it, utils, InstallConfiguration};
+use rim::toolset_manifest::{get_toolset_manifest, ToolsetManifest};
+use rim::{try_it, utils};
 
-static TOOLSET_MANIFEST: OnceLock<ToolsetManifest> = OnceLock::new();
+static TOOLSET_MANIFEST: OnceLock<Arc<ToolsetManifest>> = OnceLock::new();
 
 pub(super) fn main() -> Result<()> {
     tauri::Builder::default()
@@ -92,7 +88,7 @@ fn check_install_path(path: String) -> Option<String> {
 #[tauri::command]
 fn get_component_list() -> Result<Vec<Component>> {
     let manifest = cached_manifest();
-    Ok(get_component_list_from_manifest(manifest, false)?)
+    Ok(get_component_list_from_manifest(&manifest, false)?)
 }
 
 #[tauri::command]
@@ -108,7 +104,7 @@ fn load_manifest_and_ret_version() -> Result<String> {
     let mut manifest = get_toolset_manifest(None)?;
     manifest.adjust_paths()?;
 
-    let m = TOOLSET_MANIFEST.get_or_init(|| manifest);
+    let m = TOOLSET_MANIFEST.get_or_init(|| Arc::new(manifest));
     Ok(m.version.clone().unwrap_or_default())
 }
 
@@ -118,107 +114,19 @@ fn install_toolchain(
     components_list: Vec<Component>,
     install_dir: String,
 ) -> Result<()> {
-    let (msg_sendr, msg_recvr) = mpsc::channel::<String>();
-    // config logger to use the `msg_sendr` we just created
-    utils::Logger::new().sender(msg_sendr).setup()?;
-
-    // 使用 Arc 来共享 window
-    let window = Arc::new(window);
-    let window_clone = Arc::clone(&window);
-
-    // 在一个新线程中执行安装过程
-    let install_thread = spawn_install_thread(window, components_list, install_dir)?;
-    // 在主线程中接收进度并发送事件
-    let gui_thread = spawn_gui_update_thread(window_clone, install_thread, msg_recvr);
-
-    if gui_thread.is_finished() {
-        gui_thread.join().expect("unable to join GUI thread")?;
-    }
-    Ok(())
-}
-
-// This spawns a thread that handles installation of user selected components
-fn spawn_install_thread(
-    win: Arc<tauri::Window>,
-    components: Vec<Component>,
-    install_dir: String,
-) -> Result<thread::JoinHandle<anyhow::Result<()>>> {
-    // Split components list to `toolchain_components` and `toolset_components`,
-    // as we are running `rustup` to install toolchain components.
-    let toolset_components = component_list_to_map(
-        components
-            .iter()
-            .filter(|cm| !cm.is_toolchain_component)
-            .collect(),
-    );
-    let toolchain_components: Vec<String> = components
-        .into_iter()
-        // Skip the mocked `rust toolchain` component that we added first,
-        // it will be installed as requirement anyway.
-        .skip(1)
-        .filter_map(|comp| {
-            if comp.is_toolchain_component {
-                Some(comp.name)
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    Ok(thread::spawn(move || -> anyhow::Result<()> {
-        // FIXME: this is needed to make sure the other thread could recieve the first couple messages
-        // we sent in this thread. But it feels very wrong, there has to be better way.
-        thread::sleep(Duration::from_millis(500));
-
-        // Initialize a progress sender.
-        let pos_cb = |pos: f32| -> anyhow::Result<()> { Ok(win.emit("install-progress", pos)?) };
-        let progress = Progress::new(&pos_cb);
-
-        let manifest = cached_manifest();
-        // TODO: Use continuous progress
-        InstallConfiguration::init(Path::new(&install_dir), false, Some(progress), manifest)?
-            .install(toolchain_components, toolset_components)?;
-
-        // 安装完成后，发送安装完成事件
-        win.emit("install-complete", ())?;
-
-        Ok(())
-    }))
+    let install_dir = PathBuf::from(install_dir);
+    super::common::install_components(window, components_list, install_dir, cached_manifest())
 }
 
 /// Retrieve cached toolset manifest.
 ///
 /// # Panic
 /// Will panic if the manifest is not cached.
-fn cached_manifest() -> &'static ToolsetManifest {
+fn cached_manifest() -> Arc<ToolsetManifest> {
     TOOLSET_MANIFEST
         .get()
+        .cloned()
         .expect("toolset manifest should be loaded by now")
-}
-
-fn spawn_gui_update_thread(
-    win: Arc<tauri::Window>,
-    install_handle: thread::JoinHandle<anyhow::Result<()>>,
-    msg_recvr: mpsc::Receiver<String>,
-) -> thread::JoinHandle<anyhow::Result<()>> {
-    thread::spawn(move || loop {
-        for pending_message in msg_recvr.try_iter() {
-            win.emit("install-details", pending_message)?;
-        }
-
-        if install_handle.is_finished() {
-            return if let Err(known_error) = install_handle
-                .join()
-                .expect("unexpected error occurs when running installation thread.")
-            {
-                let error_str = known_error.to_string();
-                win.emit("install-failed", error_str.clone())?;
-                Err(known_error)
-            } else {
-                Ok(())
-            };
-        }
-    })
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -226,21 +134,4 @@ fn run_app(install_dir: String) -> Result<()> {
     let dir: PathBuf = install_dir.into();
     try_it(Some(&dir))?;
     Ok(())
-}
-
-fn component_list_to_map(list: Vec<&Component>) -> IndexMap<String, ToolInfo> {
-    let mut map = IndexMap::new();
-
-    for comp in list {
-        let (name, tool_info) = (
-            comp.name.clone(),
-            comp.tool_installer.clone().expect(
-                "Internal Error: `component_list_to_map` should only be used on third-party tools",
-            ),
-        );
-
-        map.insert(name, tool_info);
-    }
-
-    map
 }

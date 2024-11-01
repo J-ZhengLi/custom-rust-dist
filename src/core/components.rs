@@ -2,7 +2,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicU32, Ordering};
 
-use crate::toolset_manifest::{ToolInfo, ToolsetManifest};
+use crate::toolset_manifest::{ToolInfo, ToolMap, ToolsetManifest};
 
 static COMPONENTS_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -118,4 +118,14 @@ pub fn get_component_list_from_manifest(
     }
 
     Ok(components)
+}
+
+pub fn component_list_to_tool_map(list: Vec<&Component>) -> ToolMap {
+    list.iter()
+        .filter_map(|c| {
+            c.tool_installer
+                .as_ref()
+                .map(|tool_info| (c.name.clone(), tool_info.clone()))
+        })
+        .collect()
 }
