@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { KitItem, managerConf } from '@/utils/index';
+import { invokeCommand, KitItem, managerConf, Component } from '@/utils/index';
 import { useCustomRouter } from '@/router/index';
 
 const { routerPush } = useCustomRouter();
@@ -20,8 +20,15 @@ const handleUninstall = () => {
 };
 
 const handleInstall = () => {
-  managerConf.setOperation('update');
-  routerPush('/manager/change');
+  invokeCommand('handle_toolkit_install_click', {
+    url: props.kit.manifestURL as string,
+  }).then((components) => {
+    const comps = components as Component[];
+    props.kit.components = comps;
+    managerConf.setCurrent(props.kit);
+    managerConf.setOperation('update');
+    routerPush('/manager/change');
+  });
 };
 </script>
 <template>
@@ -34,7 +41,8 @@ const handleInstall = () => {
         </p>
         <p ml="3rem">{{ props.kit.version }}</p>
         <p ml="3rem">{{ props.kit.desc }}</p>
-        <a m="l-3rem t-0.5rem">{{ props.kit.info }}</a>
+        <!-- TODO: There should a button labeled as "Changelog" that shows `kit.info` in a pop-up when clicked -->
+        <!-- <a m="l-3rem t-0.5rem">{{ props.kit.info }}</a> -->
       </div>
     </div>
     <div v-if="props.installed" flex="~ col justify-around">

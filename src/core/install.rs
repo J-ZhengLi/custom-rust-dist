@@ -40,8 +40,8 @@ macro_rules! declare_unfallible_url {
 }
 
 declare_unfallible_url!(
-    default_rustup_dist_server(DEFAULT_RUSTUP_DIST_SERVER) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup";
-    default_rustup_update_root(DEFAULT_RUSTUP_UPDATE_ROOT) -> "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
+    default_rustup_dist_server(DEFAULT_RUSTUP_DIST_SERVER) -> "http://xuanwu.base.atomgit.com";
+    default_rustup_update_root(DEFAULT_RUSTUP_UPDATE_ROOT) -> "http://xuanwu.base.atomgit.com/rustup"
 );
 
 pub(crate) const DEFAULT_CARGO_REGISTRY: (&str, &str) =
@@ -90,7 +90,7 @@ impl<'a> InstallConfiguration<'a> {
     /// If `lite` is set to true, this won't make modifications on environment, and
     /// won't write manager binary as well.
     pub fn init(
-        install_dir: &Path,
+        install_dir: &'a Path,
         lite: bool,
         progress: Option<Progress<'a>>,
         manifest: &'a ToolsetManifest,
@@ -410,11 +410,11 @@ mod tests {
 
         assert_eq!(
             default_dist_server.as_str(),
-            "https://mirrors.tuna.tsinghua.edu.cn/rustup"
+            "http://xuanwu.base.atomgit.com/"
         );
         assert_eq!(
             default_update_root.as_str(),
-            "https://mirrors.tuna.tsinghua.edu.cn/rustup/rustup"
+            "http://xuanwu.base.atomgit.com/rustup"
         );
     }
 

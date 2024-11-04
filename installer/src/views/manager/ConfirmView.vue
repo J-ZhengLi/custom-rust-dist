@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useCustomRouter } from '@/router';
-import { managerConf } from '@/utils';
+import { invokeCommand, managerConf, Component } from '@/utils';
 import { computed } from 'vue';
 import ComponentLabel from './components/Label.vue';
 
@@ -18,6 +18,12 @@ const labels = computed(() => {
     };
   });
 });
+
+function handleNextClick() {
+  invokeCommand('install_toolkit', {
+    components_list: components.value as Component[],
+  }).then(() => routerPush('/manager/progress'));
+}
 </script>
 
 <template>
@@ -25,23 +31,12 @@ const labels = computed(() => {
     <h4 ml="12px">确认信息</h4>
     <scroll-box mx="12px" flex="1">
       <div v-for="item in labels" :key="item.label" mb="24px">
-        <component-label
-          :label="item.label"
-          :oldVer="item.originVer"
-          :newVer="item.targetVer"
-        />
+        <component-label :label="item.label" :oldVer="item.originVer" :newVer="item.targetVer" />
       </div>
     </scroll-box>
     <div basis="60px" flex="~ justify-end items-center">
-      <base-button theme="primary" mr="12px" @click="routerBack()"
-        >上一步</base-button
-      >
-      <base-button
-        theme="primary"
-        mr="12px"
-        @click="routerPush('/manager/progress')"
-        >下一步</base-button
-      >
+      <base-button theme="primary" mr="12px" @click="routerBack()">上一步</base-button>
+      <base-button theme="primary" mr="12px" @click="handleNextClick">开始安装</base-button>
     </div>
   </section>
 </template>

@@ -142,7 +142,7 @@ onMounted(() => {
       <scroll-box basis="200px" grow="4" ml="12px">
         <div>组件详细信息</div>
         <p font="b">{{ curCheckComponent?.value.name }}</p>
-        <p v-for="item in curCheckComponent?.value.desc">{{ item }}</p>
+        <p>{{ curCheckComponent?.value.desc }}</p>
       </scroll-box>
     </div>
 

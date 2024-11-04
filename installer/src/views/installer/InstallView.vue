@@ -26,13 +26,13 @@ function toBottom() {
 }
 
 onMounted(() => {
-  event.listen('install-progress', (event) => {
+  event.listen('update-progress', (event) => {
     if (typeof event.payload === 'number') {
       progress.value = event.payload;
     }
   });
 
-  event.listen('install-details', (event) => {
+  event.listen('update-message', (event) => {
     if (typeof event.payload === 'string') {
       event.payload.split('\n').forEach((line) => {
         output.value.push(line);
@@ -41,7 +41,7 @@ onMounted(() => {
     }
   });
 
-  event.listen('install-complete', () => {
+  event.listen('on-complete', () => {
     output.value.push('安装完成');
     toBottom();
     setTimeout(() => {
@@ -49,7 +49,7 @@ onMounted(() => {
     }, 1000);
   });
 
-  event.listen('install-failed', (event) => {
+  event.listen('on-failed', (event) => {
     if (typeof event.payload === 'string') {
       output.value.push(event.payload);
       toBottom();

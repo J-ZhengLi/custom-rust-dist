@@ -8,3 +8,4 @@ edition = "2021"
 anyhow.workspace = true
 cfg-if = "1"
 rust-i18n.workspace = true
+url.workspace = true

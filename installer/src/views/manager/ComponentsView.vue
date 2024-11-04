@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, Ref, ref, watch } from 'vue';
+import { computed, onMounted, onUpdated, Ref, ref, watch } from 'vue';
 import ScrollBox from '@/components/ScrollBox.vue';
 import { managerConf } from '@/utils/index';
 import type {
   CheckGroup,
   CheckGroupItem,
-  ManagerComponent,
+  Component,
 } from '@/utils/index';
 import { useCustomRouter } from '@/router/index';
 import CheckBoxGroup from '@/components/CheckBoxGroup.vue';
@@ -14,7 +14,7 @@ import { message } from '@tauri-apps/api/dialog';
 const { routerPush, routerBack } = useCustomRouter();
 const selectComponentId = ref(0);
 
-const groupComponents: Ref<CheckGroup<ManagerComponent>[]> = ref([]);
+const groupComponents: Ref<CheckGroup<Component>[]> = ref([]);
 const checkedAllBundle = ref(false);
 
 const checkedAll = computed(() => {
@@ -50,11 +50,11 @@ function updateTargetComponents() {
         ...group.items.filter((i) => i.checked).map((item) => item.value)
       );
       return components;
-    }, [] as ManagerComponent[])
+    }, [] as Component[])
   );
 }
 
-function handleComponentsClick(checkItem: CheckGroupItem<ManagerComponent>) {
+function handleComponentsClick(checkItem: CheckGroupItem<Component>) {
   selectComponentId.value = checkItem.value.id;
   groupComponents.value.forEach((group) => {
     group.items.forEach((item) => {
@@ -66,7 +66,8 @@ function handleComponentsClick(checkItem: CheckGroupItem<ManagerComponent>) {
     });
   });
 }
-function handleComponentsChange(items: CheckGroupItem<ManagerComponent>[]) {
+
+function handleComponentsChange(items: CheckGroupItem<Component>[]) {
   groupComponents.value.forEach((group) => {
     group.items.forEach((item) => {
       const findItem = items.find((i) => i.value.id === item.value.id);
@@ -79,11 +80,11 @@ function handleComponentsChange(items: CheckGroupItem<ManagerComponent>[]) {
 }
 
 function handleSelectAll() {
-  const target = checkedEmpty.value;
+  const target = checkedAll.value;
   groupComponents.value.forEach((group) => {
     group.items.forEach((item) => {
       if (item.disabled) return;
-      item.checked = target;
+      item.checked = !target;
     });
   });
   updateTargetComponents();
@@ -98,10 +99,13 @@ function handleClickNext() {
   routerPush('/manager/confirm');
 }
 
-onMounted(() => {
+function refreshComponents() {
   groupComponents.value = managerConf.getGroups();
   updateTargetComponents();
-});
+}
+
+onMounted(() => { refreshComponents() });
+onUpdated(() => { refreshComponents() });
 </script>
 
 <template>
@@ -174,9 +178,7 @@ onMounted(() => {
       <scroll-box basis="200px" grow="4" ml="12px">
         <b>组件详细信息</b>
         <p font="b">{{ curCheckComponent?.value.name }}</p>
-        <p v-for="item in curCheckComponent?.value.desc" :key="item">
-          {{ item }}
-        </p>
+        <p>{{ curCheckComponent?.value.desc }}</p>
       </scroll-box>
     </div>
 

@@ -13,7 +13,7 @@ watch(isUninstallManger, (val: boolean) => {
   managerConf.setUninstallManager(val);
 });
 
-const installed = computed(() => managerConf.getInstalled() || []);
+const installed = computed(() => managerConf.getInstalled());
 
 function handleUninstall() {
   invokeCommand('uninstall_toolkit', {
@@ -30,14 +30,14 @@ function handleUninstall() {
     <scroll-box mx="12px" flex="1">
       <Label
         m="0"
-        :label="installed.value?.name || ''"
-        :old-ver="installed.value?.version"
+        :label="installed?.name || ''"
+        :old-ver="installed?.version"
       ></Label>
       <div mt="1em"><b>位置</b></div>
       <span m="l-1em">{{ installDir }}</span>
       <div mt="1em"><b>组件</b></div>
       <div
-        v-for="item in installed.value?.components"
+        v-for="item in installed?.components"
         :key="item.id"
         m="b-1em l-1em"
       >

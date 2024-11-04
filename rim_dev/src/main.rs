@@ -59,9 +59,16 @@ impl DevCmd {
 
                 gen_mocked_files()?;
 
+                let mut mock_dir =
+                    PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_file_name("resources");
+                mock_dir.push("mock");
+                let mocked_server = url::Url::from_directory_path(&mock_dir).unwrap_or_else(|_| {
+                    panic!("path {} cannot be converted to URL", mock_dir.display())
+                });
                 let status = Command::new("cargo")
                     .args(cargo_args)
                     .env("MODE", "manager")
+                    .env("RIM_DIST_SERVER", mocked_server.as_str())
                     .status()?;
                 println!(
                     "\nmanager exited with status code: {}",
@@ -91,7 +98,11 @@ fn gen_mocked_files() -> Result<()> {
             "
 name = 'XuanWu Rust Distribution (Community)'
 version = '1.80.1'
-root = '{}'",
+root = '{}'
+
+[rust]
+version = '1.80.1'
+components = []",
             debug_dir.display()
         ),
     )?;

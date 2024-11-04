@@ -1,5 +1,5 @@
 import { ref, Ref } from 'vue';
-import type { Component, TauriComponent } from './types/Component';
+import type { Component } from './types/Component';
 import { invokeCommand } from './invokeCommand';
 import { CheckGroup, CheckItem } from './types/CheckBoxGroup';
 
@@ -52,24 +52,11 @@ class InstallConf {
     return Object.values(groups);
   }
 
-  getCheckedComponents(): TauriComponent[] {
+  getCheckedComponents(): Component[] {
     return this.checkComponents.value
       .filter((i) => i.checked) // 筛选选中组件
       .map((item: CheckItem<Component>) => {
-        const {
-          groupName,
-          isToolchainComponent,
-          toolInstaller,
-          desc,
-          ...rest
-        } = item.value;
-        return {
-          ...rest,
-          desc: desc.join(''),
-          group_name: groupName,
-          is_toolchain_component: isToolchainComponent,
-          tool_installer: toolInstaller,
-        } as TauriComponent;
+        return item.value as Component;
       });
   }
 
@@ -91,7 +78,7 @@ class InstallConf {
   async loadComponents() {
     const componentList = (await invokeCommand(
       'get_component_list'
-    )) as TauriComponent[];
+    )) as Component[];
     if (Array.isArray(componentList)) {
       componentList.sort((a, b) => {
         if (a.required && !b.required) {
@@ -101,10 +88,10 @@ class InstallConf {
           return 1;
         }
 
-        if (a.group_name === null && b.group_name !== null) {
+        if (a.groupName === null && b.groupName !== null) {
           return 1;
         }
-        if (a.group_name !== null && b.group_name === null) {
+        if (a.groupName !== null && b.groupName === null) {
           return -1;
         }
         // 名称排序
@@ -113,25 +100,12 @@ class InstallConf {
 
       const newComponents: CheckItem<Component>[] = componentList.map(
         (item) => {
-          const {
-            group_name,
-            is_toolchain_component,
-            tool_installer,
-            desc,
-            ...rest
-          } = item;
           return {
             label: `${item.name}${item.installed ? ' (installed)' : item.required ? ' (required)' : ''}`,
             checked: !item.installed && (item.required || !item.optional),
             required: item.required,
             disabled: item.installed ? false : item.required,
-            value: {
-              ...rest,
-              desc: item.desc.split('\n'),
-              groupName: group_name,
-              isToolchainComponent: is_toolchain_component,
-              toolInstaller: tool_installer,
-            },
+            value: item,
           } as CheckItem<Component>;
         }
       );

@@ -1,25 +1,44 @@
 use std::{
-    sync::{mpsc, Arc},
+    sync::{mpsc, Arc, Mutex, MutexGuard},
     thread,
     time::Duration,
 };
 
-use crate::{error::Result, toolkit::Toolkit};
+use crate::{
+    common::{spawn_gui_update_thread, ON_COMPLETE_EVENT, PROGRESS_UPDATE_EVENT},
+    error::Result,
+};
 use anyhow::Context;
+use rim::{
+    components::{self, Component},
+    toolkit::{get_available_kits_from_server, Toolkit},
+    toolset_manifest::{get_toolset_manifest, ToolsetManifest},
+};
 use rim::{
     utils::{self, Progress},
     UninstallConfiguration, UpdateConfiguration,
 };
+
+static SELECTED_TOOLSET: Mutex<Option<ToolsetManifest>> = Mutex::new(None);
+
+fn selected_toolset<'a>() -> MutexGuard<'a, Option<ToolsetManifest>> {
+    SELECTED_TOOLSET
+        .lock()
+        .expect("unable to lock global mutex")
+}
 
 pub(super) fn main() -> Result<()> {
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             super::close_window,
             get_installed_kit,
+            get_available_kits,
             get_install_dir,
             uninstall_toolkit,
+            install_toolkit,
             check_manager_version,
             upgrade_manager,
+            handle_toolkit_install_click,
         ])
         .setup(|app| {
             tauri::WindowBuilder::new(
@@ -45,7 +64,22 @@ pub(super) fn main() -> Result<()> {
 
 #[tauri::command]
 fn get_installed_kit() -> Result<Option<Toolkit>> {
-    Toolkit::from_installed()
+    Ok(Toolkit::from_installed()?)
+}
+
+#[tauri::command]
+fn get_available_kits() -> Result<Vec<Toolkit>> {
+    let available_kits = get_available_kits_from_server()?;
+    // filter out the one that was already installed
+    let res = if let Some(installed) = Toolkit::from_installed()? {
+        available_kits
+            .into_iter()
+            .filter(|tk| tk.name != installed.name && tk.version != installed.version)
+            .collect::<Vec<_>>()
+    } else {
+        available_kits
+    };
+    Ok(res)
 }
 
 #[tauri::command]
@@ -67,11 +101,14 @@ fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
         // we sent in this thread. But it feels very wrong, there has to be better way.
         thread::sleep(Duration::from_millis(500));
 
-        let pos_cb = |pos: f32| -> anyhow::Result<()> { Ok(window.emit("update-progress", pos)?) };
+        let pos_cb =
+            |pos: f32| -> anyhow::Result<()> { Ok(window.emit(PROGRESS_UPDATE_EVENT, pos)?) };
         let progress = Progress::new(&pos_cb);
 
         let config = UninstallConfiguration::init(Some(progress))?;
         config.uninstall(remove_self)?;
+
+        window.emit(ON_COMPLETE_EVENT, ())?;
         Ok(())
     });
 
@@ -81,6 +118,16 @@ fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
         gui_thread.join().expect("failed to join GUI thread")?;
     }
     Ok(())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+fn install_toolkit(window: tauri::Window, components_list: Vec<Component>) -> Result<()> {
+    let install_dir = rim::get_installed_dir().to_path_buf();
+    let guard = selected_toolset();
+    // NB (J-ZhengLi): the types are kinda messed up here,
+    // I have no other way but to clone the whole manifest here which is not ideal.
+    let manifest = Arc::new(guard.clone().unwrap());
+    super::common::install_components(window, components_list, install_dir, manifest)
 }
 
 #[tauri::command]
@@ -106,27 +153,20 @@ fn upgrade_manager() -> Result<()> {
     Ok(())
 }
 
-fn spawn_gui_update_thread(
-    win: Arc<tauri::Window>,
-    core_thread: thread::JoinHandle<anyhow::Result<()>>,
-    msg_recvr: mpsc::Receiver<String>,
-) -> thread::JoinHandle<anyhow::Result<()>> {
-    thread::spawn(move || loop {
-        for pending_message in msg_recvr.try_iter() {
-            win.emit("update-output", pending_message)?;
-        }
+#[tauri::command]
+fn handle_toolkit_install_click(url: String) -> Result<Vec<Component>> {
+    // the `url` input was converted from `Url`, so it will definitely be convert back without issue,
+    // thus the below line should never panic
+    let url_ = utils::force_parse_url(&url);
 
-        if core_thread.is_finished() {
-            return if let Err(known_error) = core_thread
-                .join()
-                .expect("failed to join uninstallation thread.")
-            {
-                let error_str = known_error.to_string();
-                win.emit("uninstall-failed", error_str.clone())?;
-                Err(known_error)
-            } else {
-                Ok(())
-            };
-        }
-    })
+    // load the manifest for content
+    let manifest = get_toolset_manifest(Some(&url_))?;
+
+    let components = components::get_component_list_from_manifest(&manifest, true)?;
+
+    // cache the selected toolset manifest
+    let mut guard = selected_toolset();
+    *guard = Some(manifest);
+
+    Ok(components)
 }

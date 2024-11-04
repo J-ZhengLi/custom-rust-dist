@@ -27,7 +27,7 @@ onMounted(() => {
     }
   });
 
-  event.listen('update-output', (event) => {
+  event.listen('update-message', (event) => {
     if (typeof event.payload === 'string') {
       event.payload.split('\n').forEach((line) => {
         output.value.push(line);
@@ -36,13 +36,13 @@ onMounted(() => {
     }
   });
 
-  event.listen('complete', () => {
+  event.listen('on-complete', () => {
     setTimeout(() => {
       routerPush('/manager/complete');
     }, 1000);
   });
 
-  event.listen('uninstall-failed', (event) => {
+  event.listen('on-failed', (event) => {
     if (typeof event.payload === 'string') {
       message(event.payload, { title: '错误', type: 'error' }).then(() =>
         routerPush('/manager')

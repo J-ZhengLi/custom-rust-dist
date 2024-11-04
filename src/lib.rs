@@ -9,11 +9,11 @@ mod core;
 pub mod utils;
 
 // Exports
-pub use core::components;
 pub use core::install::{default_install_dir, EnvConfig, InstallConfiguration};
 pub use core::parser::{fingerprint, get_installed_dir, toolset_manifest};
 pub use core::try_it::try_it;
 pub use core::uninstall::UninstallConfiguration;
 pub use core::update::UpdateConfiguration;
+pub use core::{components, toolkit};
 
 i18n!("locales", fallback = "en");
