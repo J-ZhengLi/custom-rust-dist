@@ -40,6 +40,7 @@ class ManagerConf {
   }
 
   public getGroups(): CheckGroup<Component>[] {
+    const installedToolchain = this._installedKit.value;
     const checkItems: CheckGroupItem<Component>[] =
       this._current.value?.components.map((item) => {
         const installedItem = this._installedKit.value?.components.find(
@@ -62,7 +63,7 @@ class ManagerConf {
           labelComponent: shallowRef(LabelComponent),
           labelComponentProps: {
             label: item.name,
-            oldVer: installedItem?.version,
+            oldVer: item.isToolchainComponent ? installedToolchain?.version : installedItem?.version,
             newVer: item.version,
           },
         };

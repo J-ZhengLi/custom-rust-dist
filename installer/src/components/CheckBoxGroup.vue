@@ -21,10 +21,10 @@ function handleExpandClick() {
 }
 
 function handleCheckAllClick() {
-  const target = isCheckedEmpty.value;
+  const target = isCheckedAll.value;
   group.items.forEach((checkItem) => {
     if (checkItem.disabled) return;
-    checkItem.checked = target;
+    checkItem.checked = !target;
   });
 }
 

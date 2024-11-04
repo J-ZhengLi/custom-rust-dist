@@ -80,11 +80,11 @@ function handleComponentsChange(items: CheckGroupItem<Component>[]) {
 }
 
 function handleSelectAll() {
-  const target = checkedEmpty.value;
+  const target = checkedAll.value;
   groupComponents.value.forEach((group) => {
     group.items.forEach((item) => {
       if (item.disabled) return;
-      item.checked = target;
+      item.checked = !target;
     });
   });
   updateTargetComponents();

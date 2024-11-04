@@ -19,6 +19,7 @@ pub(crate) const DIST_MANIFEST_TOML: &str = "distribution-manifest.toml";
 static INSTALLED_KIT: OnceLock<Toolkit> = OnceLock::new();
 
 #[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Toolkit {
     pub name: String,
     pub version: String,
