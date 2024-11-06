@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUpdated, Ref, ref, watch } from 'vue';
+import { computed, onMounted, onUpdated, Ref, ref, watch, nextTick } from 'vue';
 import ScrollBox from '@/components/ScrollBox.vue';
 import { managerConf } from '@/utils/index';
 import type {
@@ -27,6 +27,8 @@ const checkedEmpty = computed(() => {
     item.items.every((i) => !i.checked)
   );
 });
+
+let backClicked = false;
 
 watch(checkedAll, (val) => {
   checkedAllBundle.value = val;
@@ -76,7 +78,6 @@ function handleComponentsChange(items: CheckGroupItem<Component>[]) {
       }
     });
   });
-  updateTargetComponents();
 }
 
 function handleSelectAll() {
@@ -87,14 +88,24 @@ function handleSelectAll() {
       item.checked = !target;
     });
   });
-  updateTargetComponents();
+}
+
+function handleClickBack() {
+  routerBack();
+  nextTick(() => {
+    backClicked = true;
+  })
 }
 
 function handleClickNext() {
-  if (managerConf.getTargetComponents().length === 0) {
+  let noSelection = groupComponents.value.every((item) =>
+    item.items.every((i) => !i.checked)
+  );
+  if (noSelection) {
     message('请选择至少一个组件', { type: 'error' });
     return;
   }
+  updateTargetComponents();
   managerConf.setOperation('update');
   routerPush('/manager/confirm');
 }
@@ -105,7 +116,16 @@ function refreshComponents() {
 }
 
 onMounted(() => { refreshComponents() });
-onUpdated(() => { refreshComponents() });
+onUpdated(() => {
+  // only update components list if "back" was clicked,
+  // the only downside of this is it will refresh component selections once the
+  // user have clicked "back" but then select the same toolkit again,
+  // but it might not be that important to keep the same selections.
+  if (backClicked) {
+    groupComponents.value = managerConf.getGroups();
+    backClicked = false;
+  }
+});
 </script>
 
 <template>
@@ -120,60 +140,28 @@ onUpdated(() => { refreshComponents() });
             当前版本
           </span>
           <span>
-            <base-tag
-              type="success"
-              size="small"
-              w="1em"
-              h="1.5em"
-              m="r-2px b-4px"
-            ></base-tag>
+            <base-tag type="success" size="small" w="1em" h="1.5em" m="r-2px b-4px"></base-tag>
             新版本
           </span>
           <span>
-            <base-tag
-              type="warning"
-              size="small"
-              w="1em"
-              h="1.5em"
-              m="r-2px b-4px"
-            ></base-tag>
+            <base-tag type="warning" size="small" w="1em" h="1.5em" m="r-2px b-4px"></base-tag>
             旧版本
           </span>
         </div>
 
         <div ml="1.5rem">
-          <base-check-box
-            flex="~ items-center"
-            v-model="checkedAllBundle"
-            title="全选"
-          >
+          <base-check-box flex="~ items-center" v-model="checkedAllBundle" title="全选">
             <template #icon>
-              <span
-                flex="~ items-center justify-center"
-                w="full"
-                h="full"
-                @click="handleSelectAll"
-              >
+              <span flex="~ items-center justify-center" w="full" h="full" @click="handleSelectAll">
                 <i class="i-mdi:check" v-show="checkedAll" c="active" />
-                <i
-                  class="i-mdi:minus"
-                  v-show="!checkedAll && !checkedEmpty"
-                  c="active"
-                />
+                <i class="i-mdi:minus" v-show="!checkedAll && !checkedEmpty" c="active" />
               </span>
             </template>
           </base-check-box>
         </div>
 
-        <check-box-group
-          v-for="group of groupComponents"
-          :key="group.label"
-          :group="group"
-          expand
-          mb="1rem"
-          @itemClick="handleComponentsClick"
-          @change="handleComponentsChange"
-        />
+        <check-box-group v-for="group of groupComponents" :key="group.label" :group="group" expand mb="1rem"
+          @itemClick="handleComponentsClick" @change="handleComponentsChange" />
       </scroll-box>
       <scroll-box basis="200px" grow="4" ml="12px">
         <b>组件详细信息</b>
@@ -183,12 +171,8 @@ onUpdated(() => { refreshComponents() });
     </div>
 
     <div basis="60px" flex="~ justify-end items-center">
-      <base-button theme="primary" mr="12px" @click="routerBack()"
-        >上一步</base-button
-      >
-      <base-button theme="primary" mr="12px" @click="handleClickNext"
-        >下一步</base-button
-      >
+      <base-button theme="primary" mr="12px" @click="handleClickBack">上一步</base-button>
+      <base-button theme="primary" mr="12px" @click="handleClickNext">下一步</base-button>
     </div>
   </div>
 </template>

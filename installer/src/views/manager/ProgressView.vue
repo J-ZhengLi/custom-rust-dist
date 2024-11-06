@@ -37,9 +37,7 @@ onMounted(() => {
   });
 
   event.listen('on-complete', () => {
-    setTimeout(() => {
-      routerPush('/manager/complete');
-    }, 1000);
+    setTimeout(() => { complete() }, 1000);
   });
 
   event.listen('on-failed', (event) => {
@@ -65,33 +63,13 @@ function toBottom() {
   <section flex="~ col">
     <h4 ml="12px">正在{{ isUninstall ? '卸载' : '安装' }}，请稍候...</h4>
     <div px="12px">
-      <base-progress
-        w="full"
-        :percentage="progress"
-        striped
-        stripedFlow
-        :format="progressFormat"
-      />
+      <base-progress w="full" :percentage="progress" striped stripedFlow :format="progressFormat" />
     </div>
-    <div
-      ref="scrollBox"
-      flex="1"
-      m="12px"
-      p="12px"
-      overflow-y="auto"
-      b="1px solid light hover:active"
-      rounded="4px"
-    >
+    <div ref="scrollBox" flex="1" m="12px" p="12px" overflow-y="auto" b="1px solid light hover:active" rounded="4px">
       <p my="8px" v-for="item in output" :key="item">{{ item }}</p>
     </div>
     <div basis="60px" flex="~ justify-end items-center">
-      <base-button
-        theme="primary"
-        v-show="progress === 100"
-        @click="complete"
-        mr="12px"
-        >下一步</base-button
-      >
+      <base-button theme="primary" v-show="progress === 100" @click="complete" mr="12px">下一步</base-button>
     </div>
   </section>
 </template>

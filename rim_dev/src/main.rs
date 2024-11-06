@@ -96,13 +96,17 @@ fn gen_mocked_files() -> Result<()> {
         fingerprint_path,
         format!(
             "
-name = 'XuanWu Rust Distribution (Community)'
-version = '1.80.1'
-root = '{}'
+name = 'Custom Rust Distribution'
+version = 'stable-1.80.1'
+root = '{0}'
 
 [rust]
 version = '1.80.1'
-components = []",
+components = [\"llvm-tools\", \"rustc-dev\"]
+
+[tools.mingw64]
+use-cargo = false
+paths = ['{0}/tools/mingw64']",
             debug_dir.display()
         ),
     )?;

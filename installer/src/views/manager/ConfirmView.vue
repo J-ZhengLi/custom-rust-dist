@@ -8,12 +8,13 @@ const { routerPush, routerBack } = useCustomRouter();
 const components = computed(() => managerConf.getTargetComponents());
 
 const labels = computed(() => {
-  const installed = managerConf.getInstalledComponents();
+  const installed = managerConf.getInstalled();
   return components.value.map((item) => {
-    const installedComponent = installed?.find((i) => i.name === item.name);
+    const installedComponent = installed?.components.find((i) => i.name === item.name);
+    let installedVersion = item.isToolchainComponent ? installed?.version : installedComponent?.version;
     return {
       label: item.name,
-      originVer: installedComponent?.version,
+      originVer: installedVersion,
       targetVer: item.version,
     };
   });
@@ -28,7 +29,11 @@ function handleNextClick() {
 
 <template>
   <section flex="~ col" w="full" h="full">
-    <h4 ml="12px">确认信息</h4>
+    <div mx="12px">
+      <h1>确认信息</h1>
+      <p>即将安装以下产品</p>
+    </div>
+    
     <scroll-box mx="12px" flex="1">
       <div v-for="item in labels" :key="item.label" mb="24px">
         <component-label :label="item.label" :oldVer="item.originVer" :newVer="item.targetVer" />

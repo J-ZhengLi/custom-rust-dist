@@ -63,23 +63,18 @@ impl Toolkit {
         if let Some(ver) = &fp.version {
             ver.clone_into(&mut tk.version);
         }
-        // TODO: We might deprecate `name` and `version` fields in `ToolsetManifest`,
-        // but until so, this check is only used to ensure the components can be installed using
-        // that toolset manifest.
-        if matches!(&manifest.name, Some(name) if *name == tk.name)
-            && matches!(&manifest.version, Some(ver) if *ver == tk.version)
-        {
-            let installed_comps = fp.installed_components();
-            let installed_tools = fp.installed_tools();
-            let installed_set: HashSet<&&str> =
-                HashSet::from_iter(installed_comps.iter().chain(installed_tools.iter()));
-            let mut components = components::get_component_list_from_manifest(&manifest, true)?;
-            for c in &mut components {
-                if installed_set.contains(&c.name.as_str()) {
-                    c.installed = true;
-                }
+
+        let installed_comps = fp.installed_components();
+        let installed_tools = fp.installed_tools();
+        let installed_set: HashSet<&&str> =
+            HashSet::from_iter(installed_comps.iter().chain(installed_tools.iter()));
+        let components = components::get_component_list_from_manifest(&manifest, true)?;
+        tk.components = components;
+
+        for c in &mut tk.components {
+            if installed_set.contains(&c.name.as_str()) {
+                c.installed = true;
             }
-            tk.components = components;
         }
 
         // Make a clone and cache the final result

@@ -74,7 +74,7 @@ fn get_available_kits() -> Result<Vec<Toolkit>> {
     let res = if let Some(installed) = Toolkit::from_installed()? {
         available_kits
             .into_iter()
-            .filter(|tk| tk.name != installed.name && tk.version != installed.version)
+            .filter(|tk| !(tk.name == installed.name && tk.version == installed.version))
             .collect::<Vec<_>>()
     } else {
         available_kits
@@ -127,7 +127,7 @@ fn install_toolkit(window: tauri::Window, components_list: Vec<Component>) -> Re
     // NB (J-ZhengLi): the types are kinda messed up here,
     // I have no other way but to clone the whole manifest here which is not ideal.
     let manifest = Arc::new(guard.clone().unwrap());
-    super::common::install_components(window, components_list, install_dir, manifest)
+    super::common::install_components(window, components_list, install_dir, manifest, true)
 }
 
 #[tauri::command]
