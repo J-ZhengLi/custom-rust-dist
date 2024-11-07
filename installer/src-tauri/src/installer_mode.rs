@@ -115,7 +115,13 @@ fn install_toolchain(
     install_dir: String,
 ) -> Result<()> {
     let install_dir = PathBuf::from(install_dir);
-    super::common::install_components(window, components_list, install_dir, cached_manifest())
+    super::common::install_components(
+        window,
+        components_list,
+        install_dir,
+        cached_manifest(),
+        false,
+    )
 }
 
 /// Retrieve cached toolset manifest.

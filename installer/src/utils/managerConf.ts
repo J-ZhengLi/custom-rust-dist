@@ -35,10 +35,6 @@ class ManagerConf {
     return this._installedKit.value;
   }
 
-  public getInstalledComponents(): Component[] | undefined {
-    return this._installedKit.value?.components;
-  }
-
   public getGroups(): CheckGroup<Component>[] {
     const installedToolchain = this._installedKit.value;
     const checkItems: CheckGroupItem<Component>[] =
@@ -46,24 +42,23 @@ class ManagerConf {
         const installedItem = this._installedKit.value?.components.find(
           (c) => c.name === item.name
         );
+        let installedVersion = item.isToolchainComponent ? installedToolchain?.version : installedItem?.version;
+        let isVerDifferent = installedVersion && installedVersion !== item.version ? true : false;
 
-        let versionStr =
-          installedItem?.version && installedItem?.version !== item.version
-            ? `(${installedItem?.version} -> ${item.version})`
-            : ` (${item.version})`;
+        let versionStr = isVerDifferent ? `(${installedVersion} -> ${item.version})` : ` (${item.version})`;
 
         return {
           label: `${item.name}${versionStr}`,
-          checked: item.installed || item.required,
+          checked: isVerDifferent && (installedItem !== undefined || item.required),
           required: item.required,
-          disabled: item.required,
+          disabled: false,
 
           focused: false,
           value: item,
           labelComponent: shallowRef(LabelComponent),
           labelComponentProps: {
             label: item.name,
-            oldVer: item.isToolchainComponent ? installedToolchain?.version : installedItem?.version,
+            oldVer: installedVersion,
             newVer: item.version,
           },
         };

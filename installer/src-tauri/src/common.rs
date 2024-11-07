@@ -23,6 +23,7 @@ pub(crate) fn install_components(
     components_list: Vec<Component>,
     install_dir: PathBuf,
     manifest: Arc<ToolsetManifest>,
+    is_update: bool,
 ) -> Result<()> {
     let (msg_sendr, msg_recvr) = mpsc::channel::<String>();
     // config logger to use the `msg_sendr` we just created
@@ -33,7 +34,8 @@ pub(crate) fn install_components(
     let window_clone = Arc::clone(&window);
 
     // 在一个新线程中执行安装过程
-    let install_thread = spawn_install_thread(window, components_list, install_dir, manifest);
+    let install_thread =
+        spawn_install_thread(window, components_list, install_dir, manifest, is_update);
     // 在主线程中接收进度并发送事件
     let gui_thread = spawn_gui_update_thread(window_clone, install_thread, msg_recvr);
 
@@ -75,6 +77,7 @@ fn spawn_install_thread(
     components_list: Vec<Component>,
     install_dir: PathBuf,
     manifest: Arc<ToolsetManifest>,
+    is_update: bool,
 ) -> JoinHandle<anyhow::Result<()>> {
     let (toolchain_components, toolset_components) = split_components(components_list);
 
@@ -89,7 +92,7 @@ fn spawn_install_thread(
         let progress = Progress::new(&pos_cb);
 
         // TODO: Use continuous progress
-        InstallConfiguration::init(&install_dir, false, Some(progress), &manifest)?
+        InstallConfiguration::init(&install_dir, Some(progress), &manifest, is_update)?
             .install(toolchain_components, toolset_components)?;
 
         // 安装完成后，发送安装完成事件

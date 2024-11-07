@@ -87,20 +87,24 @@ impl RimDir for InstallConfiguration<'_> {
 impl<'a> InstallConfiguration<'a> {
     /// Creating install diretory and other preperations related to filesystem.
     ///
-    /// If `lite` is set to true, this won't make modifications on environment, and
+    /// If `update` is set to true, this won't make modifications on environment, and
     /// won't write manager binary as well.
     pub fn init(
         install_dir: &'a Path,
-        lite: bool,
         progress: Option<Progress<'a>>,
         manifest: &'a ToolsetManifest,
+        update: bool,
     ) -> Result<Self> {
         info!("{}", t!("install_init", dir = install_dir.display()));
 
         // Create a new folder to hold installation
         utils::ensure_dir(install_dir)?;
 
-        if !lite {
+        // Create a copy of the manifest which is later used for component management.
+        let manifest_out_path = install_dir.join(crate::toolset_manifest::FILENAME);
+        utils::write_file(manifest_out_path, &manifest.to_toml()?, false)?;
+
+        if !update {
             // Create a copy of this binary
             let self_exe = std::env::current_exe()?;
             // promote this installer to manager
@@ -110,10 +114,6 @@ impl<'a> InstallConfiguration<'a> {
             let manager_exe = install_dir.join(utils::exe!(manager_name));
             utils::copy_as(self_exe, &manager_exe)?;
             add_to_path(install_dir)?;
-
-            // Create a copy of the manifest which is later used for component management.
-            let manifest_out_path = install_dir.join(crate::toolset_manifest::FILENAME);
-            utils::write_file(manifest_out_path, &manifest.to_toml()?, false)?;
 
             #[cfg(windows)]
             // Create registry entry to add this program into "installed programs".
@@ -429,7 +429,7 @@ mod tests {
         let install_root = tempfile::Builder::new().tempdir_in(&cache_dir).unwrap();
         let manifest = get_toolset_manifest(None).unwrap();
         let config =
-            InstallConfiguration::init(install_root.path(), true, None, &manifest).unwrap();
+            InstallConfiguration::init(install_root.path(), None, &manifest, true).unwrap();
 
         assert!(config.install_record.name.is_none());
         assert!(install_root.path().join(fingerprint::FILENAME).is_file());

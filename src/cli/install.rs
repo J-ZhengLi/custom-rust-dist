@@ -53,7 +53,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         .unwrap_or(DEFAULT_CARGO_REGISTRY);
     let install_dir = user_opt.prefix;
 
-    InstallConfiguration::init(&install_dir, false, None, &manifest)?
+    InstallConfiguration::init(&install_dir, None, &manifest, false)?
         .cargo_registry(registry_name, registry_value)
         .rustup_dist_server(
             rustup_dist_server
