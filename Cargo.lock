@@ -2999,6 +2999,7 @@ dependencies = [
  "log",
  "reqwest",
  "rust-i18n",
+ "semver",
  "serde",
  "sevenz-rust",
  "sys-locale",

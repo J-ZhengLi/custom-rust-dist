@@ -11,8 +11,7 @@ use super::uninstall::UninstallConfiguration;
 use super::CARGO_HOME;
 use super::RUSTUP_DIST_SERVER;
 use super::RUSTUP_HOME;
-use crate::toolset_manifest::Proxy;
-use crate::utils::{self, download, force_url_join, set_exec_permission};
+use crate::utils::{self, download, force_url_join, set_exec_permission, Proxy};
 
 #[cfg(windows)]
 pub(crate) const RUSTUP_INIT: &str = "rustup-init.exe";
@@ -124,13 +123,32 @@ impl ToolchainInstaller {
             .collect();
         self.install_toolchain_via_rustup(&rustup, manifest, components_to_install)?;
 
-        // Remove the `rustup` uninstall entry on windows, because we don't want
-        // uses to accidently uninstall `rustup` thus removing the installed binary of this program.
+        // Remove the `rustup` uninstall entry on windows, because we don't want users to
+        // accidently uninstall `rustup` thus removing the tools installed by this program.
         #[cfg(windows)]
         super::os::windows::do_remove_from_programs(
             r"Software\Microsoft\Windows\CurrentVersion\Uninstall\Rustup",
         )?;
 
+        Ok(())
+    }
+
+    /// Update rust toolchain by invoking `rustup toolchain add`, then `rustup default`
+    pub(crate) fn update(
+        &self,
+        config: &InstallConfiguration,
+        manifest: &ToolsetManifest,
+    ) -> Result<()> {
+        let rustup = config.cargo_bin().join(RUSTUP);
+        let tc_ver = manifest.rust_version();
+        utils::Command::new(&rustup)
+            .args(&["toolchain", "add", tc_ver])
+            .output_to_file()
+            .run()?;
+        utils::Command::new(&rustup)
+            .args(&["default", tc_ver])
+            .output_to_file()
+            .run()?;
         Ok(())
     }
 

@@ -7,8 +7,8 @@ use std::{
 
 use super::Result;
 use rim::{
-    components::{component_list_to_tool_map, Component},
-    toolset_manifest::{ToolMap, ToolsetManifest},
+    components::Component,
+    toolset_manifest::ToolsetManifest,
     utils::{self, Progress},
     InstallConfiguration,
 };
@@ -22,16 +22,18 @@ pub(crate) fn install_components(
     window: tauri::Window,
     components_list: Vec<Component>,
     install_dir: PathBuf,
-    manifest: Arc<ToolsetManifest>,
+    manifest: &ToolsetManifest,
     is_update: bool,
 ) -> Result<()> {
     let (msg_sendr, msg_recvr) = mpsc::channel::<String>();
     // config logger to use the `msg_sendr` we just created
     utils::Logger::new().sender(msg_sendr).setup()?;
 
-    // 使用 Arc 来共享 window
+    // 使用 Arc 来共享
+    // NB (J-ZhengLi): Threads don't like 'normal' references
     let window = Arc::new(window);
     let window_clone = Arc::clone(&window);
+    let manifest = Arc::new(manifest.to_owned());
 
     // 在一个新线程中执行安装过程
     let install_thread =
@@ -45,33 +47,6 @@ pub(crate) fn install_components(
     Ok(())
 }
 
-/// Split components list to `toolchain_components` and `toolset_components`,
-/// as we are running `rustup` to install toolchain components, but using other methods
-/// for toolset components.
-fn split_components(components: Vec<Component>) -> (Vec<String>, ToolMap) {
-    let toolset_components = component_list_to_tool_map(
-        components
-            .iter()
-            .filter(|cm| !cm.is_toolchain_component)
-            .collect(),
-    );
-    let toolchain_components: Vec<String> = components
-        .into_iter()
-        // Skip the mocked `rust toolchain` component that we added first,
-        // it will be installed as requirement anyway.
-        .skip(1)
-        .filter_map(|comp| {
-            if comp.is_toolchain_component {
-                Some(comp.name)
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    (toolchain_components, toolset_components)
-}
-
 fn spawn_install_thread(
     window: Arc<tauri::Window>,
     components_list: Vec<Component>,
@@ -79,8 +54,6 @@ fn spawn_install_thread(
     manifest: Arc<ToolsetManifest>,
     is_update: bool,
 ) -> JoinHandle<anyhow::Result<()>> {
-    let (toolchain_components, toolset_components) = split_components(components_list);
-
     thread::spawn(move || -> anyhow::Result<()> {
         // FIXME: this is needed to make sure the other thread could recieve the first couple messages
         // we sent in this thread. But it feels very wrong, there has to be better way.
@@ -92,8 +65,13 @@ fn spawn_install_thread(
         let progress = Progress::new(&pos_cb);
 
         // TODO: Use continuous progress
-        InstallConfiguration::init(&install_dir, Some(progress), &manifest, is_update)?
-            .install(toolchain_components, toolset_components)?;
+        let config =
+            InstallConfiguration::init(&install_dir, Some(progress), &manifest, is_update)?;
+        if is_update {
+            config.update(components_list)?;
+        } else {
+            config.install(components_list)?;
+        }
 
         // 安装完成后，发送安装完成事件
         window.emit(ON_COMPLETE_EVENT, ())?;

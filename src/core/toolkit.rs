@@ -6,7 +6,8 @@ use crate::core::parser::TomlParser;
 use crate::{components, utils};
 use crate::{fingerprint::InstallationRecord, toolset_manifest::ToolsetManifest};
 use anyhow::Result;
-use log::{info, warn};
+use log::info;
+use semver::Version;
 use serde::Serialize;
 use url::Url;
 
@@ -15,8 +16,11 @@ use super::parser::dist_manifest::DistPackage;
 pub(crate) const DIST_MANIFEST_TOML: &str = "distribution-manifest.toml";
 
 /// A cached installed [`Toolkit`] struct to prevent the program doing
-/// excessive IO operations as in [`from_installed`](Toolkit::from_installed).
+/// excessive IO operations as in [`installed`](Toolkit::installed).
 static INSTALLED_KIT: OnceLock<Toolkit> = OnceLock::new();
+/// Cache the list of toolkit provided by the server, this will save the number of times
+/// that we need to make server request, in the exchange of memory usage.
+static ALL_TOOLKITS: OnceLock<Vec<Toolkit>> = OnceLock::new();
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,8 +31,16 @@ pub struct Toolkit {
     #[serde(alias = "notes")]
     info: Option<String>,
     #[serde(rename = "manifestURL")]
-    manifest_url: Option<String>,
-    components: Vec<components::Component>,
+    pub manifest_url: Option<String>,
+    pub components: Vec<components::Component>,
+}
+
+impl PartialEq for Toolkit {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.version == other.version
+            && self.manifest_url == other.manifest_url
+    }
 }
 
 impl Toolkit {
@@ -36,9 +48,9 @@ impl Toolkit {
     ///
     /// We need the manifest because it contains the details of the toolkit along with
     /// what components it has.
-    pub fn from_installed() -> Result<Option<Self>> {
+    pub fn installed() -> Result<Option<&'static Self>> {
         if let Some(cached) = INSTALLED_KIT.get() {
-            return Ok(Some(cached.clone()));
+            return Ok(Some(cached));
         }
 
         if !InstallationRecord::exists()? {
@@ -46,6 +58,9 @@ impl Toolkit {
             return Ok(None);
         }
 
+        // Right now we already know user has installed a toolkit,
+        // just don't know the details yet, so let's create a "blank" installed toolkit
+        // then try to collect the missing details later.
         let mut tk = Self {
             name: t!("unknown_toolkit").to_string(),
             version: "N/A".to_string(),
@@ -78,11 +93,8 @@ impl Toolkit {
         }
 
         // Make a clone and cache the final result
-        INSTALLED_KIT
-            .set(tk.clone())
-            .unwrap_or_else(|_| warn!("unable to cache the installed toolkit"));
-
-        Ok(Some(tk))
+        let cached = INSTALLED_KIT.get_or_init(|| tk);
+        Ok(Some(cached))
     }
 }
 
@@ -99,7 +111,14 @@ impl From<DistPackage> for Toolkit {
     }
 }
 
-pub fn get_available_kits_from_server() -> Result<Vec<Toolkit>> {
+/// Download the dist manifest from server to get the list of all provided toolkits.
+///
+/// Note the retrieved list will be reversed so that the newest toolkit will always be on top.
+fn toolkits_from_server() -> Result<&'static [Toolkit]> {
+    if let Some(cached) = ALL_TOOLKITS.get() {
+        return Ok(cached);
+    }
+
     let dist_server_env_ovr = std::env::var("RIM_DIST_SERVER");
     let dist_server = dist_server_env_ovr
         .as_deref()
@@ -126,5 +145,53 @@ pub fn get_available_kits_from_server() -> Result<Vec<Toolkit>> {
 
     // load dist "pacakges" then convert them into `toolkit`s
     let packages = DistManifest::load(dist_m_file.path())?.packages;
-    Ok(packages.into_iter().rev().map(Toolkit::from).collect())
+    let cached =
+        ALL_TOOLKITS.get_or_init(|| packages.into_iter().map(Toolkit::from).rev().collect());
+    Ok(cached)
+}
+
+/// Return a list of all toolkits that are not currently installed.
+pub fn installable_toolkits() -> Result<Vec<&'static Toolkit>> {
+    let all_toolkits = toolkits_from_server()?;
+    let installable = if let Some(installed) = Toolkit::installed()? {
+        all_toolkits.iter().filter(|tk| *tk != installed).collect()
+    } else {
+        all_toolkits.iter().collect()
+    };
+    Ok(installable)
+}
+
+/// Return the latest available toolkit if it's not already installed.
+pub fn latest_installable_toolkit() -> Result<Option<&'static Toolkit>> {
+    let all_toolkits = toolkits_from_server()?;
+    if let Some(installed) = Toolkit::installed()? {
+        let Some(maybe_latest) = all_toolkits
+            .iter()
+            // make sure they are the same **product**
+            .find(|tk| tk.name == installed.name)
+        else {
+            return Ok(None);
+        };
+        // For some reason, the version might contains prefixes such as "stable 1.80.1",
+        // therefore we need to trim them so that `semver` can be used to parse the actual
+        // version string.
+        // NB (J-ZhengLi): We might need another version field... one for display,
+        // one for the actual version.
+        let cur_ver = installed
+            .version
+            .trim_start_matches(|c| !char::is_ascii_digit(&c));
+        let target_ver = maybe_latest
+            .version
+            .trim_start_matches(|c| !char::is_ascii_digit(&c));
+        let cur_version: Version = cur_ver.parse()?;
+        let target_version: Version = target_ver.parse()?;
+
+        if target_version > cur_version {
+            Ok(Some(maybe_latest))
+        } else {
+            Ok(None)
+        }
+    } else {
+        Ok(all_toolkits.first())
+    }
 }

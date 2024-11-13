@@ -6,7 +6,7 @@ use crate::toolset_manifest::{ToolInfo, ToolMap, ToolsetManifest};
 
 static COMPONENTS_COUNTER: AtomicU32 = AtomicU32::new(0);
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Component {
     pub id: u32,

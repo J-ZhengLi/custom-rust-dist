@@ -10,7 +10,7 @@ use crate::core::install::{
     DEFAULT_CARGO_REGISTRY,
 };
 use crate::core::try_it;
-use crate::toolset_manifest::{get_toolset_manifest, ToolMap};
+use crate::toolset_manifest::get_toolset_manifest;
 use crate::{components, default_install_dir, utils};
 
 use super::{Installer, ManagerSubcommands};
@@ -65,7 +65,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
                 .clone()
                 .unwrap_or_else(|| default_rustup_update_root().clone()),
         )
-        .install(user_opt.toolchain_components, user_opt.toolset)?;
+        .install(user_opt.components)?;
 
     println!("\n{}\n", t!("install_finish_info"));
 
@@ -89,8 +89,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
 #[derive(Debug, Default)]
 struct CustomInstallOpt {
     prefix: PathBuf,
-    toolchain_components: Vec<String>,
-    toolset: ToolMap,
+    components: Vec<Component>,
 }
 
 impl CustomInstallOpt {
@@ -153,9 +152,11 @@ impl CustomInstallOpt {
                 continue;
             }
 
+            // TODO: Use common::question_multi_choices
             raw_choices = Some(common::question_str_with_retry(
-                t!("question_component_choice"),
+                t!("select_components_to_install"),
                 Some(&component_list),
+                None,
                 raw_choices.as_deref().unwrap_or(&default_choices_str),
                 |input| -> bool {
                     if input
@@ -164,14 +165,16 @@ impl CustomInstallOpt {
                     {
                         true
                     } else {
-                        warn!(
-                            "{}",
+                        let expected = format!(
+                            "{}{}",
+                            t!("space_separated_and"),
                             t!(
-                                "invalid_input",
-                                actual = input,
-                                expect = t!("list_of_ids", bound = components.len())
+                                "ranged_integer",
+                                lower_bound = 0,
+                                upper_bound = components.len() - 1
                             )
                         );
+                        warn!("{}", t!("invalid_input", actual = input, expect = expected));
                         false
                     }
                 },
@@ -186,25 +189,9 @@ impl CustomInstallOpt {
 
             match common::confirm_install()? {
                 Confirm::Yes => {
-                    let mut toolchain_components = vec![];
-                    let mut toolset = ToolMap::default();
-
-                    for component in choices
-                        .iter()
-                        // Skip `Rust minimal toolchain`
-                        .skip(1)
-                    {
-                        if component.is_toolchain_component {
-                            toolchain_components.push(component.name.clone());
-                        } else if let Some(installer) = &component.tool_installer {
-                            toolset.insert(component.name.clone(), installer.to_owned());
-                        }
-                    }
-
                     return Ok(Self {
                         prefix: install_dir.into(),
-                        toolchain_components,
-                        toolset,
+                        components: choices.into_iter().cloned().collect(),
                     });
                 }
                 Confirm::No => (),

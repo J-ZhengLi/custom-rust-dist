@@ -1,70 +1,61 @@
-use std::env;
+use std::env::{self, current_exe};
+use std::path::Path;
 
 use anyhow::{Context, Result};
-use log::info;
-use reqwest::blocking::Client;
+use semver::Version;
 use url::Url;
 
-use crate::{get_installed_dir, utils};
+use crate::utils;
 
-pub struct UpdateConfiguration;
-
-pub(crate) const MANAGER_SOURCE_PATH: &str = "/manager/version";
-
-impl UpdateConfiguration {
-    pub fn update(&self, self_udpate: bool) -> Result<()> {
-        if self_udpate {
-            self.upgrade_manager()?;
-        } else {
-            self.update_toolsets()?;
-        }
-        Ok(())
-    }
-
-    pub fn check_upgrade(&self) -> Result<bool> {
-        let local_version = local_version();
-        let latest_version = latest_version(MANAGER_SOURCE_PATH)?;
-        Ok(local_version != latest_version)
-    }
-
-    fn upgrade_manager(&self) -> Result<()> {
-        let update = self.check_upgrade()?;
-        // By default, if the version is different from the local version, an update is performed.
-        if update {
-            let latest_version = latest_version(MANAGER_SOURCE_PATH)?;
-            let download_url = parse_download_url(&format!(
-                "/manager/dist/{}/{}",
-                latest_version,
-                full_manager_name()
-            ))?;
-
-            let dest = get_installed_dir().join(full_manager_name());
-            utils::download(full_manager_name().as_str(), &download_url, &dest, None)?;
-        } else {
-            info!("Already latest version.");
-        }
-
-        Ok(())
-    }
-
-    fn update_toolsets(&self) -> Result<()> {
-        // When updating the tool, it will detect whether
-        // there is a new version of the management tool
-        let config: UpdateConfiguration = UpdateConfiguration;
-        let upgradeable = config.check_upgrade().unwrap_or(false);
-        if upgradeable {
-            info!(
-                "A new manager version has been detected. You can update it via using `--self-update`"
-            )
-        };
-        // TODO: update toolchain via toolsets manifest.
-        Ok(())
-    }
+/// Calls a function to update toolkit.
+///
+/// This is just a callback wrapper, you still have to provide a function to do the
+/// internal work.
+pub fn update_toolkit<F>(callback: F) -> Result<()>
+where
+    F: FnOnce(&Path) -> Result<()>,
+{
+    let dir = crate::get_installed_dir();
+    callback(dir).context("unable to update toolkit")
 }
 
-fn full_manager_name() -> String {
-    let full_manager_name = format!("{}-manager{}", t!("vendor_en"), env::consts::EXE_SUFFIX);
-    full_manager_name
+/// Returns `true` if current manager version is lower than its latest version.
+///
+/// Otherwise, or when the versions could not be determined, this will return `false`.
+pub fn check_self_update() -> bool {
+    macro_rules! warn_on_err {
+        (let $ident:ident = $operation:expr, $($msg:tt)*) => {
+            let Ok($ident) = $operation else {
+                log::warn!($($msg)*);
+                return false;
+            };
+        };
+    }
+
+    let cur_ver = env!("CARGO_PKG_VERSION");
+    warn_on_err!(
+        let latest_ver = latest_version(),
+        "{}", t!("fetch_latest_manager_version_failed")
+    );
+    warn_on_err!(
+        let cur_version = Version::parse(cur_ver),
+        "{}", t!("parse_version_failed", kind = t!("current"), version = cur_ver)
+    );
+    warn_on_err!(
+        let latest_version = Version::parse(&latest_ver),
+        "{}", t!("parse_version_failed", kind = t!("target"), version = latest_ver)
+    );
+
+    cur_version < latest_version
+}
+
+pub fn do_self_update() -> Result<()> {
+    let filename = format!("{}-manager{}", t!("vendor_en"), env::consts::EXE_SUFFIX);
+    let latest_version = latest_version()?;
+    let download_url = parse_download_url(&format!("/manager/dist/{latest_version}/{filename}"))?;
+
+    let dest = current_exe()?;
+    utils::download(filename, &download_url, &dest, None)
 }
 
 fn parse_download_url(source_path: &str) -> Result<Url> {
@@ -74,32 +65,30 @@ fn parse_download_url(source_path: &str) -> Result<Url> {
     Ok(Url::parse(&base_obs_server)?.join(source_path)?)
 }
 
-// Try to get manager version via execute command with `--version`.
-fn local_version() -> String {
-    env!("CARGO_PKG_VERSION").to_string()
+// Try to get the latest manager version
+fn latest_version() -> Result<String> {
+    let download_url = parse_download_url("/manager/version")?;
+    utils::DownloadOpt::<()>::new("manager version file")?.read(&download_url)
 }
 
-// Try to get the latest manager version
-fn latest_version(source_path: &str) -> Result<String> {
-    let download_url = parse_download_url(source_path)?;
-    // Download the latest manager version file
-    let client = Client::new();
-    let resp = client.get(download_url).send().with_context(|| {
-        format!(
-            "failed to get latest manager version file: \n '{}'",
-            source_path
-        )
-    })?;
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn version_comparison() {
+        macro_rules! compare {
+            ($lhs:literal $op:tt $rhs:literal) => {
+                assert!(
+                    semver::Version::parse($lhs).unwrap() $op semver::Version::parse($rhs).unwrap()
+                );
+            };
+        }
 
-    if resp.status().is_success() {
-        let content = resp
-            .text()
-            .with_context(|| "Failed to read response text")?;
-        Ok(content)
-    } else {
-        Err(anyhow::anyhow!(
-            "Failed to download object: {}",
-            resp.status()
-        ))
+        compare!("0.1.0" < "0.2.0");
+        compare!("0.1.0" < "0.2.0-alpha");
+        compare!("0.1.0" > "0.1.0-alpha");
+        compare!("0.1.0-alpha" < "0.1.0-beta");
+        compare!("0.1.0-alpha" < "0.1.0-alpha.1");
+        compare!("0.1.0-alpha.1" < "0.1.0-alpha.2");
+        compare!("1.0.0" == "1.0.0");
     }
 }

@@ -12,8 +12,10 @@
     "install_env_config": "Configuring environment variables...",
     "install_cargo_config": "Writing cargo configuration...",
     "install_tools": "Installing dependencies & standalone tools...",
-    "install_toolchain": "Installing rust minimal toolchain and extra components...",
-    "install_via_cargo": "Installing cargo tools...",
+    "update_tools": "Updating third-party tools...",
+    "install_toolchain": "Installing rustup and rust toolchain...",
+    "update_toolchain": "Updating rustup and rust toolchain...",
+    "install_via_cargo": "Installing third-party tools via cargo...",
 
     "installing_tool_info": "installing '%{name}'",
     "installing_via_cargo_info": "installing '%{name}' using cargo",
@@ -44,7 +46,8 @@
     "what_this_is": "This program will guide you through installing the Rust programming language, with additional third party tools of your choice.",
     "custom_install_help": "Enter the value of each installation options, or just press 'Enter' key to use the default value.",
     "question_install_dir": "Installation path?",
-    "question_component_choice": "Choose what to install: (separated by spaces, required tools are automatically selected)",
+    "select_components_to_install": "Choose what components to install: (separated multiple options by spaces, required tools are automatically selected)",
+    "select_components_to_update": "Choose what components to update: (separated multiple options by spaces)",
     "question_try_demo": "Do you want to try Rust with a demo project?",
     "demo_project_exported": "The demo project was successfully exported to '%{dir}'",
     
@@ -52,8 +55,12 @@
     "pause_prompt": "press ENTER key to continue...",
     "confirm": "Confirm",
     "reenter": "Re-enter",
-    "cancel": "Cancel installation",
-    "list_of_ids": "space separated integers less than %{bound}", 
+    "enter_choice_below": "please enter your choice below",
+    "cancel": "Cancel",
+    "ranged_integer": "integer within the range of [%{lower_bound}, %{upper_bound}]",
+    "space_separated_and": "space separated ",
+    "list_of_ids": "space separated integers less than %{bound}",
+    "integers": "integers",
     "invalid_input": "Invalid input '%{actual}', expecting %{expect}, please try again",
     "current_install_option": "Current installation options:",
     "install_dir": "installation path",
@@ -76,5 +83,16 @@
     "notify_root_dir": "Cannot install in root directory, please select another one",
     "notify_relative_path": "Please enter the full absolute path",
 
-    "fetching": "fetching"
+    "fetching": "fetching",
+
+    "fetch_latest_manager_version_failed": "failed to retrieve information about the latest manager version",
+    "current": "current",
+    "target": "target",
+    "parse_version_failed": "failed to parse %{kind} version '%{version}', skipping self update checks",
+    "checking_updates": "checking for updates...",
+    "no_available_updates": "no available updates",
+    "pre_update_note": "updating toolkit version to '%{target_version}' (currently '%{current_version}'), this will replace your current toolkit after installation.",
+    "continue": "Continue",
+    "customize": "Customize",
+    "pre_update_confirmation": "\nThese components below will be updated, you may choose to install them, or select a different list by entering '2'\n\n%{list}"
 }

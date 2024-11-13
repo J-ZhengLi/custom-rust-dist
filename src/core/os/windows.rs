@@ -4,17 +4,16 @@ use std::process::Command;
 use crate::core::directories::RimDir;
 use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
-use crate::toolset_manifest::ToolsetManifest;
 use anyhow::Result;
 
 use log::info;
 pub(crate) use rustup::*;
 
 impl EnvConfig for InstallConfiguration<'_> {
-    fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()> {
+    fn config_env_vars(&self) -> Result<()> {
         info!("{}", t!("install_env_config"));
 
-        let vars_raw = self.env_vars(manifest)?;
+        let vars_raw = self.env_vars()?;
         for (key, val) in vars_raw {
             set_env_var(key, val.encode_utf16().collect())?;
         }

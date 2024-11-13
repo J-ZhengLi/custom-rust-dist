@@ -161,7 +161,6 @@ enum ManagerSubcommands {
         #[arg(value_name = "VERSION")]
         version: String,
     },
-    #[command(hide = true)]
     /// Update the current installed dist suite to the newest version
     Update {
         /// We keep the Manager version unchanged by default.

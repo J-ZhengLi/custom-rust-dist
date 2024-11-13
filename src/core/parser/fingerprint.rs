@@ -109,6 +109,12 @@ impl InstallationRecord {
         });
     }
 
+    pub(crate) fn update_rust(&mut self, version: &str) {
+        if let Some(rust) = self.rust.as_mut() {
+            rust.version = version.into()
+        }
+    }
+
     pub(crate) fn add_tool_record(&mut self, name: &str, record: ToolRecord) {
         self.tools.insert(name.into(), record);
     }

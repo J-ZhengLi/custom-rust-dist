@@ -11,13 +11,11 @@ use crate::{
 use anyhow::Context;
 use rim::{
     components::{self, Component},
-    toolkit::{get_available_kits_from_server, Toolkit},
+    toolkit::{self, Toolkit},
     toolset_manifest::{get_toolset_manifest, ToolsetManifest},
-};
-use rim::{
     utils::{self, Progress},
-    UninstallConfiguration, UpdateConfiguration,
 };
+use rim::{update, UninstallConfiguration};
 
 static SELECTED_TOOLSET: Mutex<Option<ToolsetManifest>> = Mutex::new(None);
 
@@ -64,22 +62,15 @@ pub(super) fn main() -> Result<()> {
 
 #[tauri::command]
 fn get_installed_kit() -> Result<Option<Toolkit>> {
-    Ok(Toolkit::from_installed()?)
+    Ok(Toolkit::installed()?.cloned())
 }
 
 #[tauri::command]
 fn get_available_kits() -> Result<Vec<Toolkit>> {
-    let available_kits = get_available_kits_from_server()?;
-    // filter out the one that was already installed
-    let res = if let Some(installed) = Toolkit::from_installed()? {
-        available_kits
-            .into_iter()
-            .filter(|tk| !(tk.name == installed.name && tk.version == installed.version))
-            .collect::<Vec<_>>()
-    } else {
-        available_kits
-    };
-    Ok(res)
+    Ok(toolkit::installable_toolkits()?
+        .into_iter()
+        .cloned()
+        .collect())
 }
 
 #[tauri::command]
@@ -122,20 +113,26 @@ fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
 
 #[tauri::command(rename_all = "snake_case")]
 fn install_toolkit(window: tauri::Window, components_list: Vec<Component>) -> Result<()> {
-    let install_dir = rim::get_installed_dir().to_path_buf();
-    let guard = selected_toolset();
-    // NB (J-ZhengLi): the types are kinda messed up here,
-    // I have no other way but to clone the whole manifest here which is not ideal.
-    let manifest = Arc::new(guard.clone().unwrap());
-    super::common::install_components(window, components_list, install_dir, manifest, true)
+    update::update_toolkit(|p| {
+        let guard = selected_toolset();
+        let manifest = guard
+            .as_ref()
+            .expect("internal error: a toolkit must be selected to install");
+        super::common::install_components(
+            window,
+            components_list,
+            p.to_path_buf(),
+            manifest,
+            true,
+        )?;
+        Ok(())
+    })?;
+    Ok(())
 }
 
 #[tauri::command]
 fn check_manager_version() -> bool {
-    let check_update_thread = thread::spawn(|| {
-        let config: UpdateConfiguration = UpdateConfiguration;
-        config.check_upgrade().unwrap_or(false)
-    });
+    let check_update_thread = thread::spawn(update::check_self_update);
 
     // Join the thread and capture the result, with a default value in case of failure
     check_update_thread.join().unwrap_or_default()
@@ -143,11 +140,7 @@ fn check_manager_version() -> bool {
 
 #[tauri::command]
 fn upgrade_manager() -> Result<()> {
-    let upgrade_thread = thread::spawn(move || -> anyhow::Result<()> {
-        let config: UpdateConfiguration = UpdateConfiguration;
-        config.update(true)
-    });
-
+    let upgrade_thread = thread::spawn(move || -> anyhow::Result<()> { update::do_self_update() });
     upgrade_thread.join().expect("failed to upgrade manager.")?;
 
     Ok(())
@@ -159,9 +152,8 @@ fn handle_toolkit_install_click(url: String) -> Result<Vec<Component>> {
     // thus the below line should never panic
     let url_ = utils::force_parse_url(&url);
 
-    // load the manifest for content
+    // load the manifest for components information
     let manifest = get_toolset_manifest(Some(&url_))?;
-
     let components = components::get_component_list_from_manifest(&manifest, true)?;
 
     // cache the selected toolset manifest
