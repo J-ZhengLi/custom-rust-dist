@@ -74,7 +74,9 @@
     "uninstalling_rust_toolchain": "Uninstalling Rust toolchain",
     "uninstall_env_config": "Removing environment variables...",
     "uninstall_self": "Removing self & wrapping up",
-    "uninstall_tool_failed_warn": "unable to uninstall tool '%{tool}', maybe it was already uninstalled, skipping",
+    "uninstall_tool_skipped": "skipping uninstall for tool '%{tool}'",
+    "maybe_uninstalled_already": "maybe it was already uninstalled.",
+    "path_to_installation_not_found": "path to the it's installation at '%{path}' cannot be found.",
 
     "linux_source_hint": "Please restart the current shell or run `%{cmd}` for the environment changes to take effect",
     "unknown_toolkit": "Unknown Toolkit",

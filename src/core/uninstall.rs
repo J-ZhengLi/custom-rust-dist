@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use log::info;
+use log::{info, warn};
 
 use super::{
     directories::RimDir,
@@ -94,7 +94,17 @@ impl<'a> UninstallConfiguration<'a> {
             let tool = if tool_detail.use_cargo {
                 Tool::cargo_tool(name, None)
             } else if let [path] = tool_detail.paths.as_slice() {
-                Tool::from_path(name, path)?
+                // don't interrupt uninstallation if the path of some tools cannot be found,
+                // as the user might have manually remove them
+                let Ok(tool) = Tool::from_path(name, path) else {
+                    warn!(
+                        "{}: {}",
+                        t!("uninstall_tool_skipped", tool = name),
+                        t!("path_to_installation_not_found", path = path.display())
+                    );
+                    continue;
+                };
+                tool
             } else if !tool_detail.paths.is_empty() {
                 Tool::Executables(name.into(), tool_detail.paths.clone())
             } else {
@@ -114,7 +124,11 @@ impl<'a> UninstallConfiguration<'a> {
         for tool in tools_to_uninstall {
             info!("{}", t!("uninstalling_for", name = tool.name()));
             if tool.uninstall(self).is_err() {
-                info!("{}", t!("uninstall_tool_failed_warn", tool = tool.name()));
+                info!(
+                    "{}: {}",
+                    t!("uninstall_tool_skipped", tool = tool.name()),
+                    t!("maybe_uninstalled_already")
+                );
             }
             self.install_record.remove_tool_record(tool.name());
             self.install_record.write()?;

@@ -68,7 +68,9 @@
     "uninstalling_rust_toolchain": "正在卸载 Rust 官方工具链",
     "uninstall_env_config": "正在移除环境变量配置...",
     "uninstall_self": "正在清除此管理程序...",
-    "uninstall_tool_failed_warn": "工具 '%{tool}' 可能已被卸载, 跳过中...",
+    "uninstall_tool_skipped": "跳过卸载工具 '%{tool}'",
+    "maybe_uninstalled_already": "该工具可能已被卸载。",
+    "path_to_installation_not_found": "找不到工具安装路径 '%{path}'。",
 
     "linux_source_hint": "请重启当前终端窗口或执行 `%{cmd}` 以使环境变更生效",
     "unknown_toolkit": "未知工具集",
