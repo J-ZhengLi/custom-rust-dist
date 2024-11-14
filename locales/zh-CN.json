@@ -84,11 +84,12 @@
     "fetch_latest_manager_version_failed": "无法获取最新版本管理工具信息",
     "current": "当前",
     "target": "目标",
-    "parse_version_failed": "%{kind}版本 '%{version}' 不是有效的版本标识, 跳过自更新检查",
-    "checking_updates": "正在检查更新...",
+    "checking_manager_updates": "正在检查管理工具更新...",
+    "checking_toolkit_updates": "正在检查工具套件更新...",
     "no_available_updates": "无可用更新",
     "pre_update_note": "即将升级套件版本至 '%{target_version}' (当前 '%{current_version}')，此举将会覆盖您当前已安装的工具套件。",
     "continue": "继续",
     "customize": "自定义",
-    "pre_update_confirmation": "\n即将更新以下组件，您可以选择更新它们，或输入 '2' 来自定义组件列表\n\n%{list}"
+    "pre_update_confirmation": "\n即将更新以下组件，您可以选择更新它们，或输入 '2' 来手动选择要更新的组件\n\n%{list}",
+    "downloading_rustup_init": "正在下载 rustup-init..."
 }

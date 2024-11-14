@@ -1,9 +1,11 @@
 pub(crate) mod cargo_config;
 pub mod dist_manifest;
 pub mod fingerprint;
+pub(crate) mod release_info;
 pub mod toolset_manifest;
 
 use anyhow::{bail, Context, Result};
+use fingerprint::InstallationRecord;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     path::{Path, PathBuf},
@@ -17,6 +19,8 @@ static INSTALL_DIR_ONCE: OnceLock<PathBuf> = OnceLock::new();
 
 #[allow(unused)]
 pub(crate) trait TomlParser {
+    const FILENAME: &str;
+
     /// Deserialize a certain type from [`str`] value.
     fn from_str(from: &str) -> Result<Self>
     where
@@ -67,11 +71,14 @@ pub fn get_installed_dir() -> &'static Path {
             bail!("it appears that this program was mistakenly installed in root directory");
         }
         // the second check
-        if !maybe_install_dir.join(fingerprint::FILENAME).is_file() {
+        if !maybe_install_dir
+            .join(InstallationRecord::FILENAME)
+            .is_file()
+        {
             bail!("installation record cannot be found");
         }
         // the third check
-        let fp = fingerprint::InstallationRecord::load(&maybe_install_dir)
+        let fp = InstallationRecord::load(&maybe_install_dir)
             .context("'.fingerprint' file exists but cannot be loaded")?;
         if fp.root != maybe_install_dir {
             bail!(

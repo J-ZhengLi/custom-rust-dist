@@ -161,12 +161,17 @@ enum ManagerSubcommands {
         #[arg(value_name = "VERSION")]
         version: String,
     },
-    /// Update the current installed dist suite to the newest version
+    /// Update toolkit and/or this installation manager
+    ///
+    /// By default, this will update both the toolkit and manager, if you just want to update
+    /// on of them, pass `--<toolkit|manager>-only` option to it.
     Update {
-        /// We keep the Manager version unchanged by default.
-        /// You can update the Manager using the flag
-        #[arg(long)]
-        self_update: bool,
+        /// Update toolkit only
+        #[arg(long, alias = "toolkit", conflicts_with = "manager_only")]
+        toolkit_only: bool,
+        /// Update manager only
+        #[arg(long, alias = "manager")]
+        manager_only: bool,
     },
     #[command(hide = true)]
     /// Show a list of available dist version or components

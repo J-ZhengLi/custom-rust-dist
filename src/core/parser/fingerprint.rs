@@ -7,8 +7,6 @@ use crate::utils;
 
 use super::{toolset_manifest::ToolsetManifest, TomlParser};
 
-pub(crate) const FILENAME: &str = ".fingerprint.toml";
-
 /// Re-load fingerprint file just to get the list of installed tools,
 /// therefore we can use this list to uninstall, while avoiding race condition.
 pub(crate) fn installed_tools_fresh(root: &Path) -> Result<IndexMap<String, ToolRecord>> {
@@ -30,6 +28,8 @@ pub struct InstallationRecord {
 }
 
 impl TomlParser for InstallationRecord {
+    const FILENAME: &str = ".fingerprint.toml";
+
     /// Load fingerprint from a given root.
     ///
     /// Note that the fingerprint filename is fixed, as defined as [`FILENAME`],
@@ -43,7 +43,7 @@ impl TomlParser for InstallationRecord {
             "install record needs to be loaded from a directory"
         );
 
-        let fp_path = root.as_ref().join(FILENAME);
+        let fp_path = root.as_ref().join(Self::FILENAME);
         if fp_path.is_file() {
             let raw = utils::read_to_string("installation fingerprint", &fp_path)?;
             Self::from_str(&raw)
@@ -65,7 +65,7 @@ impl InstallationRecord {
     /// the program to panic using [`get_installed_dir`](super::get_installed_dir).
     pub fn exists() -> Result<bool> {
         let parent_dir = utils::parent_dir_of_cur_exe()?;
-        Ok(parent_dir.join(FILENAME).is_file())
+        Ok(parent_dir.join(Self::FILENAME).is_file())
     }
 
     /// Load installation record from a presumed install directory,
@@ -80,7 +80,7 @@ impl InstallationRecord {
     }
 
     pub(crate) fn write(&self) -> Result<()> {
-        let path = self.root.join(FILENAME);
+        let path = self.root.join(Self::FILENAME);
         let content = self
             .to_toml()
             .context("unable to serialize installation fingerprint")?;

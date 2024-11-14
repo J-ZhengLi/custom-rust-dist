@@ -1,16 +1,25 @@
 use std::env::{self, current_exe};
 use std::path::Path;
+use std::sync::OnceLock;
 
 use anyhow::{Context, Result};
+use log::{debug, info, warn};
 use semver::Version;
 use url::Url;
 
+use super::parser::release_info::ReleaseInfo;
+use super::parser::TomlParser;
 use crate::utils;
+
+/// Caching the latest manager release info, reduce the number of time accessing the server.
+static LATEST_RELEASE: OnceLock<ReleaseInfo> = OnceLock::new();
 
 /// Calls a function to update toolkit.
 ///
-/// This is just a callback wrapper, you still have to provide a function to do the
+/// This is just a callback wrapper (for now), you still have to provide a function to do the
 /// internal work.
+// TODO: find a way to generalize this, so we can write a shared logic here instead of
+// creating update functions for both CLI and GUI.
 pub fn update_toolkit<F>(callback: F) -> Result<()>
 where
     F: FnOnce(&Path) -> Result<()>,
@@ -23,52 +32,55 @@ where
 ///
 /// Otherwise, or when the versions could not be determined, this will return `false`.
 pub fn check_self_update() -> bool {
-    macro_rules! warn_on_err {
-        (let $ident:ident = $operation:expr, $($msg:tt)*) => {
-            let Ok($ident) = $operation else {
-                log::warn!($($msg)*);
-                return false;
-            };
-        };
-    }
+    info!("{}", t!("checking_manager_updates"));
 
-    let cur_ver = env!("CARGO_PKG_VERSION");
-    warn_on_err!(
-        let latest_ver = latest_version(),
-        "{}", t!("fetch_latest_manager_version_failed")
-    );
-    warn_on_err!(
-        let cur_version = Version::parse(cur_ver),
-        "{}", t!("parse_version_failed", kind = t!("current"), version = cur_ver)
-    );
-    warn_on_err!(
-        let latest_version = Version::parse(&latest_ver),
-        "{}", t!("parse_version_failed", kind = t!("target"), version = latest_ver)
-    );
+    let latest_version = match latest_release() {
+        Ok(release) => &release.version,
+        Err(e) => {
+            warn!("{}: {e}", t!("fetch_latest_manager_version_failed"));
+            return false;
+        }
+    };
 
-    cur_version < latest_version
+    // safe to unwrap, otherwise cargo would fails the build
+    let cur_version = Version::parse(env!("CARGO_PKG_VERSION")).unwrap();
+
+    &cur_version < latest_version
 }
 
 pub fn do_self_update() -> Result<()> {
     let filename = format!("{}-manager{}", t!("vendor_en"), env::consts::EXE_SUFFIX);
-    let latest_version = latest_version()?;
-    let download_url = parse_download_url(&format!("/manager/dist/{latest_version}/{filename}"))?;
+    let latest_version = &latest_release()?.version;
+    let download_url = parse_download_url(&format!("manager/archive/{latest_version}/{filename}"))?;
 
     let dest = current_exe()?;
     utils::download(filename, &download_url, &dest, None)
 }
 
 fn parse_download_url(source_path: &str) -> Result<Url> {
-    let base_obs_server =
+    let mut base_obs_server =
         env::var("RIM_DIST_SERVER").unwrap_or_else(|_| super::RIM_DIST_SERVER.to_string());
+
+    // without the trailing slash, `.join` will replace the last component instead of append it.
+    if !base_obs_server.ends_with('/') {
+        base_obs_server.push('/');
+    }
+    debug!("parsing download url for '{source_path}' from server '{base_obs_server}'");
 
     Ok(Url::parse(&base_obs_server)?.join(source_path)?)
 }
 
 // Try to get the latest manager version
-fn latest_version() -> Result<String> {
-    let download_url = parse_download_url("/manager/version")?;
-    utils::DownloadOpt::<()>::new("manager version file")?.read(&download_url)
+fn latest_release() -> Result<&'static ReleaseInfo> {
+    if let Some(release_info) = LATEST_RELEASE.get() {
+        return Ok(release_info);
+    }
+
+    let download_url = parse_download_url(&format!("manager/{}", ReleaseInfo::FILENAME))?;
+    let raw = utils::DownloadOpt::<()>::new("manager release info")?.read(&download_url)?;
+    let release_info = ReleaseInfo::from_str(&raw)?;
+
+    Ok(LATEST_RELEASE.get_or_init(|| release_info))
 }
 
 #[cfg(test)]

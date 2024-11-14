@@ -25,7 +25,9 @@ pub struct DistPackage {
     pub manifest_url: Url,
 }
 
-impl TomlParser for DistManifest {}
+impl TomlParser for DistManifest {
+    const FILENAME: &str = "distribution-manifest.toml";
+}
 
 impl DistManifest {}
 

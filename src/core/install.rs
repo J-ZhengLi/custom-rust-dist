@@ -93,13 +93,15 @@ impl<'a> InstallConfiguration<'a> {
         manifest: &'a ToolsetManifest,
         update: bool,
     ) -> Result<Self> {
-        info!("{}", t!("install_init", dir = install_dir.display()));
+        if !update {
+            info!("{}", t!("install_init", dir = install_dir.display()));
+        }
 
         // Create a new folder to hold installation
         utils::ensure_dir(install_dir)?;
 
         // Create a copy of the manifest which is later used for component management.
-        let manifest_out_path = install_dir.join(crate::toolset_manifest::FILENAME);
+        let manifest_out_path = install_dir.join(ToolsetManifest::FILENAME);
         utils::write_file(manifest_out_path, &manifest.to_toml()?, false)?;
 
         if !update {
@@ -353,7 +355,7 @@ impl<'a> InstallConfiguration<'a> {
 
         let config_toml = config.to_toml()?;
         if !config_toml.trim().is_empty() {
-            let config_path = self.cargo_home().join("config.toml");
+            let config_path = self.cargo_home().join(CargoConfig::FILENAME);
             utils::write_file(config_path, &config_toml, false)?;
         }
 
@@ -459,7 +461,7 @@ fn split_components(components: Vec<Component>) -> (Vec<String>, ToolMap) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fingerprint, toolset_manifest::get_toolset_manifest};
+    use crate::toolset_manifest::get_toolset_manifest;
 
     #[test]
     fn declare_unfallible_url_macro() {
@@ -490,6 +492,9 @@ mod tests {
             InstallConfiguration::init(install_root.path(), None, &manifest, true).unwrap();
 
         assert!(config.install_record.name.is_none());
-        assert!(install_root.path().join(fingerprint::FILENAME).is_file());
+        assert!(install_root
+            .path()
+            .join(InstallationRecord::FILENAME)
+            .is_file());
     }
 }

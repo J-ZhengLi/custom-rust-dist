@@ -18,13 +18,18 @@ use super::{common, ManagerSubcommands};
 type ComponentChoices<'c> = IndexMap<&'c Component, usize>;
 
 pub(super) fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
-    let ManagerSubcommands::Update { self_update } = cmd else {
+    let ManagerSubcommands::Update {
+        toolkit_only,
+        manager_only,
+    } = cmd
+    else {
         return Ok(false);
     };
 
-    update_toolkit(update_toolkit_)?;
-
-    if *self_update && check_self_update() {
+    if !manager_only {
+        update_toolkit(update_toolkit_)?;
+    }
+    if !toolkit_only && check_self_update() {
         do_self_update()?;
     }
 
@@ -37,6 +42,7 @@ fn update_toolkit_(install_dir: &Path) -> Result<()> {
         return Ok(());
     };
 
+    info!("{}", t!("checking_toolkit_updates"));
     // get possible update
     let Some(latest_toolkit) = latest_installable_toolkit()? else {
         info!("{}", t!("no_available_updates"));

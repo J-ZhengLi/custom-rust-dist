@@ -17,8 +17,6 @@ use super::TomlParser;
 /// A map of tools, contains the name and source package information.
 pub type ToolMap = IndexMap<String, ToolInfo>;
 
-pub const FILENAME: &str = "toolset-manifest.toml";
-
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Default, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToolsetManifest {
@@ -38,6 +36,8 @@ pub struct ToolsetManifest {
 }
 
 impl TomlParser for ToolsetManifest {
+    const FILENAME: &str = "toolset-manifest.toml";
+
     fn load<P: AsRef<std::path::Path>>(path: P) -> anyhow::Result<Self> {
         let raw = utils::read_to_string("manifest", &path)?;
         let mut temp_manifest = Self::from_str(&raw)?;
@@ -53,7 +53,7 @@ impl ToolsetManifest {
     /// Only use this during **manager** mode.
     pub fn load_from_install_dir() -> Result<Self> {
         let root = super::get_installed_dir();
-        Self::load(root.join(FILENAME))
+        Self::load(root.join(Self::FILENAME))
     }
 
     // Get a list of all optional componets.

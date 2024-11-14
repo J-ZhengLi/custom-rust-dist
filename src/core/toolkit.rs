@@ -13,8 +13,6 @@ use url::Url;
 
 use super::parser::dist_manifest::DistPackage;
 
-pub(crate) const DIST_MANIFEST_TOML: &str = "distribution-manifest.toml";
-
 /// A cached installed [`Toolkit`] struct to prevent the program doing
 /// excessive IO operations as in [`installed`](Toolkit::installed).
 static INSTALLED_KIT: OnceLock<Toolkit> = OnceLock::new();
@@ -125,8 +123,9 @@ fn toolkits_from_server() -> Result<&'static [Toolkit]> {
         .unwrap_or(super::RIM_DIST_SERVER);
 
     // download dist manifest from server
-    info!("{} {DIST_MANIFEST_TOML}", t!("fetching"));
-    let dist_m_url = Url::parse(&format!("{dist_server}/dist/{DIST_MANIFEST_TOML}"))?;
+    let dist_m_filename = DistManifest::FILENAME;
+    info!("{} {dist_m_filename}", t!("fetching"));
+    let dist_m_url = Url::parse(&format!("{dist_server}/dist/{dist_m_filename}"))?;
     let dist_m_file = utils::make_temp_file("dist-manifest-", None)?;
     utils::DownloadOpt::<()>::new("distribution manifest")?.download_file(
         &dist_m_url,

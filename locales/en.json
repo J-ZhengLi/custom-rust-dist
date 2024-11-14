@@ -90,11 +90,12 @@
     "fetch_latest_manager_version_failed": "failed to retrieve information about the latest manager version",
     "current": "current",
     "target": "target",
-    "parse_version_failed": "failed to parse %{kind} version '%{version}', skipping self update checks",
-    "checking_updates": "checking for updates...",
+    "checking_manager_updates": "checking for manager updates...",
+    "checking_toolkit_updates": "checking for toolkit updates...",
     "no_available_updates": "no available updates",
     "pre_update_note": "updating toolkit version to '%{target_version}' (currently '%{current_version}'), this will replace your current toolkit after installation.",
     "continue": "Continue",
     "customize": "Customize",
-    "pre_update_confirmation": "\nThese components below will be updated, you may choose to install them, or select a different list by entering '2'\n\n%{list}"
+    "pre_update_confirmation": "\nThese components below will be updated, you may choose to install them, or manually select another set by entering '2'\n\n%{list}",
+    "downloading_rustup_init": "downloading rustup-init..."
 }

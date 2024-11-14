@@ -21,9 +21,14 @@ impl Default for Logger {
 
 impl Logger {
     pub fn new() -> Self {
+        #[cfg(not(debug_assertions))]
+        let level = LevelFilter::Info;
+        #[cfg(debug_assertions)]
+        let level = LevelFilter::Debug;
+
         Self {
             output_sender: None,
-            dispatcher_: fern::Dispatch::new().level(LevelFilter::Info),
+            dispatcher_: fern::Dispatch::new().level(level),
         }
     }
     /// Set verbose output, this will print `debug!` messages as well.
