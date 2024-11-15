@@ -1,5 +1,6 @@
 use anyhow::Result;
 use std::{
+    env::consts::EXE_SUFFIX,
     fs,
     path::{Path, PathBuf},
     process::Command,
@@ -66,12 +67,11 @@ edition = \"2021\"
         dest_dir.push(&self.version);
         dest_dir.push(env!("TARGET"));
         fs::create_dir_all(&dest_dir)?;
-        let dest_path = dest_dir.join(format!(
-            "{}-manager{}",
-            t!("vendor_en"),
-            std::env::consts::EXE_SUFFIX
-        ));
-        fs::copy(binary_path, dest_path)?;
+
+        let gui_name = format!("{}-manager{EXE_SUFFIX}", t!("vendor_en"));
+        let cli_name = format!("{}-manager-cli{EXE_SUFFIX}", t!("vendor_en"));
+        fs::copy(&binary_path, dest_dir.join(gui_name))?;
+        fs::copy(&binary_path, dest_dir.join(cli_name))?;
 
         Ok(())
     }

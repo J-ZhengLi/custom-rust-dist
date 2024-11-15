@@ -1,5 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use indexmap::IndexMap;
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -84,6 +85,7 @@ impl InstallationRecord {
         let content = self
             .to_toml()
             .context("unable to serialize installation fingerprint")?;
+        debug!("writing installation record into '{}'", path.display());
         utils::write_bytes(&path, content.as_bytes(), false).with_context(|| {
             anyhow!(
                 "unable to write fingerprint file to the given location: '{}'",
@@ -111,7 +113,8 @@ impl InstallationRecord {
 
     pub(crate) fn update_rust(&mut self, version: &str) {
         if let Some(rust) = self.rust.as_mut() {
-            rust.version = version.into()
+            rust.version = version.into();
+            debug!("toolchain installation record was updated to '{version}'");
         }
     }
 
@@ -139,15 +142,22 @@ impl InstallationRecord {
         self.tools.shift_remove(tool_name);
     }
 
+    /// Return a list of installed tools' names.
     pub fn installed_tools(&self) -> Vec<&str> {
         self.tools.keys().map(|k| k.as_str()).collect()
     }
 
+    /// Return a list of installed toolchain components's names.
     pub fn installed_components(&self) -> Vec<&str> {
         self.rust
             .as_ref()
             .map(|r| r.components.iter().map(|c| c.as_str()).collect::<Vec<_>>())
             .unwrap_or_default()
+    }
+
+    /// Returns the rust toolchain channel installed, such as `stable`, `nightly`, `1.80.1`, etc.
+    pub fn installed_toolchain_channel(&self) -> Option<&str> {
+        self.rust.as_ref().map(|rr| rr.version.as_str())
     }
 
     pub(crate) fn print_installation(&self) -> String {

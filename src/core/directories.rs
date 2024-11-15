@@ -26,7 +26,7 @@ pub(crate) trait RimDir {
         get_path_and_create!(RUSTUP_HOME_DIR, self.install_dir().join(".rustup"))
     }
 
-    fn temp_root(&self) -> &Path {
+    fn temp_dir(&self) -> &Path {
         get_path_and_create!(TEMP_DIR, self.install_dir().join("temp"))
     }
 

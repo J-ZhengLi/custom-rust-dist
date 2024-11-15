@@ -9,13 +9,15 @@ use crate::{
     error::Result,
 };
 use anyhow::Context;
+use rim::UninstallConfiguration;
 use rim::{
     components::{self, Component},
     toolkit::{self, Toolkit},
     toolset_manifest::{get_toolset_manifest, ToolsetManifest},
+    update::{self, UpdateOpt},
     utils::{self, Progress},
 };
-use rim::{update, UninstallConfiguration};
+use tauri::{api::dialog, AppHandle, Manager};
 
 static SELECTED_TOOLSET: Mutex<Option<ToolsetManifest>> = Mutex::new(None);
 
@@ -34,8 +36,7 @@ pub(super) fn main() -> Result<()> {
             get_install_dir,
             uninstall_toolkit,
             install_toolkit,
-            check_manager_version,
-            upgrade_manager,
+            maybe_self_update,
             handle_toolkit_install_click,
         ])
         .setup(|app| {
@@ -113,7 +114,7 @@ fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
 
 #[tauri::command(rename_all = "snake_case")]
 fn install_toolkit(window: tauri::Window, components_list: Vec<Component>) -> Result<()> {
-    update::update_toolkit(|p| {
+    UpdateOpt::new().update_toolkit(|p| {
         let guard = selected_toolset();
         let manifest = guard
             .as_ref()
@@ -131,17 +132,29 @@ fn install_toolkit(window: tauri::Window, components_list: Vec<Component>) -> Re
 }
 
 #[tauri::command]
-fn check_manager_version() -> bool {
-    let check_update_thread = thread::spawn(update::check_self_update);
+fn maybe_self_update(app: AppHandle) -> Result<()> {
+    let update_kind = update::check_self_update();
+    let Some(new_ver) = update_kind.newer_version() else {
+        return Ok(());
+    };
 
-    // Join the thread and capture the result, with a default value in case of failure
-    check_update_thread.join().unwrap_or_default()
-}
-
-#[tauri::command]
-fn upgrade_manager() -> Result<()> {
-    let upgrade_thread = thread::spawn(move || -> anyhow::Result<()> { update::do_self_update() });
-    upgrade_thread.join().expect("failed to upgrade manager.")?;
+    dialog::ask(
+        app.get_focused_window().as_ref(),
+        t!("update_available"),
+        t!(
+            "ask_self_update",
+            latest = new_ver,
+            current = env!("CARGO_PKG_VERSION")
+        ),
+        move |yes| {
+            if yes {
+                if let Ok(true) = UpdateOpt::new().self_update() {
+                    // FIXME: find a way to block main windows interaction
+                    app.restart();
+                }
+            }
+        },
+    );
 
     Ok(())
 }

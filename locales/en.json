@@ -97,5 +97,11 @@
     "continue": "Continue",
     "customize": "Customize",
     "pre_update_confirmation": "\nThese components below will be updated, you may choose to install them, or manually select another set by entering '2'\n\n%{list}",
-    "downloading_rustup_init": "downloading rustup-init..."
+    "downloading_rustup_init": "downloading rustup-init...",
+    "unable_to_remove": "unable to remove '%{path}' as it might be current used by other programs, please close such programs then try again.",
+    "update_available": "new update available",
+    "ask_self_update": "detected new release version: %{latest}\ncurrently running: %{current}\nupdate now?",
+    "self_update_complete": "update completed! If you are using the graphical interface, please close then re-open this program to avoid possible issues.",
+    "latest_manager_installed": "already running on the latest release version (%{version}), no need to update",
+    "downloading_latest_manager": "downloading the latest manager release (version '%{version}')..."
 }

@@ -1,10 +1,10 @@
-use std::path::PathBuf;
-use std::process::Command;
+use std::env::current_exe;
 
 use crate::core::directories::RimDir;
 use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
-use anyhow::Result;
+use crate::utils;
+use anyhow::{bail, Result};
 
 use log::info;
 pub(crate) use rustup::*;
@@ -40,33 +40,31 @@ impl Uninstallation for UninstallConfiguration<'_> {
     }
 
     fn remove_self(&self) -> Result<()> {
+        do_remove_from_programs(uninstall_entry())?;
+        remove_from_path(&self.install_dir)?;
+
+        let current_exe = current_exe()?;
         // On windows, we cannot delete an executable that is currently running.
-        // Therefore, we are spawning a child process that runs `rmdir` and hope for the best.
-        // `rustup` did something like this, it creates a "self-destructable" clone called `rustup-gc`,
-        // and it is far more safe than this primitive way of hack, if this method has problem,
-        // use the rustup way.
-        remove_self_(&self.install_dir)?;
+        // So, let's remove what we can, and **hopefully** that will only left us
+        // this binary, and its parent directory (aka.`install_dir`)
+        for entry in utils::walk_dir(&self.install_dir, true)?.iter().rev() {
+            if utils::remove(entry).is_err() {
+                if entry == &current_exe || entry == &self.install_dir {
+                    // we'll deal with these two later
+                    continue;
+                }
+
+                bail!(t!("unable_to_remove", path = entry.display()));
+            }
+        }
+
+        // remove current exe
+        self_replace::self_delete()?;
+        // remove parent dir, which should be empty by now, and should be very quick to remove.
+        // but if for some reason it fails, well it's too late then, the `self` binary is gone now.
+        _ = utils::remove(&self.install_dir);
         Ok(())
     }
-}
-
-/// Remove the installation directory, including the binary of this program.
-// FIXME: This is such a mess, but it works. However, when uninstall from `control panel`,
-// a window flashs, the env vars are removed but nothing has been removed.
-fn remove_self_(install_dir: &PathBuf) -> Result<()> {
-    /// Execute a command then heads out.
-    fn yolo(cmd: &mut Command) -> ! {
-        let _yolo = cmd.spawn();
-        std::process::exit(0)
-    }
-
-    let mut rmdir_cmd = Command::new("cmd.exe");
-    let cmd = rmdir_cmd.args(["/C", "rmdir", "/s", "/q"]).arg(install_dir);
-
-    do_remove_from_programs(uninstall_entry())?;
-    remove_from_path(install_dir)?;
-
-    yolo(cmd);
 }
 
 /// Module containing functions that are modified from `rustup`.

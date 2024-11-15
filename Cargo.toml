@@ -55,6 +55,7 @@ log.workspace = true
 fern.workspace = true
 chrono = "0.4.38"
 semver = "1.0.23"
+self-replace = "1"
 
 [target."cfg(windows)".dependencies]
 winreg = "0.52.0"

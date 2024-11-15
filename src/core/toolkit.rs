@@ -6,7 +6,7 @@ use crate::core::parser::TomlParser;
 use crate::{components, utils};
 use crate::{fingerprint::InstallationRecord, toolset_manifest::ToolsetManifest};
 use anyhow::Result;
-use log::info;
+use log::{debug, info};
 use semver::Version;
 use serde::Serialize;
 use url::Url;
@@ -48,6 +48,7 @@ impl Toolkit {
     /// what components it has.
     pub fn installed() -> Result<Option<&'static Self>> {
         if let Some(cached) = INSTALLED_KIT.get() {
+            debug!("using cached INSTALLED_KIT: {:#?}", cached);
             return Ok(Some(cached));
         }
 
@@ -81,12 +82,22 @@ impl Toolkit {
         let installed_tools = fp.installed_tools();
         let installed_set: HashSet<&&str> =
             HashSet::from_iter(installed_comps.iter().chain(installed_tools.iter()));
+        debug!("all installed tools: {:?}", &installed_set);
         let components = components::get_component_list_from_manifest(&manifest, true)?;
         tk.components = components;
+
+        // get installed toolchain version, to adjust components version later.
+        // FIXME: this should be returned from `installed_components`
+        let channel = fp.installed_toolchain_channel();
 
         for c in &mut tk.components {
             if installed_set.contains(&c.name.as_str()) {
                 c.installed = true;
+            }
+            // FIXME: the components are from manifest,
+            // so there's this hack to make sure they reflect the actual installed version.
+            if c.is_toolchain_component {
+                c.version = channel.map(ToOwned::to_owned);
             }
         }
 

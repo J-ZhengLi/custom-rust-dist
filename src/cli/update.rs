@@ -7,7 +7,7 @@ use url::Url;
 
 use crate::components::{get_component_list_from_manifest, Component};
 use crate::core::toolkit::Toolkit;
-use crate::core::update::{check_self_update, do_self_update, update_toolkit};
+use crate::core::update::UpdateOpt;
 use crate::toolkit::latest_installable_toolkit;
 use crate::toolset_manifest::get_toolset_manifest;
 use crate::InstallConfiguration;
@@ -26,11 +26,12 @@ pub(super) fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
         return Ok(false);
     };
 
+    let update_opt = UpdateOpt;
     if !manager_only {
-        update_toolkit(update_toolkit_)?;
+        update_opt.update_toolkit(update_toolkit_)?;
     }
-    if !toolkit_only && check_self_update() {
-        do_self_update()?;
+    if !toolkit_only {
+        update_opt.self_update()?;
     }
 
     Ok(true)

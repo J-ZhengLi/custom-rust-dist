@@ -364,7 +364,7 @@ impl<'a> InstallConfiguration<'a> {
 
     /// Creates a temporary directory under `install_dir/temp`, with a certain prefix.
     pub(crate) fn create_temp_dir(&self, prefix: &str) -> Result<TempDir> {
-        let root = self.temp_root();
+        let root = self.temp_dir();
 
         tempfile::Builder::new()
             .prefix(&format!("{prefix}_"))
