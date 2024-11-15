@@ -1,5 +1,5 @@
 use std::{
-    sync::{mpsc, Arc, Mutex, MutexGuard},
+    sync::{mpsc, Arc, Mutex, MutexGuard, OnceLock},
     thread,
     time::Duration,
 };
@@ -20,6 +20,7 @@ use rim::{
 use tauri::{api::dialog, AppHandle, Manager};
 
 static SELECTED_TOOLSET: Mutex<Option<ToolsetManifest>> = Mutex::new(None);
+static LOGGER_SETUP: OnceLock<()> = OnceLock::new();
 
 fn selected_toolset<'a>() -> MutexGuard<'a, Option<ToolsetManifest>> {
     SELECTED_TOOLSET
@@ -82,8 +83,9 @@ fn get_install_dir() -> String {
 #[tauri::command(rename_all = "snake_case")]
 fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
     let (msg_sendr, msg_recvr) = mpsc::channel::<String>();
-    // config logger to use the `msg_sendr` we just created
-    utils::Logger::new().sender(msg_sendr).setup()?;
+    // config logger to use the `msg_sendr` we just created, use OnceLock to make sure it run
+    // exactly once.
+    LOGGER_SETUP.get_or_init(|| _ = utils::Logger::new().sender(msg_sendr).setup());
 
     let window = Arc::new(window);
     let window_clone = Arc::clone(&window);

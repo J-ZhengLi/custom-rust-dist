@@ -92,7 +92,7 @@
     "customize": "自定义",
     "pre_update_confirmation": "\n即将更新以下组件, 您可以选择更新它们, 或输入 '2' 来手动选择要更新的组件\n\n%{list}",
     "downloading_rustup_init": "正在下载 rustup-init...",
-    "unable_to_remove": "无法删除 '%{path}', 此文件可能正在被占用, 请关闭相关应用程序后重试。",
+    "unable_to_remove": "无法删除 '%{path}', 此文件可能正在被占用, 请尝试手动将其删除。",
     "update_available": "有可用更新",
     "ask_self_update": "检测到最新可用版本: %{latest}\n当前运行版本: %{current}\n是否更新？",
     "self_update_complete": "更新完成! 为避免产生不必要的问题, 如果您正在使用此工具的图形界面版, 请关闭当前窗口并重新运行此应用程序。",

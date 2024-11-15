@@ -4,9 +4,9 @@ use crate::core::directories::RimDir;
 use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
 use crate::utils;
-use anyhow::{bail, Result};
+use anyhow::Result;
 
-use log::info;
+use log::{info, warn};
 pub(crate) use rustup::*;
 
 impl EnvConfig for InstallConfiguration<'_> {
@@ -53,8 +53,7 @@ impl Uninstallation for UninstallConfiguration<'_> {
                     // we'll deal with these two later
                     continue;
                 }
-
-                bail!(t!("unable_to_remove", path = entry.display()));
+                warn!("{}", t!("unable_to_remove", path = entry.display()));
             }
         }
 
