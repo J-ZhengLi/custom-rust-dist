@@ -1,13 +1,12 @@
 use anyhow::{anyhow, Context, Result};
 use indexmap::IndexMap;
+use log::debug;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 use crate::utils;
 
 use super::{toolset_manifest::ToolsetManifest, TomlParser};
-
-pub(crate) const FILENAME: &str = ".fingerprint.toml";
 
 /// Re-load fingerprint file just to get the list of installed tools,
 /// therefore we can use this list to uninstall, while avoiding race condition.
@@ -30,6 +29,8 @@ pub struct InstallationRecord {
 }
 
 impl TomlParser for InstallationRecord {
+    const FILENAME: &str = ".fingerprint.toml";
+
     /// Load fingerprint from a given root.
     ///
     /// Note that the fingerprint filename is fixed, as defined as [`FILENAME`],
@@ -43,7 +44,7 @@ impl TomlParser for InstallationRecord {
             "install record needs to be loaded from a directory"
         );
 
-        let fp_path = root.as_ref().join(FILENAME);
+        let fp_path = root.as_ref().join(Self::FILENAME);
         if fp_path.is_file() {
             let raw = utils::read_to_string("installation fingerprint", &fp_path)?;
             Self::from_str(&raw)
@@ -65,7 +66,7 @@ impl InstallationRecord {
     /// the program to panic using [`get_installed_dir`](super::get_installed_dir).
     pub fn exists() -> Result<bool> {
         let parent_dir = utils::parent_dir_of_cur_exe()?;
-        Ok(parent_dir.join(FILENAME).is_file())
+        Ok(parent_dir.join(Self::FILENAME).is_file())
     }
 
     /// Load installation record from a presumed install directory,
@@ -80,10 +81,11 @@ impl InstallationRecord {
     }
 
     pub(crate) fn write(&self) -> Result<()> {
-        let path = self.root.join(FILENAME);
+        let path = self.root.join(Self::FILENAME);
         let content = self
             .to_toml()
             .context("unable to serialize installation fingerprint")?;
+        debug!("writing installation record into '{}'", path.display());
         utils::write_bytes(&path, content.as_bytes(), false).with_context(|| {
             anyhow!(
                 "unable to write fingerprint file to the given location: '{}'",
@@ -107,6 +109,13 @@ impl InstallationRecord {
             version: version.to_string(),
             components: components.to_vec(),
         });
+    }
+
+    pub(crate) fn update_rust(&mut self, version: &str) {
+        if let Some(rust) = self.rust.as_mut() {
+            rust.version = version.into();
+            debug!("toolchain installation record was updated to '{version}'");
+        }
     }
 
     pub(crate) fn add_tool_record(&mut self, name: &str, record: ToolRecord) {
@@ -133,15 +142,22 @@ impl InstallationRecord {
         self.tools.shift_remove(tool_name);
     }
 
+    /// Return a list of installed tools' names.
     pub fn installed_tools(&self) -> Vec<&str> {
         self.tools.keys().map(|k| k.as_str()).collect()
     }
 
+    /// Return a list of installed toolchain components's names.
     pub fn installed_components(&self) -> Vec<&str> {
         self.rust
             .as_ref()
             .map(|r| r.components.iter().map(|c| c.as_str()).collect::<Vec<_>>())
             .unwrap_or_default()
+    }
+
+    /// Returns the rust toolchain channel installed, such as `stable`, `nightly`, `1.80.1`, etc.
+    pub fn installed_toolchain_channel(&self) -> Option<&str> {
+        self.rust.as_ref().map(|rr| rr.version.as_str())
     }
 
     pub(crate) fn print_installation(&self) -> String {

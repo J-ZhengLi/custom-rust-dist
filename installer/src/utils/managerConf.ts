@@ -4,8 +4,6 @@ import { Component } from './types/Component';
 import { CheckGroup, CheckGroupItem } from './types/CheckBoxGroup';
 import LabelComponent from '@/views/manager/components/Label.vue';
 import { invokeCommand } from './invokeCommand';
-import { ask } from '@tauri-apps/api/dialog';
-
 
 type Target = {
   operation: 'update' | 'uninstall';
@@ -130,9 +128,6 @@ class ManagerConf {
     );
   }
   async loadConf() {
-    // TODO: Complete update detection
-    // await this.checkUpdate();
-
     let dir = await invokeCommand('get_install_dir');
     if (typeof dir === 'string' && dir.trim() !== '') {
       this.path.value = dir;
@@ -140,19 +135,8 @@ class ManagerConf {
 
     await this.loadInstalledKit();
     await this.loadAvailableKits();
-  }
-
-  async checkUpdate() {
-    let update = await invokeCommand('check_manager_version') as boolean;
-
-    if (update) {
-      // TODO: It is up to the user to decide whether to upgrade
-      await ask("检测到新的可用版本，是否现在更新？");
-    }
-  }
-
-  async upgradeManager() {
-    await invokeCommand('upgrade_manager');
+    // check self update and ask user if they what to install it.
+    await invokeCommand('maybe_self_update');
   }
 
   async loadInstalledKit() {

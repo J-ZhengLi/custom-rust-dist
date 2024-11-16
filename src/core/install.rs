@@ -1,4 +1,5 @@
 use super::{
+    components::{component_list_to_tool_map, Component},
     directories::RimDir,
     parser::{
         cargo_config::CargoConfig,
@@ -12,7 +13,7 @@ use super::{
 };
 use crate::{
     core::os::add_to_path,
-    toolset_manifest::{Proxy, ToolMap},
+    toolset_manifest::ToolMap,
     utils::{self, Extractable, Progress},
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -48,15 +49,12 @@ pub(crate) const DEFAULT_CARGO_REGISTRY: (&str, &str) =
     ("rsproxy", "sparse+https://rsproxy.cn/index/");
 
 /// Contains definition of installation steps, including pre-install configs.
-///
-/// Make sure to always call `init()` as it creates essential folders to
-/// hold the installation files.
 pub trait EnvConfig {
     /// Configure environment variables.
     ///
     /// This will set persistent environment variables including
     /// `RUSTUP_DIST_SERVER`, `RUSTUP_UPDATE_ROOT`, `CARGO_HOME`, `RUSTUP_HOME`, etc.
-    fn config_env_vars(&self, manifest: &ToolsetManifest) -> Result<()>;
+    fn config_env_vars(&self) -> Result<()>;
 }
 
 pub struct InstallConfiguration<'a> {
@@ -95,13 +93,15 @@ impl<'a> InstallConfiguration<'a> {
         manifest: &'a ToolsetManifest,
         update: bool,
     ) -> Result<Self> {
-        info!("{}", t!("install_init", dir = install_dir.display()));
+        if !update {
+            info!("{}", t!("install_init", dir = install_dir.display()));
+        }
 
         // Create a new folder to hold installation
         utils::ensure_dir(install_dir)?;
 
         // Create a copy of the manifest which is later used for component management.
-        let manifest_out_path = install_dir.join(crate::toolset_manifest::FILENAME);
+        let manifest_out_path = install_dir.join(ToolsetManifest::FILENAME);
         utils::write_file(manifest_out_path, &manifest.to_toml()?, false)?;
 
         if !update {
@@ -137,8 +137,10 @@ impl<'a> InstallConfiguration<'a> {
         })
     }
 
-    pub fn install(mut self, tc_components: Vec<String>, tools: ToolMap) -> Result<()> {
-        self.config_env_vars(self.manifest)?;
+    pub fn install(mut self, components: Vec<Component>) -> Result<()> {
+        let (tc_components, tools) = split_components(components);
+
+        self.config_env_vars()?;
         self.config_cargo()?;
         // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
         self.install_tools(&tools)?;
@@ -174,10 +176,7 @@ impl<'a> InstallConfiguration<'a> {
         self
     }
 
-    pub(crate) fn env_vars(
-        &self,
-        manifest: &ToolsetManifest,
-    ) -> Result<HashMap<&'static str, String>> {
+    pub(crate) fn env_vars(&self) -> Result<HashMap<&'static str, String>> {
         let cargo_home = self
             .cargo_home()
             .to_str()
@@ -195,7 +194,7 @@ impl<'a> InstallConfiguration<'a> {
         ]);
 
         // Add proxy settings if has
-        if let Some(proxy) = &manifest.proxy {
+        if let Some(proxy) = &self.manifest.proxy {
             if let Some(url) = &proxy.http {
                 env_vars.insert("http_proxy", url.to_string());
             }
@@ -210,14 +209,7 @@ impl<'a> InstallConfiguration<'a> {
         Ok(env_vars)
     }
 
-    fn install_tools_(
-        &mut self,
-        manifest: Option<&ToolsetManifest>,
-        tools: &ToolMap,
-        weight: f32,
-    ) -> Result<()> {
-        let use_cargo = manifest.is_none();
-
+    fn install_tools_(&mut self, use_cargo: bool, tools: &ToolMap, weight: f32) -> Result<()> {
         let to_install = tools
             .into_iter()
             .filter(|(_, t)| {
@@ -242,7 +234,7 @@ impl<'a> InstallConfiguration<'a> {
             };
             info!("{info}");
 
-            self.install_tool(name, tool, manifest.and_then(|m| m.proxy.as_ref()))?;
+            self.install_tool(name, tool)?;
 
             self.inc_progress(sub_progress_delta)?;
         }
@@ -254,12 +246,12 @@ impl<'a> InstallConfiguration<'a> {
 
     pub fn install_tools(&mut self, tools: &ToolMap) -> Result<()> {
         info!("{}", t!("install_tools"));
-        self.install_tools_(Some(self.manifest), tools, 30.0)
+        self.install_tools_(false, tools, 30.0)
     }
 
     pub fn cargo_install(&mut self, tools: &ToolMap) -> Result<()> {
         info!("{}", t!("install_via_cargo"));
-        self.install_tools_(None, tools, 30.0)
+        self.install_tools_(true, tools, 30.0)
     }
 
     pub fn install_rust(&mut self, optional_components: &[String]) -> Result<()> {
@@ -286,7 +278,7 @@ impl<'a> InstallConfiguration<'a> {
 
     // TODO: Write version info after installing each tool,
     // which is later used for updating.
-    fn install_tool(&mut self, name: &str, tool: &ToolInfo, proxy: Option<&Proxy>) -> Result<()> {
+    fn install_tool(&mut self, name: &str, tool: &ToolInfo) -> Result<()> {
         let record = match tool {
             ToolInfo::PlainVersion(version) | ToolInfo::DetailedVersion { ver: version, .. } => {
                 Tool::cargo_tool(name, Some(vec![name, "--version", version])).install(self)?
@@ -324,7 +316,7 @@ impl<'a> InstallConfiguration<'a> {
                     .filter(|seg| !seg.is_empty())
                     .ok_or_else(|| anyhow!("'{url}' doesn't appear to be a downloadable file"))?;
                 let dest = temp_dir.path().join(downloaded_file_name);
-                utils::download(name, url, &dest, proxy)?;
+                utils::download(name, url, &dest, self.manifest.proxy.as_ref())?;
 
                 self.try_install_from_path(name, &dest)?
             }
@@ -363,7 +355,7 @@ impl<'a> InstallConfiguration<'a> {
 
         let config_toml = config.to_toml()?;
         if !config_toml.trim().is_empty() {
-            let config_path = self.cargo_home().join("config.toml");
+            let config_path = self.cargo_home().join(CargoConfig::FILENAME);
             utils::write_file(config_path, &config_toml, false)?;
         }
 
@@ -372,7 +364,7 @@ impl<'a> InstallConfiguration<'a> {
 
     /// Creates a temporary directory under `install_dir/temp`, with a certain prefix.
     pub(crate) fn create_temp_dir(&self, prefix: &str) -> Result<TempDir> {
-        let root = self.temp_root();
+        let root = self.temp_dir();
 
         tempfile::Builder::new()
             .prefix(&format!("{prefix}_"))
@@ -394,14 +386,82 @@ impl<'a> InstallConfiguration<'a> {
     }
 }
 
+// For updates
+impl<'a> InstallConfiguration<'a> {
+    pub fn update(mut self, components: Vec<Component>) -> Result<()> {
+        let (_, tools) = split_components(components);
+        // setup env for current process
+        for (key, val) in self.env_vars()? {
+            std::env::set_var(key, val);
+        }
+        self.inc_progress(10.0)?;
+
+        self.update_toolchain()?;
+        self.update_tools(&tools)?;
+        Ok(())
+    }
+
+    fn update_toolchain(&mut self) -> Result<()> {
+        info!("{}", t!("update_toolchain"));
+
+        let manifest = self.manifest;
+
+        ToolchainInstaller::init().update(self, manifest)?;
+
+        // Add the rust info to the fingerprint.
+        self.install_record.update_rust(manifest.rust_version());
+        // record meta info
+        self.install_record
+            .clone_toolkit_meta_from_manifest(manifest);
+        // write changes
+        self.install_record.write()?;
+
+        self.inc_progress(60.0)
+    }
+
+    fn update_tools(&mut self, tools: &ToolMap) -> Result<()> {
+        info!("{}", t!("update_tools"));
+        self.install_tools_(false, tools, 15.0)?;
+        self.install_tools_(true, tools, 15.0)?;
+        Ok(())
+    }
+}
+
 pub fn default_install_dir() -> PathBuf {
     utils::home_dir().join(&*t!("vendor_en"))
+}
+
+/// Split components list to `toolchain_components` and `toolset_components`,
+/// as we are running `rustup` to install toolchain components, but using other methods
+/// for toolset components.
+fn split_components(components: Vec<Component>) -> (Vec<String>, ToolMap) {
+    let toolset_components = component_list_to_tool_map(
+        components
+            .iter()
+            .filter(|cm| !cm.is_toolchain_component)
+            .collect(),
+    );
+    let toolchain_components: Vec<String> = components
+        .into_iter()
+        // Skip the mocked `rust toolchain` component that we added first,
+        // it will be installed as requirement anyway.
+        .skip(1)
+        .filter_map(|comp| {
+            if comp.is_toolchain_component {
+                Some(comp.name)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    (toolchain_components, toolset_components)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fingerprint, toolset_manifest::get_toolset_manifest};
+    use crate::toolset_manifest::get_toolset_manifest;
 
     #[test]
     fn declare_unfallible_url_macro() {
@@ -432,6 +492,9 @@ mod tests {
             InstallConfiguration::init(install_root.path(), None, &manifest, true).unwrap();
 
         assert!(config.install_record.name.is_none());
-        assert!(install_root.path().join(fingerprint::FILENAME).is_file());
+        assert!(install_root
+            .path()
+            .join(InstallationRecord::FILENAME)
+            .is_file());
     }
 }

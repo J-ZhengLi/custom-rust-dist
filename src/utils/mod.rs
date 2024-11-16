@@ -15,7 +15,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub use download::{download, DownloadOpt};
+pub use download::{download, DownloadOpt, Proxy};
 pub use extraction::Extractable;
 pub use file_system::*;
 pub use log::{log_file_path, Logger};
@@ -25,9 +25,23 @@ pub use progress_bar::Progress;
 use anyhow::Result;
 use url::Url;
 
-/// Mark the given string as an executable's filename.
+/// Insert a `.exe` postfix to given input.
 ///
-/// This will set a `.exe` postfix on Windows, and does nothing if on Unix.
+/// # Example
+///
+/// ```ignore
+/// let this_works = rim::exe!("hello_world");
+///
+/// #[cfg(windows)]
+/// {
+///     assert!(this_works, "hello_world.exe");
+/// }
+///
+/// #[cfg(not(windows))]
+/// {
+///     assert!(this_works, "hello_world");
+/// }
+/// ```
 macro_rules! exe {
     ($input:expr) => {{
         #[cfg(windows)]

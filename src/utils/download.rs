@@ -6,9 +6,8 @@ use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context, Result};
 use reqwest::blocking::{Client, ClientBuilder};
+use serde::{Deserialize, Serialize};
 use url::Url;
-
-use crate::toolset_manifest::Proxy;
 
 use super::progress_bar::{CliProgress, Style};
 
@@ -18,6 +17,36 @@ fn client_builder() -> ClientBuilder {
         .user_agent(user_agent)
         .timeout(Duration::from_secs(30))
         .connection_verbose(false)
+}
+
+/// The proxy for download
+#[derive(Debug, Deserialize, Default, Serialize, PartialEq, Eq, Clone)]
+pub struct Proxy {
+    pub http: Option<Url>,
+    pub https: Option<Url>,
+    #[serde(alias = "no-proxy")]
+    pub no_proxy: Option<String>,
+}
+
+impl TryFrom<Proxy> for reqwest::Proxy {
+    type Error = anyhow::Error;
+    fn try_from(value: Proxy) -> std::result::Result<Self, Self::Error> {
+        let base = match (value.http, value.https) {
+            // When nothing provided, use env proxy if there is.
+            (None, None) => reqwest::Proxy::custom(|url| env_proxy::for_url(url).to_url()),
+            // When both are provided, use the provided https proxy.
+            (Some(_), Some(https)) => reqwest::Proxy::all(https)?,
+            (Some(http), None) => reqwest::Proxy::http(http)?,
+            (None, Some(https)) => reqwest::Proxy::https(https)?,
+        };
+        let with_no_proxy = if let Some(no_proxy) = value.no_proxy {
+            base.no_proxy(reqwest::NoProxy::from_string(&no_proxy))
+        } else {
+            // Fallback to using env var
+            base.no_proxy(reqwest::NoProxy::from_env())
+        };
+        Ok(with_no_proxy)
+    }
 }
 
 pub struct DownloadOpt<T: Sized> {
@@ -45,34 +74,59 @@ impl<T: Sized> DownloadOpt<T> {
         self.handler = progress_handler;
         self
     }
+    /// Retrive text response by sending request to a given url.
+    ///
+    /// If the `url` is a local file, this will use [`read_to_string`](fs::read_to_string) to
+    /// get the text instead.
+    pub fn read(&self, url: &Url) -> Result<String> {
+        if url.scheme() == "file" {
+            let file_url = url
+                .to_file_path()
+                .map_err(|_| anyhow!("file url does not exist"))?;
+            return fs::read_to_string(&file_url).with_context(|| {
+                format!(
+                    "unable to read {} located in {}",
+                    self.name,
+                    file_url.display()
+                )
+            });
+        }
+
+        let resp = self
+            .client
+            .get(url.as_ref())
+            .send()
+            .with_context(|| format!("failed to receive surver response from '{url}'"))?;
+        if resp.status().is_success() {
+            Ok(resp.text()?)
+        } else {
+            bail!(
+                "unable to get text content of url '{url}': server responded with error {}",
+                resp.status()
+            );
+        }
+    }
     // TODO: make local file download fancier
     pub fn download_file(&self, url: &Url, path: &Path, resume: bool) -> Result<()> {
         if url.scheme() == "file" {
             fs::copy(
-                url.to_file_path().map_err(|_| {
-                    anyhow!("unable to convert to file path for url '{}'", url.as_str())
-                })?,
+                url.to_file_path()
+                    .map_err(|_| anyhow!("unable to convert to file path for url '{url}'"))?,
                 path,
             )?;
             return Ok(());
         }
 
         let mut resp = self.client.get(url.as_ref()).send().with_context(|| {
-            format!(
-                "failed to receive surver response when downloading from '{}':",
-                url.as_str()
-            )
+            format!("failed to receive surver response when downloading from '{url}'")
         })?;
         let status = resp.status();
         if !status.is_success() {
-            bail!(
-                "server returns error when attempting download from '{}': {status}",
-                url.as_str()
-            );
+            bail!("server returns error when attempting download from '{url}': {status}");
         }
         let total_size = resp
             .content_length()
-            .ok_or_else(|| anyhow!("unable to get file length of '{}'", url.as_str()))?;
+            .ok_or_else(|| anyhow!("unable to get file length of '{url}'"))?;
 
         let maybe_indicator = self.handler.as_ref().and_then(|h| {
             (h.start)(

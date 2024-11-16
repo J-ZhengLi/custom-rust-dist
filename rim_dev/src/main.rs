@@ -3,6 +3,7 @@ extern crate rust_i18n;
 
 mod common;
 mod dist;
+mod mocked_manager;
 mod vendor;
 
 use anyhow::{Context, Result};
@@ -58,6 +59,9 @@ impl DevCmd {
                 cargo_args.extend(args.iter().map(|s| s.as_str()));
 
                 gen_mocked_files()?;
+                if args.iter().any(|arg| arg == "update") {
+                    mocked_manager::generate()?;
+                }
 
                 let mut mock_dir =
                     PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_file_name("resources");

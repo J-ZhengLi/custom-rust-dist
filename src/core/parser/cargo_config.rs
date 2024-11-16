@@ -18,7 +18,9 @@ pub(crate) struct CargoConfig {
     source: BTreeMap<String, Source>,
 }
 
-impl TomlParser for CargoConfig {}
+impl TomlParser for CargoConfig {
+    const FILENAME: &str = "config.toml";
+}
 
 // FIXME: remove this `allow` before 0.1.0 release.
 #[allow(unused)]

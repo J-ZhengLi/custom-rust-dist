@@ -17,8 +17,6 @@ use super::TomlParser;
 /// A map of tools, contains the name and source package information.
 pub type ToolMap = IndexMap<String, ToolInfo>;
 
-pub const FILENAME: &str = "toolset-manifest.toml";
-
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Default, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToolsetManifest {
@@ -31,13 +29,15 @@ pub struct ToolsetManifest {
     #[serde(default)]
     pub(crate) tools: Tools,
     /// Proxy settings that used for download.
-    pub proxy: Option<Proxy>,
+    pub proxy: Option<utils::Proxy>,
     /// Path to the manifest file.
     #[serde(skip)]
     path: Option<PathBuf>,
 }
 
 impl TomlParser for ToolsetManifest {
+    const FILENAME: &str = "toolset-manifest.toml";
+
     fn load<P: AsRef<std::path::Path>>(path: P) -> anyhow::Result<Self> {
         let raw = utils::read_to_string("manifest", &path)?;
         let mut temp_manifest = Self::from_str(&raw)?;
@@ -53,7 +53,7 @@ impl ToolsetManifest {
     /// Only use this during **manager** mode.
     pub fn load_from_install_dir() -> Result<Self> {
         let root = super::get_installed_dir();
-        Self::load(root.join(FILENAME))
+        Self::load(root.join(Self::FILENAME))
     }
 
     // Get a list of all optional componets.
@@ -177,37 +177,6 @@ impl ToolsetManifest {
     }
 }
 
-/// The proxy for download, if not set, the program will fallback to use
-/// environment settings instead.
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Default, Clone)]
-pub struct Proxy {
-    pub http: Option<Url>,
-    pub https: Option<Url>,
-    #[serde(alias = "no-proxy")]
-    pub no_proxy: Option<String>,
-}
-
-impl TryFrom<Proxy> for reqwest::Proxy {
-    type Error = anyhow::Error;
-    fn try_from(value: Proxy) -> std::result::Result<Self, Self::Error> {
-        let base = match (value.http, value.https) {
-            // When nothing provided, use env proxy if there is.
-            (None, None) => reqwest::Proxy::custom(|url| env_proxy::for_url(url).to_url()),
-            // When both are provided, use the provided https proxy.
-            (Some(_), Some(https)) => reqwest::Proxy::all(https)?,
-            (Some(http), None) => reqwest::Proxy::http(http)?,
-            (None, Some(https)) => reqwest::Proxy::https(https)?,
-        };
-        let with_no_proxy = if let Some(no_proxy) = value.no_proxy {
-            base.no_proxy(reqwest::NoProxy::from_string(&no_proxy))
-        } else {
-            // Fallback to using env var
-            base.no_proxy(reqwest::NoProxy::from_env())
-        };
-        Ok(with_no_proxy)
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Default, Clone)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) struct RustToolchain {
@@ -293,7 +262,7 @@ impl Tools {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone, Hash)]
 #[serde(untagged)]
 pub enum ToolInfo {
     PlainVersion(String),
@@ -441,7 +410,6 @@ fn baked_in_manifest_raw() -> &'static str {
 /// - Download from specific url.
 /// - Load from an attached source file.
 ///
-/// Note that `proxy` is unused if `url` is not provided.
 pub fn get_toolset_manifest(url: Option<&Url>) -> Result<ToolsetManifest> {
     if let Some(url) = url {
         let temp = utils::make_temp_file("toolset-manifest-", None)?;
@@ -962,7 +930,7 @@ no-proxy = "localhost,some.domain.com"
         let expected = ToolsetManifest::from_str(input).unwrap();
         assert_eq!(
             expected.proxy.unwrap(),
-            Proxy {
+            utils::Proxy {
                 http: Some(Url::parse("http://username:password@proxy.example.com:8080").unwrap()),
                 https: Some(
                     Url::parse("https://username:password@proxy.example.com:8080").unwrap()

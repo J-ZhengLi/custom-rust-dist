@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 
 use anyhow::Context;
 use tauri::api::dialog::FileDialogBuilder;
@@ -10,7 +10,7 @@ use rim::components::{get_component_list_from_manifest, Component};
 use rim::toolset_manifest::{get_toolset_manifest, ToolsetManifest};
 use rim::{try_it, utils};
 
-static TOOLSET_MANIFEST: OnceLock<Arc<ToolsetManifest>> = OnceLock::new();
+static TOOLSET_MANIFEST: OnceLock<ToolsetManifest> = OnceLock::new();
 
 pub(super) fn main() -> Result<()> {
     tauri::Builder::default()
@@ -88,7 +88,7 @@ fn check_install_path(path: String) -> Option<String> {
 #[tauri::command]
 fn get_component_list() -> Result<Vec<Component>> {
     let manifest = cached_manifest();
-    Ok(get_component_list_from_manifest(&manifest, false)?)
+    Ok(get_component_list_from_manifest(manifest, false)?)
 }
 
 #[tauri::command]
@@ -104,7 +104,7 @@ fn load_manifest_and_ret_version() -> Result<String> {
     let mut manifest = get_toolset_manifest(None)?;
     manifest.adjust_paths()?;
 
-    let m = TOOLSET_MANIFEST.get_or_init(|| Arc::new(manifest));
+    let m = TOOLSET_MANIFEST.get_or_init(|| manifest);
     Ok(m.version.clone().unwrap_or_default())
 }
 
@@ -128,10 +128,9 @@ fn install_toolchain(
 ///
 /// # Panic
 /// Will panic if the manifest is not cached.
-fn cached_manifest() -> Arc<ToolsetManifest> {
+fn cached_manifest() -> &'static ToolsetManifest {
     TOOLSET_MANIFEST
         .get()
-        .cloned()
         .expect("toolset manifest should be loaded by now")
 }
 
