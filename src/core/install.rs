@@ -41,12 +41,14 @@ macro_rules! declare_unfallible_url {
 }
 
 declare_unfallible_url!(
-    default_rustup_dist_server(DEFAULT_RUSTUP_DIST_SERVER) -> "http://xuanwu.base.atomgit.com";
-    default_rustup_update_root(DEFAULT_RUSTUP_UPDATE_ROOT) -> "http://xuanwu.base.atomgit.com/rustup"
+    default_rustup_dist_server(DEFAULT_RUSTUP_DIST_SERVER) -> "https://xuanwu.base.atomgit.com";
+    default_rustup_update_root(DEFAULT_RUSTUP_UPDATE_ROOT) -> "https://xuanwu.base.atomgit.com/rustup"
 );
 
-pub(crate) const DEFAULT_CARGO_REGISTRY: (&str, &str) =
-    ("rsproxy", "sparse+https://rsproxy.cn/index/");
+pub(crate) const DEFAULT_CARGO_REGISTRY: (&str, &str) = (
+    "xuanwu-sparse",
+    "sparse+https://xuanwu.base.atomgit.com/index/",
+);
 
 /// Contains definition of installation steps, including pre-install configs.
 pub trait EnvConfig {
@@ -470,11 +472,11 @@ mod tests {
 
         assert_eq!(
             default_dist_server.as_str(),
-            "http://xuanwu.base.atomgit.com/"
+            "https://xuanwu.base.atomgit.com/"
         );
         assert_eq!(
             default_update_root.as_str(),
-            "http://xuanwu.base.atomgit.com/rustup"
+            "https://xuanwu.base.atomgit.com/rustup"
         );
     }
 
