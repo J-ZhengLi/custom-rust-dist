@@ -1,7 +1,6 @@
 use anyhow::{anyhow, Result};
-use indexmap::IndexMap;
 use log::info;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::path::Path;
 use url::Url;
 
@@ -12,10 +11,8 @@ use crate::toolkit::latest_installable_toolkit;
 use crate::toolset_manifest::get_toolset_manifest;
 use crate::InstallConfiguration;
 
+use super::common::{ComponentChoices, ComponentDecoration, ComponentListBuilder, VersionDiffMap};
 use super::{common, ManagerSubcommands};
-
-/// A map contains the selected components with their indexes in the full component list.
-type ComponentChoices<'c> = IndexMap<&'c Component, usize>;
 
 pub(super) fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
     let ManagerSubcommands::Update {
@@ -92,7 +89,7 @@ enum UpdateOption<'c> {
 
 struct ComponentsUpdater<'c> {
     target: &'c [Component],
-    version_diff: HashMap<&'c str, (Option<&'c str>, Option<&'c str>)>,
+    version_diff: VersionDiffMap<'c>,
 }
 
 impl<'c> ComponentsUpdater<'c> {
@@ -143,7 +140,10 @@ impl<'c> ComponentsUpdater<'c> {
     }
 
     fn custom_component_choices(&self, orig: ComponentChoices<'c>) -> Result<ComponentChoices<'c>> {
-        let choices = self.component_list_to_display(self.target, true, true);
+        let choices = ComponentListBuilder::new(self.target)
+            .decorate(ComponentDecoration::VersionDiff(&self.version_diff))
+            .show_desc(true)
+            .build();
         let defult_choices = orig
             .values()
             .map(|idx| (idx + 1).to_string())
@@ -171,8 +171,9 @@ impl<'c> ComponentsUpdater<'c> {
     // recursively ask for user input
     fn handle_update_interaction_(&self, list: ComponentChoices<'c>) -> Result<UpdateOption<'c>> {
         let choices = vec![t!("continue"), t!("customize"), t!("cancel")];
-        let comp_list = self
-            .component_list_to_display(list.keys().copied(), true, false)
+        let comp_list = ComponentListBuilder::new(list.keys().copied())
+            .decorate(ComponentDecoration::VersionDiff(&self.version_diff))
+            .build()
             .join("\n");
         let choice = common::question_single_choice(
             t!("pre_update_confirmation", list = comp_list),
@@ -190,34 +191,5 @@ impl<'c> ComponentsUpdater<'c> {
                 unreachable!("input function should already catches out of range input '{choice}'")
             }
         }
-    }
-
-    fn component_list_to_display<I: IntoIterator<Item = &'c Component>>(
-        &self,
-        list: I,
-        show_version_diff: bool,
-        show_desc: bool,
-    ) -> Vec<String> {
-        list.into_iter()
-            .map(|c| {
-                let ver_diff = if show_version_diff {
-                    let (from, to) = self.version_diff.get(c.name.as_str()).unwrap_or_else(|| {
-                        panic!(
-                            "internal error: unable to get version difference for component: {}",
-                            &c.name
-                        )
-                    });
-                    format!(" ({} -> {})", from.unwrap_or("N/A"), to.unwrap_or("N/A"))
-                } else {
-                    String::new()
-                };
-                let desc = if show_desc {
-                    format!("\n\t{}: {}", t!("description"), &c.desc)
-                } else {
-                    String::new()
-                };
-                format!("{}{ver_diff}{desc}", &c.name)
-            })
-            .collect()
     }
 }

@@ -1,16 +1,30 @@
 //! Common API for CLI interactions.
 //!
-//! You might think these look like they are from rustup.
+//! You might think some of these look like they are from rustup.
 //! You are god d*mn right!
 //!                         --- Walter White
 
 use std::{
+    collections::HashMap,
     fmt::Display,
     io::{self, BufRead, Write},
 };
 
 use anyhow::{Context, Result};
+use indexmap::IndexMap;
 use log::warn;
+
+use crate::components::Component;
+
+/// A map containing a component's version difference.
+///
+/// The keys of this map is the name of the component, the value is a pair of (maybe) strings
+/// with the first one being the current version, second one being the target version.
+pub(crate) type VersionDiffMap<'c> = HashMap<&'c str, (Option<&'c str>, Option<&'c str>)>;
+/// A map contains the selected components with their indexes in the full component list.
+///
+/// Notice that this is an [`IndexMap`], which means the order will be preserved.
+pub(crate) type ComponentChoices<'c> = IndexMap<&'c Component, usize>;
 
 pub(crate) fn question_str<Q: Display, A: Display>(
     question: Q,
@@ -53,7 +67,10 @@ where
 
     loop {
         if let Some(prmt) = prompt {
-            writeln!(&mut stdout, "{prmt} {default_badge}")?;
+            write!(&mut stdout, "{prmt} ")?;
+        }
+        if show_default_above_input {
+            writeln!(&mut stdout, "{default_badge}")?;
         }
         write!(&mut stdout, "> ")?;
         _ = stdout.flush();
@@ -253,4 +270,96 @@ fn readline() -> Result<String> {
         .read_line(&mut input_buf)
         .context("unable to read from standard input")?;
     Ok(input_buf.trim().to_string())
+}
+
+/// Specify the string after each component's name, which is usually wrapped in parenthese.
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) enum ComponentDecoration<'c> {
+    /// Version change info, i.e.:
+    /// `hello-world (0.1.0 -> 0.2.0)`
+    VersionDiff(&'c VersionDiffMap<'c>),
+    /// Pre-installation labels, including `installed|required` to indicate whether a tool
+    /// is installed or required but not installed, i.e.:
+    /// `hello-world (required)`
+    InstalledOrRequired,
+    /// A label to show during confirmation page, indicates whether a tool is installed but will be re-install,
+    /// i.e.: `hello-world (installed, reinstalling)`
+    Confirmation,
+    /// No decoration string, this is the default variant, i.e.:
+    /// `hello-world`
+    #[default]
+    None,
+}
+
+impl<'c> ComponentDecoration<'c> {
+    pub(crate) fn for_component(self, comp: &Component) -> String {
+        match self {
+            Self::None => String::new(),
+            Self::InstalledOrRequired => {
+                if comp.installed {
+                    format!(" ({})", t!("installed"))
+                } else if comp.required {
+                    format!(" ({})", t!("required"))
+                } else {
+                    String::new()
+                }
+            }
+            Self::Confirmation => {
+                if comp.installed {
+                    format!(" ({})", t!("reinstall"))
+                } else {
+                    String::new()
+                }
+            }
+            Self::VersionDiff(diff_map) => diff_map
+                .get(comp.name.as_str())
+                .map(|(from, to)| {
+                    format!(" ({} -> {})", from.unwrap_or("N/A"), to.unwrap_or("N/A"))
+                })
+                .unwrap_or_else(String::new),
+        }
+    }
+}
+
+/// A helper struct that takes a list of [`Component`], and convert it
+/// to a list of component strings.
+pub(crate) struct ComponentListBuilder<'c, I: IntoIterator<Item = &'c Component>> {
+    components: I,
+    show_desc: bool,
+    decoration: ComponentDecoration<'c>,
+}
+
+impl<'c, I: IntoIterator<Item = &'c Component>> ComponentListBuilder<'c, I> {
+    pub(crate) fn new(components: I) -> Self {
+        Self {
+            components,
+            show_desc: false,
+            decoration: ComponentDecoration::default(),
+        }
+    }
+
+    pub(crate) fn show_desc(mut self, yes: bool) -> Self {
+        self.show_desc = yes;
+        self
+    }
+
+    pub(crate) fn decorate(mut self, deco: ComponentDecoration<'c>) -> Self {
+        self.decoration = deco;
+        self
+    }
+
+    pub(crate) fn build(self) -> Vec<String> {
+        self.components
+            .into_iter()
+            .map(|c| {
+                let deco = self.decoration.for_component(c);
+                let desc = if self.show_desc {
+                    format!("\n\t{}: {}", t!("description"), &c.desc)
+                } else {
+                    String::new()
+                };
+                format!("{}{deco}{desc}", &c.name)
+            })
+            .collect()
+    }
 }
