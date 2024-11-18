@@ -1,5 +1,6 @@
 //! Separated module to handle installation related behaviors in command line.
 
+use std::collections::HashSet;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
@@ -13,10 +14,12 @@ use crate::core::try_it;
 use crate::toolset_manifest::get_toolset_manifest;
 use crate::{components, default_install_dir, utils};
 
+use super::common::{
+    question_single_choice, ComponentChoices, ComponentDecoration, ComponentListBuilder,
+};
 use super::{Installer, ManagerSubcommands};
 
 use anyhow::{bail, Result};
-use indexmap::IndexSet;
 use log::warn;
 
 /// Perform installer actions.
@@ -111,79 +114,17 @@ impl CustomInstallOpt {
         writeln!(&mut stdout, "\n\n{}", t!("what_this_is"))?;
         writeln!(&mut stdout, "{}\n", t!("custom_install_help"))?;
 
-        let default_install_dir = utils::path_to_str(prefix)?.to_string();
-        let component_list = displayed_component_list(components.iter(), false);
-        let mut default_choices = vec![];
-        let mut enforced_choices = vec![];
-        for (idx, c) in components.iter().enumerate() {
-            if !c.installed {
-                if c.required {
-                    enforced_choices.push(idx);
-                }
-                if !c.optional {
-                    default_choices.push(idx);
-                }
-            }
-        }
-        let default_choices_str = default_choices
-            .iter()
-            .map(ToString::to_string)
-            .collect::<Vec<_>>()
-            .join(" ");
-
-        let mut install_dir = String::new();
-        let mut raw_choices: Option<String> = None;
+        // initialize these with default value, but they could be altered by the user
+        let mut install_dir = utils::path_to_str(prefix)?.to_string();
 
         loop {
-            // NB: Do NOT change `Some(res?)` to `result.ok()` in this case here,
-            // we want to throw error if the input cannot be read.
-            install_dir = common::question_str(
-                t!("question_install_dir"),
-                None,
-                if install_dir.is_empty() {
-                    &default_install_dir
-                } else {
-                    &install_dir
-                },
-            )?;
-            // verify path input before proceeding
-            if utils::is_root_dir(&install_dir) {
-                warn!("{}", t!("notify_root_dir"));
+            if let Some(dir_input) = read_install_dir_input(&install_dir)? {
+                install_dir = dir_input;
+            } else {
                 continue;
             }
 
-            // TODO: Use common::question_multi_choices
-            raw_choices = Some(common::question_str_with_retry(
-                t!("select_components_to_install"),
-                Some(&component_list),
-                None,
-                raw_choices.as_deref().unwrap_or(&default_choices_str),
-                |input| -> bool {
-                    if input
-                        .split_whitespace()
-                        .all(|s| matches!(s.parse::<usize>(), Ok(idx) if idx < components.len()))
-                    {
-                        true
-                    } else {
-                        let expected = format!(
-                            "{}{}",
-                            t!("space_separated_and"),
-                            t!(
-                                "ranged_integer",
-                                lower_bound = 0,
-                                upper_bound = components.len() - 1
-                            )
-                        );
-                        warn!("{}", t!("invalid_input", actual = input, expect = expected));
-                        false
-                    }
-                },
-            )?);
-            let choices = choice_string_to_choices(
-                raw_choices.as_deref().unwrap(),
-                &components,
-                &enforced_choices,
-            );
+            let choices = read_component_selections(&components)?;
 
             show_confirmation(&install_dir, &choices)?;
 
@@ -191,7 +132,7 @@ impl CustomInstallOpt {
                 Confirm::Yes => {
                     return Ok(Self {
                         prefix: install_dir.into(),
-                        components: choices.into_iter().cloned().collect(),
+                        components: choices.keys().map(|c| (*c).to_owned()).collect(),
                     });
                 }
                 Confirm::No => (),
@@ -201,76 +142,107 @@ impl CustomInstallOpt {
     }
 }
 
-// Convert the choice input such as `1 2 3` to actual selected set of components
-fn choice_string_to_choices<'a>(
-    raw_choices: &str,
-    components: &'a [Component],
-    enforced: &[usize],
-) -> Vec<&'a Component> {
-    let user_seleted = raw_choices
-        .split_whitespace()
-        // The choices should already be valid at this point, but use filter_map just in case.
-        .filter_map(|s| s.parse::<usize>().ok());
-    // Use `IndexSet` for easy dedup.
-    let idx_set = enforced
-        .iter()
-        .copied()
-        .chain(user_seleted)
-        .collect::<IndexSet<_>>();
-    idx_set
-        .iter()
-        .filter_map(|idx| components.get(*idx))
-        .collect()
+fn read_install_dir_input(default: &str) -> Result<Option<String>> {
+    let dir_input = common::question_str(t!("question_install_dir"), None, default)?;
+    // verify path input before proceeding
+    if utils::is_root_dir(&dir_input) {
+        warn!("{}", t!("notify_root_dir"));
+        Ok(None)
+    } else {
+        Ok(Some(dir_input))
+    }
 }
 
-fn show_confirmation(install_dir: &str, choices: &[&Component]) -> Result<()> {
+/// Read user response of what set of components they want to install.
+///
+/// Currently, there's only three options:
+/// 1. default
+/// 2. everything
+/// 3. custom
+fn read_component_selections<'a>(components: &'a [Component]) -> Result<ComponentChoices<'a>> {
+    let profile_choices = &[
+        t!("install_default"),
+        t!("install_everything"),
+        t!("install_custom"),
+    ];
+    let default_set = || -> ComponentChoices<'a> {
+        components
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, c)| {
+                if !c.installed && !c.optional {
+                    Some((c, idx))
+                } else {
+                    None
+                }
+            })
+            .collect()
+    };
+    let choice = question_single_choice(t!("question_components_profile"), profile_choices, "1")?;
+    let selection = match choice {
+        // Default set
+        1 => default_set(),
+        // Full set, but exclude installed components
+        2 => components
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, c)| if !c.installed { Some((c, idx)) } else { None })
+            .collect(),
+        // Customized set
+        3 => {
+            let list_of_comps = ComponentListBuilder::new(components)
+                .show_desc(true)
+                .decorate(ComponentDecoration::InstalledOrRequired)
+                .build();
+            let default_ids = default_set()
+                .values()
+                .map(|idx| (idx + 1).to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
+            let choices = common::question_multi_choices(
+                t!("select_components_to_install"),
+                &list_of_comps,
+                &default_ids,
+            )?;
+            // convert input vec to set for faster lookup
+            // Note: user input index are started from 1.
+            let index_set: HashSet<usize> = choices.into_iter().collect();
+
+            // convert the input indexes to `ComponentChoices`,
+            // and we also need to add the `required` tools even if the user didn't choose it.
+            components
+                .iter()
+                .enumerate()
+                .filter_map(|(idx, c)| {
+                    if c.required || index_set.contains(&(idx + 1)) {
+                        Some((c, idx))
+                    } else {
+                        None
+                    }
+                })
+                .collect()
+        }
+        _ => unreachable!("out-of-range input should already be caught"),
+    };
+
+    Ok(selection)
+}
+
+fn show_confirmation(install_dir: &str, choices: &ComponentChoices<'_>) -> Result<()> {
     let mut stdout = std::io::stdout();
 
     writeln!(&mut stdout, "\n{}\n", t!("current_install_option"))?;
     writeln!(&mut stdout, "{}:\n\t{install_dir}", t!("install_dir"))?;
     writeln!(&mut stdout, "\n{}:", t!("selected_components"))?;
-    for line in displayed_component_list(choices.iter().copied(), true).lines() {
+    let list_of_comp = ComponentListBuilder::new(choices.keys().copied())
+        .decorate(ComponentDecoration::Confirmation)
+        .build()
+        .join("\n");
+    for line in list_of_comp.lines() {
         writeln!(&mut stdout, "\t{line}")?;
     }
 
     Ok(())
-}
-
-fn displayed_component_list<'a, I: Iterator<Item = &'a Component>>(
-    components: I,
-    is_confirm: bool,
-) -> String {
-    components
-        .enumerate()
-        .map(|(idx, c)| {
-            format!(
-                "{}{}{}{}",
-                if is_confirm {
-                    "".to_string()
-                } else {
-                    format!("{idx}) ")
-                },
-                &c.name,
-                if c.installed {
-                    if is_confirm {
-                        format!(" ({})", t!("reinstall"))
-                    } else {
-                        format!(" ({})", t!("installed"))
-                    }
-                } else if c.required {
-                    format!(" ({})", t!("required"))
-                } else {
-                    "".to_string()
-                },
-                if is_confirm || c.desc.is_empty() {
-                    "".to_string()
-                } else {
-                    format!("\n\t{}: {}", t!("description"), &c.desc)
-                }
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 pub(super) fn execute_manager(manager: &ManagerSubcommands) -> Result<bool> {
