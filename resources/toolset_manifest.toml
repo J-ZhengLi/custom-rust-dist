@@ -1,8 +1,8 @@
 name = "玄武 Rust 一站式开发套件"
-version = "stable v1.81.0"
+version = "stable v1.82.0"
 
 [rust]
-version = "stable"
+version = "1.82.0"
 group = "Rust"
 components = ["clippy", "rustfmt", "rust-src", "rust-docs"]
 optional-components = ["llvm-tools", "rustc-dev"]
@@ -26,14 +26,14 @@ cargo-nextest = "新一代 Rust 项目测试运行程序，相比传统 cargo te
 [tools.target.x86_64-pc-windows-gnu]
 mingw64 = { required = true, url = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/x86_64-14.2.0-release-posix-seh-ucrt-rt_v12-rev0.7z", version = "14.2.0-rt_v12-rev0" }
 # `-msvc` can also be used here as long as these are built.
-cargo-nextest = { optional = true, version = "0.9.81", url = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/cargo-nextest-0.9.81-x86_64-pc-windows-msvc.zip" }
-typos = { optional = true, version = "1.26.0", url = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/typos-v1.26.0-x86_64-pc-windows-msvc.zip" }
+cargo-nextest = { optional = true, version = "0.9.84", url = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/cargo-nextest/cargo-nextest-0.9.84-x86_64-pc-windows-msvc.zip" }
+typos = { optional = true, version = "1.27.3", url = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/typos/typos-v1.27.3-x86_64-pc-windows-msvc.zip" }
 
 [tools.target.x86_64-pc-windows-msvc]
-cargo-nextest = { optional = true, version = "0.9.81", url = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/cargo-nextest-0.9.81-x86_64-pc-windows-msvc.zip" }
-typos = { optional = true, version = "1.26.0", url = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/typos-v1.26.0-x86_64-pc-windows-msvc.zip" }
+cargo-nextest = { optional = true, version = "0.9.84", url = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/cargo-nextest/cargo-nextest-0.9.84-x86_64-pc-windows-msvc.zip" }
+typos = { optional = true, version = "1.27.3", url = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/typos/typos-v1.27.3-x86_64-pc-windows-msvc.zip" }
 
 [tools.target.x86_64-unknown-linux-gnu]
-cargo-nextest = { optional = true, version = "0.9.81", url = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/cargo-nextest-0.9.81-x86_64-unknown-linux-gnu.tar.gz" }
+cargo-nextest = { optional = true, version = "0.9.84", url = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/cargo-nextest/cargo-nextest-0.9.84-x86_64-unknown-linux-gnu.tar.gz" }
 # `-musl` target built binary still works here
-typos = { optional = true, version = "1.26.0", url = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/typos-v1.26.0-x86_64-unknown-linux-musl.tar.gz" }
+typos = { optional = true, version = "1.27.3", url = "https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/typos/typos-v1.27.3-x86_64-unknown-linux-musl.tar.gz" }

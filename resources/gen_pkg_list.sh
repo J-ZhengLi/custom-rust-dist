@@ -1,12 +1,15 @@
 set -x
 
-RUST_VERSION='1.81.0'
-DIST_DATE='2024-09-05'
-SERVER='http://static.rust-lang.org'
+RUST_VERSION='1.82.0'
+DIST_DATE='2024-10-17'
+SERVER='https://static.rust-lang.org'
 
 RUSTUP_VERSION='1.27.1'
+# third-party tools version
+TYPOS_VERSION='1.27.3'
+CARGO_NEXTEST_VERSION='0.9.84'
 
-manifest='channel-rust-stable.toml'
+manifest="channel-rust-$RUST_VERSION.toml"
 targets=(
     x86_64-pc-windows-gnu
     x86_64-pc-windows-msvc
@@ -29,11 +32,10 @@ other_components=(
 # Unless some package needs re-pack, we can just use original link here, since this basically only used for ci.
 other_tools=(
     x86_64-pc-windows-gnu/x86_64-14.2.0-release-posix-seh-ucrt-rt_v12-rev0.7z@https://github.com/niXman/mingw-builds-binaries/releases/download/14.2.0-rt_v12-rev0/x86_64-14.2.0-release-posix-seh-ucrt-rt_v12-rev0.7z
-    x86_64-pc-windows/cargo-nextest-0.9.81-x86_64-pc-windows-msvc.zip@https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.81/cargo-nextest-0.9.81-x86_64-pc-windows-msvc.zip
-    # Use re-packed `typos`, which contains only the binary
-    x86_64-pc-windows/typos-v1.26.0-x86_64-pc-windows-msvc.zip@https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/typos-v1.26.0-x86_64-pc-windows-msvc.zip
-    x86_64-unknown-linux/typos-v1.26.0-x86_64-unknown-linux-musl.tar.gz@https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/typos-v1.26.0-x86_64-unknown-linux-musl.tar.gz
-    x86_64-unknown-linux-gnu/cargo-nextest-0.9.81-x86_64-unknown-linux-gnu.tar.gz@https://github.com/nextest-rs/nextest/releases/download/cargo-nextest-0.9.81/cargo-nextest-0.9.81-x86_64-unknown-linux-gnu.tar.gz
+    x86_64-pc-windows/cargo-nextest-$CARGO_NEXTEST_VERSION-x86_64-pc-windows-msvc.zip@https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/cargo-nextest/cargo-nextest-$CARGO_NEXTEST_VERSION-x86_64-pc-windows-msvc.zip
+    x86_64-pc-windows/typos-v$TYPOS_VERSION-x86_64-pc-windows-msvc.zip@https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/typos/typos-v$TYPOS_VERSION-x86_64-pc-windows-msvc.zip
+    x86_64-unknown-linux/typos-v$TYPOS_VERSION-x86_64-unknown-linux-musl.tar.gz@https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/typos/typos-v$TYPOS_VERSION-x86_64-unknown-linux-musl.tar.gz
+    x86_64-unknown-linux-gnu/cargo-nextest-$CARGO_NEXTEST_VERSION-x86_64-unknown-linux-gnu.tar.gz@https://rust-mirror.obs.cn-north-4.myhuaweicloud.com/dist/toolset/cargo-nextest/cargo-nextest-$CARGO_NEXTEST_VERSION-x86_64-unknown-linux-gnu.tar.gz
 )
 
 write_dist() {
