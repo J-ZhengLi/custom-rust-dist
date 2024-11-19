@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::sync::OnceLock;
 
 use crate::core::parser::dist_manifest::DistManifest;
@@ -35,9 +34,7 @@ pub struct Toolkit {
 
 impl PartialEq for Toolkit {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.version == other.version
-            && self.manifest_url == other.manifest_url
+        self.name == other.name && self.version == other.version
     }
 }
 
@@ -78,28 +75,8 @@ impl Toolkit {
             ver.clone_into(&mut tk.version);
         }
 
-        let installed_comps = fp.installed_components();
-        let installed_tools = fp.installed_tools();
-        let installed_set: HashSet<&&str> =
-            HashSet::from_iter(installed_comps.iter().chain(installed_tools.iter()));
-        debug!("all installed tools: {:?}", &installed_set);
-        let components = components::get_component_list_from_manifest(&manifest, true)?;
+        let components = components::get_component_list_from_manifest(&manifest, Some(&fp))?;
         tk.components = components;
-
-        // get installed toolchain version, to adjust components version later.
-        // FIXME: this should be returned from `installed_components`
-        let channel = fp.installed_toolchain_channel();
-
-        for c in &mut tk.components {
-            if installed_set.contains(&c.name.as_str()) {
-                c.installed = true;
-            }
-            // FIXME: the components are from manifest,
-            // so there's this hack to make sure they reflect the actual installed version.
-            if c.is_toolchain_component {
-                c.version = channel.map(ToOwned::to_owned);
-            }
-        }
 
         // Make a clone and cache the final result
         let cached = INSTALLED_KIT.get_or_init(|| tk);

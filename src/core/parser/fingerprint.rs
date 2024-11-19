@@ -142,22 +142,17 @@ impl InstallationRecord {
         self.tools.shift_remove(tool_name);
     }
 
-    /// Return a list of installed tools' names.
-    pub fn installed_tools(&self) -> Vec<&str> {
-        self.tools.keys().map(|k| k.as_str()).collect()
+    /// Return an iterator of installed tools' names.
+    pub fn installed_tools(&self) -> impl Iterator<Item = &String> {
+        self.tools.keys()
     }
 
-    /// Return a list of installed toolchain components's names.
-    pub fn installed_components(&self) -> Vec<&str> {
+    /// Returns the rust toolchain channel name (such as `stable`, `nightly`, `1.80.1`, etc.),
+    /// and an iterator of installed components.
+    pub fn installed_toolchain(&self) -> Option<(&str, impl Iterator<Item = &String>)> {
         self.rust
             .as_ref()
-            .map(|r| r.components.iter().map(|c| c.as_str()).collect::<Vec<_>>())
-            .unwrap_or_default()
-    }
-
-    /// Returns the rust toolchain channel installed, such as `stable`, `nightly`, `1.80.1`, etc.
-    pub fn installed_toolchain_channel(&self) -> Option<&str> {
-        self.rust.as_ref().map(|rr| rr.version.as_str())
+            .map(|rr| (rr.version.as_str(), rr.components.iter()))
     }
 
     pub(crate) fn print_installation(&self) -> String {

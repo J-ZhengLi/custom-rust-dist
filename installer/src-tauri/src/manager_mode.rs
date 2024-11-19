@@ -169,7 +169,7 @@ fn handle_toolkit_install_click(url: String) -> Result<Vec<Component>> {
 
     // load the manifest for components information
     let manifest = get_toolset_manifest(Some(&url_))?;
-    let components = components::get_component_list_from_manifest(&manifest, true)?;
+    let components = components::get_component_list_from_manifest(&manifest, None)?;
 
     // cache the selected toolset manifest
     let mut guard = selected_toolset();

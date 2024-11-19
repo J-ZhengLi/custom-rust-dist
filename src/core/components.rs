@@ -1,8 +1,14 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::{
+    collections::HashSet,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
-use crate::toolset_manifest::{ToolInfo, ToolMap, ToolsetManifest};
+use crate::{
+    fingerprint::InstallationRecord,
+    toolset_manifest::{ToolInfo, ToolMap, ToolsetManifest},
+};
 
 static COMPONENTS_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -67,10 +73,48 @@ impl Component {
     setter!(version(self, version: Option<&str>) { version.map(ToOwned::to_owned) });
 }
 
+struct InstalledComponents<'a> {
+    toolchain_channel: Option<&'a str>,
+    all: HashSet<&'a String>,
+}
+
+impl<'a> InstalledComponents<'a> {
+    fn from_record(record: Option<&'a InstallationRecord>) -> Self {
+        let mut all = HashSet::new();
+        let mut toolchain_channel = None;
+
+        if let Some(installed_tools) = record.map(|r| r.installed_tools()) {
+            all.extend(installed_tools);
+        }
+        if let Some((tc_channel, installed_comps)) = record.and_then(|r| r.installed_toolchain()) {
+            toolchain_channel = Some(tc_channel);
+            all.extend(installed_comps);
+        }
+
+        Self {
+            all,
+            toolchain_channel,
+        }
+    }
+    fn toolchain_installed(&self) -> bool {
+        self.toolchain_channel.is_some()
+    }
+}
+
+/// Get a components from manifest that are available in the current target.
+///
+/// If the `record` is present, this will read the installation record and the
+/// returned components will also contain [`installed`](Component::installed) info as well.
 pub fn get_component_list_from_manifest(
     manifest: &ToolsetManifest,
-    ignore_installed: bool,
+    record: Option<&InstallationRecord>,
 ) -> Result<Vec<Component>> {
+    // Try getting these record first in order to determine `is_installed` status
+    let installed = InstalledComponents::from_record(record);
+    let tc_channel = installed
+        .toolchain_channel
+        .unwrap_or(manifest.rust_version());
+
     let profile = manifest.toolchain_profile().cloned().unwrap_or_default();
     let profile_name = profile.verbose_name.as_deref().unwrap_or(&profile.name);
     // Add a component that represents rust toolchain
@@ -81,7 +125,8 @@ pub fn get_component_list_from_manifest(
     .group_name(Some(manifest.toolchain_group_name()))
     .is_toolchain_component(true)
     .required(true)
-    .version(Some(manifest.rust_version()))];
+    .installed(installed.toolchain_installed())
+    .version(Some(tc_channel))];
 
     for component in manifest.optional_toolchain_components() {
         components.push(
@@ -92,15 +137,11 @@ pub fn get_component_list_from_manifest(
             .group_name(Some(manifest.toolchain_group_name()))
             .optional(true)
             .is_toolchain_component(true)
-            .version(Some(manifest.rust_version())),
+            .installed(installed.all.contains(component))
+            .version(Some(tc_channel)),
         );
     }
 
-    let already_installed_tools = if !ignore_installed {
-        manifest.already_installed_tools()
-    } else {
-        vec![]
-    };
     if let Some(tools) = manifest.current_target_tools() {
         for (tool_name, tool_info) in tools {
             components.push(
@@ -112,7 +153,7 @@ pub fn get_component_list_from_manifest(
                 .tool_installer(tool_info)
                 .required(tool_info.is_required())
                 .optional(tool_info.is_optional())
-                .installed(already_installed_tools.contains(&tool_name))
+                .installed(installed.all.contains(tool_name))
                 .version(tool_info.version()),
             );
         }
