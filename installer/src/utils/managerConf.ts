@@ -34,13 +34,12 @@ class ManagerConf {
   }
 
   public getGroups(): CheckGroup<Component>[] {
-    const installedToolchain = this._installedKit.value;
     const checkItems: CheckGroupItem<Component>[] =
       this._current.value?.components.map((item) => {
         const installedItem = this._installedKit.value?.components.find(
           (c) => c.name === item.name
         );
-        let installedVersion = item.isToolchainComponent ? installedToolchain?.version : installedItem?.version;
+        let installedVersion = installedItem?.version;
         let isVerDifferent = installedVersion && installedVersion !== item.version ? true : false;
 
         let versionStr = isVerDifferent ? `(${installedVersion} -> ${item.version})` : ` (${item.version})`;

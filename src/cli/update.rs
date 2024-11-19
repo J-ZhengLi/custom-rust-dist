@@ -59,7 +59,7 @@ fn update_toolkit_(install_dir: &Path) -> Result<()> {
             )
         })?;
     let manifest = get_toolset_manifest(Some(&manifest_url))?;
-    let new_components = get_component_list_from_manifest(&manifest, false)?;
+    let new_components = get_component_list_from_manifest(&manifest, None)?;
 
     // notify user that we will install the latest update to replace their current installation
     info!(

@@ -88,7 +88,7 @@ fn check_install_path(path: String) -> Option<String> {
 #[tauri::command]
 fn get_component_list() -> Result<Vec<Component>> {
     let manifest = cached_manifest();
-    Ok(get_component_list_from_manifest(manifest, false)?)
+    Ok(get_component_list_from_manifest(manifest, None)?)
 }
 
 #[tauri::command]
