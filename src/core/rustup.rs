@@ -52,13 +52,9 @@ impl ToolchainInstaller {
             utils::Command::new(rustup)
                 .args(&args)
                 .env(RUSTUP_DIST_SERVER, local_server.as_str())
-                .output_to_file()
                 .run()
         } else {
-            utils::Command::new(rustup)
-                .args(&args)
-                .output_to_file()
-                .run()
+            utils::Command::new(rustup).args(&args).run()
         }
     }
 
@@ -101,11 +97,9 @@ impl ToolchainInstaller {
         let tc_ver = manifest.rust_version();
         utils::Command::new(&rustup)
             .args(&["toolchain", "add", tc_ver])
-            .output_to_file()
             .run()?;
         utils::Command::new(&rustup)
             .args(&["default", tc_ver])
-            .output_to_file()
             .run()?;
         Ok(())
     }
@@ -117,7 +111,6 @@ impl ToolchainInstaller {
             .args(&["self", "uninstall", "-y"])
             .env(CARGO_HOME, config.cargo_home())
             .env(RUSTUP_HOME, config.rustup_home())
-            .output_to_file()
             .run()
     }
 }
@@ -176,8 +169,5 @@ fn install_rustup(rustup_init: &PathBuf) -> Result<()> {
         env!("TARGET"),
         "-vy",
     ];
-    utils::Command::new(rustup_init)
-        .args(&args)
-        .output_to_file()
-        .run()
+    utils::Command::new(rustup_init).args(&args).run()
 }
