@@ -65,11 +65,11 @@ pub fn force_parse_url(url: &str) -> Url {
     Url::parse(url).unwrap_or_else(|e| panic!("failed to parse url '{url}': {e}"))
 }
 
-/// Basically [`Url::join`], but will insert a forward slash (`/`) to the root if necessary.
+/// Basically [`Url::join`], but will push a forward slash (`/`) to the root if necessary.
 ///
 /// [`Url::join`] will replace the last part of a root if the root does not have trailing slash,
 /// and this function is to make sure of that, so the `root` will always join with `s`.
-pub fn force_url_join(root: &Url, s: &str) -> Result<Url> {
+pub fn url_join(root: &Url, s: &str) -> Result<Url> {
     let result = if root.as_str().ends_with('/') {
         root.join(s)?
     } else {

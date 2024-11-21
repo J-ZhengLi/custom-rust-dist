@@ -5,7 +5,7 @@ use crate::core::parser::TomlParser;
 use crate::{components, utils};
 use crate::{fingerprint::InstallationRecord, toolset_manifest::ToolsetManifest};
 use anyhow::Result;
-use log::{debug, info};
+use log::info;
 use semver::Version;
 use serde::Serialize;
 use url::Url;
@@ -45,7 +45,6 @@ impl Toolkit {
     /// what components it has.
     pub fn installed() -> Result<Option<&'static Self>> {
         if let Some(cached) = INSTALLED_KIT.get() {
-            debug!("using cached INSTALLED_KIT: {:#?}", cached);
             return Ok(Some(cached));
         }
 
@@ -150,6 +149,8 @@ pub fn installable_toolkits() -> Result<Vec<&'static Toolkit>> {
 
 /// Return the latest available toolkit if it's not already installed.
 pub fn latest_installable_toolkit() -> Result<Option<&'static Toolkit>> {
+    info!("{}", t!("checking_toolkit_updates"));
+
     let all_toolkits = toolkits_from_server()?;
     if let Some(installed) = Toolkit::installed()? {
         let Some(maybe_latest) = all_toolkits
@@ -157,6 +158,7 @@ pub fn latest_installable_toolkit() -> Result<Option<&'static Toolkit>> {
             // make sure they are the same **product**
             .find(|tk| tk.name == installed.name)
         else {
+            info!("{}", t!("no_available_updates"));
             return Ok(None);
         };
         // For some reason, the version might contains prefixes such as "stable 1.80.1",
@@ -176,6 +178,14 @@ pub fn latest_installable_toolkit() -> Result<Option<&'static Toolkit>> {
         if target_version > cur_version {
             Ok(Some(maybe_latest))
         } else {
+            info!(
+                "{}",
+                t!(
+                    "latest_toolkit_installed",
+                    name = installed.name,
+                    version = cur_version
+                )
+            );
             Ok(None)
         }
     } else {
