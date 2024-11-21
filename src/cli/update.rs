@@ -40,10 +40,8 @@ fn update_toolkit_(install_dir: &Path) -> Result<()> {
         return Ok(());
     };
 
-    info!("{}", t!("checking_toolkit_updates"));
     // get possible update
     let Some(latest_toolkit) = latest_installable_toolkit()? else {
-        info!("{}", t!("no_available_updates"));
         return Ok(());
     };
 

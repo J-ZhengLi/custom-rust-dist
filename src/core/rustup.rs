@@ -12,7 +12,7 @@ use super::uninstall::UninstallConfiguration;
 use super::CARGO_HOME;
 use super::RUSTUP_DIST_SERVER;
 use super::RUSTUP_HOME;
-use crate::utils::{self, download, force_url_join, set_exec_permission, Proxy};
+use crate::utils::{self, download, set_exec_permission, url_join, Proxy};
 
 #[cfg(windows)]
 pub(crate) const RUSTUP_INIT: &str = "rustup-init.exe";
@@ -151,7 +151,7 @@ fn ensure_rustup(config: &InstallConfiguration, manifest: &ToolsetManifest) -> R
 fn download_rustup_init(dest: &Path, server: &Url, proxy: Option<&Proxy>) -> Result<()> {
     info!("{}", t!("downloading_rustup_init"));
 
-    let download_url = force_url_join(server, &format!("dist/{}/{RUSTUP_INIT}", env!("TARGET")))
+    let download_url = url_join(server, &format!("dist/{}/{RUSTUP_INIT}", env!("TARGET")))
         .context("Failed to init rustup download url.")?;
     download(RUSTUP_INIT, &download_url, dest, proxy).context("Failed to download rustup.")
 }

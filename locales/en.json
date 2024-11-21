@@ -102,6 +102,7 @@
     "update_available": "new update available",
     "ask_self_update": "detected new release version: %{latest}\ncurrently running: %{current}\nupdate now?",
     "self_update_complete": "update completed! If you are using the graphical interface, please close then re-open this program to avoid possible issues.",
+    "latest_toolkit_installed": "already installed the latest toolkit (%{name}-%{version}), no need to update",
     "latest_manager_installed": "already running on the latest release version (%{version}), no need to update",
     "downloading_latest_manager": "downloading the latest manager release (version '%{version}')...",
     "question_components_profile": "Choose a component profile",

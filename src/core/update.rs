@@ -156,16 +156,13 @@ pub fn check_self_update() -> SelfUpdateKind<'static> {
 }
 
 fn parse_download_url(source_path: &str) -> Result<Url> {
-    let mut base_obs_server =
-        env::var("RIM_DIST_SERVER").unwrap_or_else(|_| super::RIM_DIST_SERVER.to_string());
+    let base_obs_server: Url = env::var("RIM_DIST_SERVER")
+        .as_deref()
+        .unwrap_or(super::RIM_DIST_SERVER)
+        .parse()?;
 
-    // without the trailing slash, `.join` will replace the last component instead of append it.
-    if !base_obs_server.ends_with('/') {
-        base_obs_server.push('/');
-    }
     debug!("parsing download url for '{source_path}' from server '{base_obs_server}'");
-
-    Ok(Url::parse(&base_obs_server)?.join(source_path)?)
+    utils::url_join(&base_obs_server, source_path)
 }
 
 #[cfg(test)]
