@@ -201,7 +201,6 @@ fn cargo_install_or_uninstall(op: &str, args: &[&str], cargo_home: &Path) -> Res
         .arg(op)
         .args(args)
         .env(CARGO_HOME, cargo_home)
-        .output_to_file()
         .run()
 }
 

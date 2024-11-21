@@ -1,7 +1,9 @@
+use log::{error, info, warn};
 use std::ffi::OsStr;
-use std::process::Command as StdCommand;
+use std::io::{BufRead, BufReader};
+use std::process::{Command as StdCommand, ExitStatus, Stdio};
 use std::sync::Mutex;
-use std::{env, fs, io};
+use std::{env, io};
 
 use anyhow::Result;
 
@@ -23,7 +25,6 @@ cfg_if::cfg_if! {
 /// A [`std::process::Command`] wrapper type that supports better error reporting.
 pub struct Command {
     cmd_: StdCommand,
-    log_output: bool,
 }
 
 impl Command {
@@ -33,7 +34,6 @@ impl Command {
 
         Self {
             cmd_: StdCommand::new(program),
-            log_output: false,
         }
     }
     /// Create a command that will be execute using a separated shell.
@@ -46,10 +46,7 @@ impl Command {
         let mut inner = StdCommand::new(SHELL);
         inner.arg(START_ARG).arg(program);
 
-        Self {
-            cmd_: inner,
-            log_output: false,
-        }
+        Self { cmd_: inner }
     }
     pub fn arg<A: AsRef<OsStr>>(&mut self, arg: A) -> &mut Self {
         let mut guard = COMMAND_STRING.lock().unwrap();
@@ -81,13 +78,6 @@ impl Command {
         self.cmd_.env(key, val);
         self
     }
-    /// Set a flag to write command output (including `stdout` and `stderr`)
-    /// to a [log file](super::log_file_path).
-    pub fn output_to_file(&mut self) -> &mut Command {
-        self.log_output = true;
-        self
-    }
-
     pub fn run(&mut self) -> Result<()> {
         self.execute_command(true)?;
         Ok(())
@@ -101,47 +91,65 @@ impl Command {
         cfg_if::cfg_if! {
             if #[cfg(windows)] {
                 use std::os::windows::process::CommandExt;
-                use winapi::um::winbase::CREATE_NO_WINDOW;
                 // Prevent CMD window popup
-                let output = self.cmd_.creation_flags(CREATE_NO_WINDOW).output()?;
-                let ret_code = output.status.code().unwrap();
+                use winapi::um::winbase::CREATE_NO_WINDOW;
+                let mut child = self.cmd_
+                    .creation_flags(CREATE_NO_WINDOW)
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .spawn()?;
             } else {
-                use std::os::unix::process::ExitStatusExt;
-                let output = self.cmd_.output()?;
-                let ret_code = output.status.into_raw();
+                let mut child = self.cmd_
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::piped())
+                    .spawn()?;
             }
         }
 
-        // manually copy output to standard pipeline.
-        io::copy(&mut output.stderr.as_slice(), &mut io::stderr())?;
-        io::copy(&mut output.stdout.as_slice(), &mut io::stdout())?;
+        output_to_log(child.stdout.as_mut());
+        output_to_log(child.stderr.as_mut());
 
-        if self.log_output {
-            let mut log_file = fs::OpenOptions::new()
-                .append(true)
-                .create(true)
-                .open(super::log_file_path()?)?;
-            io::copy(&mut output.stderr.as_slice(), &mut log_file)?;
-            io::copy(&mut output.stdout.as_slice(), &mut log_file)?;
-        }
-
-        if expect_success && !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            // stderr might be empty if using `Stdio::inherit()`
-            let err = if stderr.is_empty() {
-                "Undocumented error, check log for more details"
-            } else {
-                &*stderr
-            };
+        let status = child.wait()?;
+        let ret_code = get_ret_code(&status);
+        if expect_success && !status.success() {
             let command = COMMAND_STRING.lock().unwrap();
             anyhow::bail!(
                 "programm exited with code {ret_code}. \n\
-                Command: {}
-                Error output: {err}",
+                Command: {}",
                 (*command).join(" "),
             );
         } else {
             Ok(ret_code)
+        }
+    }
+}
+
+fn get_ret_code(status: &ExitStatus) -> i32 {
+    cfg_if::cfg_if! {
+        if #[cfg(windows)] {
+            // status code can only be `None` on Unix
+            status.code().unwrap()
+        } else {
+            use std::os::unix::process::ExitStatusExt;
+            status.into_raw()
+        }
+    }
+}
+
+/// Log the command output
+fn output_to_log<R: io::Read>(from: Option<&mut R>) {
+    let Some(out) = from else { return };
+    let reader = BufReader::new(out);
+    for line in reader.lines().map_while(Result::ok) {
+        // prevent double 'info|warn|error:' labels, although this might be a dumb way to do it
+        if let Some(info) = line.strip_prefix("info: ") {
+            info!("{info}");
+        } else if let Some(warn) = line.strip_prefix("warn: ") {
+            warn!("{warn}");
+        } else if let Some(error) = line.strip_prefix("error: ") {
+            error!("{error}");
+        } else if !line.is_empty() {
+            info!("{line}");
         }
     }
 }
