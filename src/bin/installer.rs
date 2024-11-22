@@ -33,6 +33,5 @@ impl Mode {
 }
 
 fn main() -> Result<()> {
-    utils::use_current_locale();
     Mode::detect().run()
 }
