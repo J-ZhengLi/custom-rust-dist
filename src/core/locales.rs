@@ -2,6 +2,7 @@ use std::str::FromStr;
 
 use clap::builder::PossibleValue;
 
+#[non_exhaustive]
 pub enum Language {
     CN,
     EN,

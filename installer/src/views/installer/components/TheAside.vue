@@ -48,7 +48,7 @@ function menuItemActive(order: number) {
 
 <template>
   <div flex="~ col items-center" h="full">
-    <h4 w="full" text="center" m="0" py="12px">安装步骤</h4>
+    <h4 w="full" text="center">安装步骤</h4>
     <div flex="1" text="end secondary" w="full">
       <div
         :style="beforeTop"
