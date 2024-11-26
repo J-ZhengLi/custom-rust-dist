@@ -104,3 +104,40 @@ pub(crate) fn spawn_gui_update_thread(
         }
     })
 }
+
+#[derive(serde::Serialize)]
+pub struct Language {
+    pub id: String,
+    pub name: String,
+}
+
+#[tauri::command]
+pub(crate) fn supported_languages() -> Vec<Language> {
+    rim::Language::possible_values()
+        .iter()
+        .map(|lang| {
+            let id = lang.as_str();
+            match lang {
+                rim::Language::EN => Language {
+                    id: id.to_string(),
+                    name: "English".to_string(),
+                },
+                rim::Language::CN => Language {
+                    id: id.to_string(),
+                    name: "简体中文".to_string(),
+                },
+                _ => Language {
+                    id: id.to_string(),
+                    name: id.to_string(),
+                },
+            }
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub(crate) fn set_locale(language: String) -> Result<()> {
+    let lang: rim::Language = language.parse()?;
+    utils::set_locale(lang.locale_str());
+    Ok(())
+}

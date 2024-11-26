@@ -16,7 +16,7 @@ use std::{
 };
 use url::Url;
 
-use crate::utils;
+use crate::{core::Language, utils};
 
 /// Install rustup, rust toolchain, and various tools.
 // NOTE: If you changed anything in this struct, or any other child types that related to
@@ -38,6 +38,9 @@ pub struct Installer {
     #[arg(hide = true, long)]
     pub no_gui: bool,
 
+    /// Specify another language to display
+    #[arg(short, long, value_name = "LANG", value_parser = Language::possible_values())]
+    pub lang: Option<String>,
     /// Set another path to install Rust.
     #[arg(long, value_name = "PATH", value_hint = ValueHint::DirPath)]
     prefix: Option<PathBuf>,
@@ -113,6 +116,10 @@ pub struct Manager {
     /// Don't show GUI when running the program.
     #[arg(hide = true, long)]
     pub no_gui: bool,
+
+    /// Specify another language to display
+    #[arg(short, long, value_name = "LANG", value_parser = Language::possible_values())]
+    pub lang: Option<String>,
     #[command(subcommand)]
     command: Option<ManagerSubcommands>,
 }
@@ -127,11 +134,7 @@ impl Installer {
     }
 
     pub fn execute(&self) -> Result<()> {
-        // Setup logger
-        utils::Logger::new()
-            .verbose(self.verbose)
-            .quiet(self.quiet)
-            .setup()?;
+        setup(self.verbose, self.quiet, self.lang.as_deref())?;
 
         install::execute_installer(self)
     }
@@ -139,11 +142,7 @@ impl Installer {
 
 impl Manager {
     pub fn execute(&self) -> Result<()> {
-        // Setup logger
-        utils::Logger::new()
-            .verbose(self.verbose)
-            .quiet(self.quiet)
-            .setup()?;
+        setup(self.verbose, self.quiet, self.lang.as_deref())?;
 
         let Some(subcmd) = &self.command else {
             return Ok(());
@@ -232,4 +231,18 @@ pub fn parse_installer_cli() -> Installer {
 
 pub fn parse_manager_cli() -> Manager {
     Manager::parse()
+}
+
+fn setup(verbose: bool, quiet: bool, lang: Option<&str>) -> Result<()> {
+    // Setup locale
+    if let Some(lang_str) = lang {
+        let parsed: Language = lang_str.parse()?;
+        utils::set_locale(parsed.locale_str());
+    } else {
+        utils::use_current_locale();
+    }
+    // Setup logger
+    utils::Logger::new().verbose(verbose).quiet(quiet).setup()?;
+
+    Ok(())
 }

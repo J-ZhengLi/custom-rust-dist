@@ -131,7 +131,11 @@ pub fn to_string_lossy<S: AsRef<OsStr>>(s: S) -> String {
 /// Allowing the i18n framework to use the current system locale.
 pub fn use_current_locale() {
     let locale = sys_locale::get_locale().unwrap_or_else(|| "en".to_string());
-    rust_i18n::set_locale(&locale);
+    set_locale(&locale);
+}
+
+pub fn set_locale(loc: &str) {
+    rust_i18n::set_locale(loc);
 }
 
 #[cfg(test)]

@@ -24,9 +24,11 @@ pub(super) fn main() -> Result<()> {
             run_app,
             welcome_label,
             load_manifest_and_ret_version,
+            window_title,
+            crate::common::supported_languages,
+            crate::common::set_locale,
         ])
         .setup(|app| {
-            let version = env!("CARGO_PKG_VERSION");
             tauri::WindowBuilder::new(
                 app,
                 "installer_window",
@@ -34,10 +36,8 @@ pub(super) fn main() -> Result<()> {
             )
             .inner_size(800.0, 600.0)
             .min_inner_size(640.0, 480.0)
-            .title(format!(
-                "{} v{version}",
-                t!("installer_title", product = t!("product"))
-            ))
+            .decorations(false)
+            .transparent(true)
             .build()?;
 
             Ok(())
@@ -45,6 +45,15 @@ pub(super) fn main() -> Result<()> {
         .run(tauri::generate_context!())
         .context("unknown error occurs while running tauri application")?;
     Ok(())
+}
+
+#[tauri::command]
+fn window_title() -> String {
+    format!(
+        "{} v{}",
+        t!("installer_title", product = t!("product")),
+        env!("CARGO_PKG_VERSION")
+    )
 }
 
 #[tauri::command]

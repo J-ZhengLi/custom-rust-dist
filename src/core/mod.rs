@@ -6,6 +6,7 @@ pub mod components;
 mod custom_instructions;
 pub(crate) mod directories;
 pub mod install;
+mod locales;
 pub(crate) mod os;
 pub(crate) mod parser;
 pub(crate) mod rustup;
@@ -14,6 +15,8 @@ pub(crate) mod tools;
 pub mod try_it;
 pub(crate) mod uninstall;
 pub mod update;
+
+pub use locales::Language;
 
 macro_rules! declare_env_vars {
     ($($key:ident),+) => {
