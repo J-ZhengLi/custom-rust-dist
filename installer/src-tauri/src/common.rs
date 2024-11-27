@@ -141,3 +141,15 @@ pub(crate) fn set_locale(language: String) -> Result<()> {
     utils::set_locale(lang.locale_str());
     Ok(())
 }
+
+/// Add back rounded corners (on Windows) and shadow effects.
+///
+// TODO: This is not needed if we migrate to tauri@2, also make sure to get rid
+// of the `window_shadows` dependency at the time since it adds 6 dependencies in total.
+#[allow(unused_variables)]
+pub(crate) fn set_window_shadow(window: &tauri::Window) {
+    #[cfg(any(windows, target_os = "macos"))]
+    if let Err(e) = window_shadows::set_shadow(window, true) {
+        log::error!("unable to apply window effects: {e}");
+    }
+}

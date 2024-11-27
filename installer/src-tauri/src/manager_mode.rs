@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    common::{spawn_gui_update_thread, ON_COMPLETE_EVENT, PROGRESS_UPDATE_EVENT},
+    common::{self, spawn_gui_update_thread, ON_COMPLETE_EVENT, PROGRESS_UPDATE_EVENT},
     error::Result,
 };
 use anyhow::Context;
@@ -40,11 +40,11 @@ pub(super) fn main() -> Result<()> {
             maybe_self_update,
             handle_toolkit_install_click,
             window_title,
-            crate::common::supported_languages,
-            crate::common::set_locale,
+            common::supported_languages,
+            common::set_locale,
         ])
         .setup(|app| {
-            tauri::WindowBuilder::new(
+            let window = tauri::WindowBuilder::new(
                 app,
                 "manager_window",
                 tauri::WindowUrl::App("index.html/#/manager".into()),
@@ -55,6 +55,7 @@ pub(super) fn main() -> Result<()> {
             .transparent(true)
             .build()?;
 
+            common::set_window_shadow(&window);
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -130,13 +131,7 @@ fn install_toolkit(window: tauri::Window, components_list: Vec<Component>) -> Re
         let manifest = guard
             .as_ref()
             .expect("internal error: a toolkit must be selected to install");
-        super::common::install_components(
-            window,
-            components_list,
-            p.to_path_buf(),
-            manifest,
-            true,
-        )?;
+        common::install_components(window, components_list, p.to_path_buf(), manifest, true)?;
         Ok(())
     })?;
     Ok(())
