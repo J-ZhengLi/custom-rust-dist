@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 use anyhow::Context;
 use tauri::api::dialog::FileDialogBuilder;
 
-use super::INSTALL_DIR;
+use super::{common, INSTALL_DIR};
 use crate::error::Result;
 use rim::components::{get_component_list_from_manifest, Component};
 use rim::toolset_manifest::{get_toolset_manifest, ToolsetManifest};
@@ -25,11 +25,11 @@ pub(super) fn main() -> Result<()> {
             welcome_label,
             load_manifest_and_ret_version,
             window_title,
-            crate::common::supported_languages,
-            crate::common::set_locale,
+            common::supported_languages,
+            common::set_locale,
         ])
         .setup(|app| {
-            tauri::WindowBuilder::new(
+            let window = tauri::WindowBuilder::new(
                 app,
                 "installer_window",
                 tauri::WindowUrl::App("index.html/#/installer".into()),
@@ -40,6 +40,7 @@ pub(super) fn main() -> Result<()> {
             .transparent(true)
             .build()?;
 
+            common::set_window_shadow(&window);
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -124,7 +125,7 @@ fn install_toolchain(
     install_dir: String,
 ) -> Result<()> {
     let install_dir = PathBuf::from(install_dir);
-    super::common::install_components(
+    common::install_components(
         window,
         components_list,
         install_dir,

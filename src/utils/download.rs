@@ -6,47 +6,20 @@ use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context, Result};
 use reqwest::blocking::{Client, ClientBuilder};
-use serde::{Deserialize, Serialize};
 use url::Url;
 
 use super::progress_bar::{CliProgress, Style};
+use crate::toolset_manifest::Proxy as CrateProxy;
 
 fn client_builder() -> ClientBuilder {
     let user_agent = format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
+    let default_proxy = reqwest::Proxy::custom(|url| env_proxy::for_url(url).to_url())
+        .no_proxy(reqwest::NoProxy::from_env());
     Client::builder()
         .user_agent(user_agent)
         .timeout(Duration::from_secs(30))
         .connection_verbose(false)
-}
-
-/// The proxy for download
-#[derive(Debug, Deserialize, Default, Serialize, PartialEq, Eq, Clone)]
-pub struct Proxy {
-    pub http: Option<Url>,
-    pub https: Option<Url>,
-    #[serde(alias = "no-proxy")]
-    pub no_proxy: Option<String>,
-}
-
-impl TryFrom<Proxy> for reqwest::Proxy {
-    type Error = anyhow::Error;
-    fn try_from(value: Proxy) -> std::result::Result<Self, Self::Error> {
-        let base = match (value.http, value.https) {
-            // When nothing provided, use env proxy if there is.
-            (None, None) => reqwest::Proxy::custom(|url| env_proxy::for_url(url).to_url()),
-            // When both are provided, use the provided https proxy.
-            (Some(_), Some(https)) => reqwest::Proxy::all(https)?,
-            (Some(http), None) => reqwest::Proxy::http(http)?,
-            (None, Some(https)) => reqwest::Proxy::https(https)?,
-        };
-        let with_no_proxy = if let Some(no_proxy) = value.no_proxy {
-            base.no_proxy(reqwest::NoProxy::from_string(&no_proxy))
-        } else {
-            // Fallback to using env var
-            base.no_proxy(reqwest::NoProxy::from_env())
-        };
-        Ok(with_no_proxy)
-    }
+        .proxy(default_proxy)
 }
 
 pub struct DownloadOpt<T: Sized> {
@@ -64,10 +37,12 @@ impl<T: Sized> DownloadOpt<T> {
             handler: None,
         })
     }
-    pub fn proxy(&mut self, proxy: Option<Proxy>) -> Result<&mut Self> {
-        self.client = client_builder()
-            .proxy(proxy.unwrap_or_default().try_into()?)
-            .build()?;
+    pub fn proxy(&mut self, proxy: Option<CrateProxy>) -> Result<&mut Self> {
+        // rebuild client with given proxy, otherwise do nothing
+        if let Some(p) = proxy {
+            self.client = client_builder().proxy(p.try_into()?).build()?;
+        }
+
         Ok(self)
     }
     pub fn handler(&mut self, progress_handler: Option<CliProgress<T>>) -> &mut Self {
@@ -183,9 +158,21 @@ impl<T: Sized> DownloadOpt<T> {
 }
 
 /// Download a file without resuming, with proxy settings.
-pub fn download<S: ToString>(name: S, url: &Url, dest: &Path, proxy: Option<&Proxy>) -> Result<()> {
+pub fn download_with_proxy<S: ToString>(
+    name: S,
+    url: &Url,
+    dest: &Path,
+    proxy: Option<&CrateProxy>,
+) -> Result<()> {
     DownloadOpt::new(name)?
         .proxy(proxy.cloned())?
+        .handler(Some(CliProgress::new()))
+        .download_file(url, dest, false)
+}
+
+/// Download a file without resuming, with default proxy settings (from env).
+pub fn download<S: ToString>(name: S, url: &Url, dest: &Path) -> Result<()> {
+    DownloadOpt::new(name)?
         .handler(Some(CliProgress::new()))
         .download_file(url, dest, false)
 }
