@@ -83,7 +83,7 @@ impl UpdateOpt {
         // dest file don't need the `-cli` suffix to confuse users
         let dest_name = utils::exe!(format!("{}-manager", t!("vendor_en")));
         let newer_manager = temp_root.path().join(dest_name);
-        utils::download("latest manager", &download_url, &newer_manager, None)?;
+        utils::download("latest manager", &download_url, &newer_manager)?;
 
         // replace the current executable
         // TODO: restart GUI when available.

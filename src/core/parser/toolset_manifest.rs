@@ -29,7 +29,7 @@ pub struct ToolsetManifest {
     #[serde(default)]
     pub(crate) tools: Tools,
     /// Proxy settings that used for download.
-    pub proxy: Option<utils::Proxy>,
+    pub proxy: Option<Proxy>,
     /// Path to the manifest file.
     #[serde(skip)]
     path: Option<PathBuf>,
@@ -174,6 +174,36 @@ impl ToolsetManifest {
 
     pub fn rust_version(&self) -> &str {
         self.rust.version.as_str()
+    }
+}
+
+/// The proxy for download
+#[derive(Debug, Deserialize, Default, Serialize, PartialEq, Eq, Clone)]
+pub struct Proxy {
+    pub http: Option<Url>,
+    pub https: Option<Url>,
+    #[serde(alias = "no-proxy")]
+    pub no_proxy: Option<String>,
+}
+
+impl TryFrom<Proxy> for reqwest::Proxy {
+    type Error = anyhow::Error;
+    fn try_from(value: Proxy) -> std::result::Result<Self, Self::Error> {
+        let base = match (value.http, value.https) {
+            // When nothing provided, use env proxy if there is.
+            (None, None) => reqwest::Proxy::custom(|url| env_proxy::for_url(url).to_url()),
+            // When both are provided, use the provided https proxy.
+            (Some(_), Some(https)) => reqwest::Proxy::all(https)?,
+            (Some(http), None) => reqwest::Proxy::http(http)?,
+            (None, Some(https)) => reqwest::Proxy::https(https)?,
+        };
+        let with_no_proxy = if let Some(no_proxy) = value.no_proxy {
+            base.no_proxy(reqwest::NoProxy::from_string(&no_proxy))
+        } else {
+            // Fallback to using env var
+            base.no_proxy(reqwest::NoProxy::from_env())
+        };
+        Ok(with_no_proxy)
     }
 }
 
@@ -930,7 +960,7 @@ no-proxy = "localhost,some.domain.com"
         let expected = ToolsetManifest::from_str(input).unwrap();
         assert_eq!(
             expected.proxy.unwrap(),
-            utils::Proxy {
+            Proxy {
                 http: Some(Url::parse("http://username:password@proxy.example.com:8080").unwrap()),
                 https: Some(
                     Url::parse("https://username:password@proxy.example.com:8080").unwrap()

@@ -15,7 +15,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub use download::{download, DownloadOpt, Proxy};
+pub use download::{download, download_with_proxy, DownloadOpt};
 pub use extraction::Extractable;
 pub use file_system::*;
 pub use log::{log_file_path, Logger};

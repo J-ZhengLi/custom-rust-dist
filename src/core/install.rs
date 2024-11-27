@@ -318,7 +318,7 @@ impl<'a> InstallConfiguration<'a> {
                     .filter(|seg| !seg.is_empty())
                     .ok_or_else(|| anyhow!("'{url}' doesn't appear to be a downloadable file"))?;
                 let dest = temp_dir.path().join(downloaded_file_name);
-                utils::download(name, url, &dest, self.manifest.proxy.as_ref())?;
+                utils::download_with_proxy(name, url, &dest, self.manifest.proxy.as_ref())?;
 
                 self.try_install_from_path(name, &dest)?
             }
