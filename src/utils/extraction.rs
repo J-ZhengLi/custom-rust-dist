@@ -110,7 +110,7 @@ struct ExtractHelper<'a, T: Sized> {
     indicator: CliProgress<T>,
 }
 
-impl<'a, T: Sized> ExtractHelper<'a, T> {
+impl<T: Sized> ExtractHelper<'_, T> {
     fn start_progress_bar(&self, len: u64, style: Style) -> Result<T> {
         (self.indicator.start)(
             len,
