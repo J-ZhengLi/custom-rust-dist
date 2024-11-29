@@ -61,6 +61,7 @@ pub(crate) use exe;
 /// # Usage
 ///
 /// ```rust
+/// # use rim::setter;
 /// #[derive(Default)]
 /// struct Foo {
 ///     a: bool,
@@ -74,15 +75,13 @@ pub(crate) use exe;
 ///     setter!(c(self, value: u8) { Some(value) });
 /// }
 ///
-/// fn main() {
-///     let foo = Foo::default()
-///         .a(true)
-///         .b(10)
-///         .c(100);
-///     assert_eq!(foo.a, true);
-///     assert_eq!(foo.b, 10);
-///     assert_eq!(foo.c, Some(100));
-/// }
+/// let foo = Foo::default()
+///     .a(true)
+///     .b(10)
+///     .c(100);
+/// assert_eq!(foo.a, true);
+/// assert_eq!(foo.b, 10);
+/// assert_eq!(foo.c, Some(100));
 /// ```
 // FIXME(?): Find a proper way to provide function visibility instead of all `pub`.
 #[macro_export]

@@ -8,6 +8,7 @@ use super::{
     directories::RimDir,
     parser::fingerprint::{installed_tools_fresh, InstallationRecord, ToolRecord},
     rustup::ToolchainInstaller,
+    tools::ToolKind,
 };
 use crate::{core::tools::Tool, utils::Progress};
 
@@ -106,7 +107,7 @@ impl<'a> UninstallConfiguration<'a> {
                 };
                 tool
             } else if !tool_detail.paths.is_empty() {
-                Tool::Executables(name.into(), tool_detail.paths.clone())
+                Tool::new(name.into(), ToolKind::Executables).path(tool_detail.paths.clone())
             } else {
                 info!("{}", t!("uninstall_unknown_tool_warn", tool = name));
                 continue;
@@ -119,7 +120,7 @@ impl<'a> UninstallConfiguration<'a> {
         }
         let progress_dt = weight / tools_to_uninstall.len() as f32;
 
-        tools_to_uninstall.sort_by(|a, b| b.cmp(a));
+        tools_to_uninstall.sort_by(|a, b| b.kind.cmp(&a.kind));
 
         for tool in tools_to_uninstall {
             info!("{}", t!("uninstalling_for", name = tool.name()));
