@@ -52,7 +52,7 @@ struct ExampleTemplate<'a> {
     vscode_config: &'a str,
 }
 
-impl<'a> ExampleTemplate<'a> {
+impl ExampleTemplate<'_> {
     fn load() -> Self {
         Self {
             src_main: include_str!("../../resources/example/src/main.rs"),

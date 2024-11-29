@@ -389,7 +389,7 @@ impl<'a> InstallConfiguration<'a> {
 }
 
 // For updates
-impl<'a> InstallConfiguration<'a> {
+impl InstallConfiguration<'_> {
     pub fn update(mut self, components: Vec<Component>) -> Result<()> {
         let (_, tools) = split_components(components);
         // setup env for current process

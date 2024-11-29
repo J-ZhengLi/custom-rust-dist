@@ -39,7 +39,7 @@ struct DistWorker<'a> {
     dest_bin_name: String,
 }
 
-impl<'a> DistWorker<'a> {
+impl DistWorker<'_> {
     fn cli(src_dir: &Path) -> Self {
         Self {
             build_args: &["build", "--release", "--locked"],

@@ -122,7 +122,7 @@ impl SelfUpdateKind<'_> {
     }
 }
 
-impl<'a> SelfUpdateKind<'a> {
+impl SelfUpdateKind<'_> {
     pub fn newer_version(&self) -> Option<&Version> {
         match self {
             Self::Newer(v) => Some(*v),

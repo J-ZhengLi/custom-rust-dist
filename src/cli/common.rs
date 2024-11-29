@@ -291,7 +291,7 @@ pub(crate) enum ComponentDecoration<'c> {
     None,
 }
 
-impl<'c> ComponentDecoration<'c> {
+impl ComponentDecoration<'_> {
     pub(crate) fn for_component(self, comp: &Component) -> String {
         match self {
             Self::None => String::new(),

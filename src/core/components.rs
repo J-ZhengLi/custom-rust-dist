@@ -109,9 +109,10 @@ pub fn get_component_list_from_manifest(
     manifest: &ToolsetManifest,
     record: Option<&InstallationRecord>,
 ) -> Result<Vec<Component>> {
-    // Try getting these record first in order to determine `is_installed` status
-    let installed = InstalledComponents::from_record(record);
-    let tc_channel = installed
+    // components that are installed by rim previously.
+    let installed_by_rim = InstalledComponents::from_record(record);
+
+    let tc_channel = installed_by_rim
         .toolchain_channel
         .unwrap_or(manifest.rust_version());
 
@@ -125,7 +126,7 @@ pub fn get_component_list_from_manifest(
     .group_name(Some(manifest.toolchain_group_name()))
     .is_toolchain_component(true)
     .required(true)
-    .installed(installed.toolchain_installed())
+    .installed(installed_by_rim.toolchain_installed())
     .version(Some(tc_channel))];
 
     for component in manifest.optional_toolchain_components() {
@@ -137,13 +138,18 @@ pub fn get_component_list_from_manifest(
             .group_name(Some(manifest.toolchain_group_name()))
             .optional(true)
             .is_toolchain_component(true)
-            .installed(installed.all.contains(component))
+            .installed(installed_by_rim.all.contains(component))
             .version(Some(tc_channel)),
         );
     }
 
     if let Some(tools) = manifest.current_target_tools() {
+        // components that are already installed in user's machine, such as vscode, or mingw.
+        let installed_by_user = manifest.already_installed_tools();
+
         for (tool_name, tool_info) in tools {
+            let installed =
+                installed_by_rim.all.contains(tool_name) || installed_by_user.contains(&tool_name);
             components.push(
                 Component::new(
                     tool_name,
@@ -153,7 +159,7 @@ pub fn get_component_list_from_manifest(
                 .tool_installer(tool_info)
                 .required(tool_info.is_required())
                 .optional(tool_info.is_optional())
-                .installed(installed.all.contains(tool_name))
+                .installed(installed)
                 .version(tool_info.version()),
             );
         }
