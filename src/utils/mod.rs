@@ -56,6 +56,52 @@ macro_rules! exe {
 }
 pub(crate) use exe;
 
+/// Struct member variables setter.
+///
+/// # Usage
+///
+/// ```rust
+/// #[derive(Default)]
+/// struct Foo {
+///     a: bool,
+///     b: u32,
+///     c: Option<u8>,
+/// }
+///
+/// impl Foo {
+///     setter!(a(self, bool));
+///     setter!(b(self, u32));
+///     setter!(c(self, value: u8) { Some(value) });
+/// }
+///
+/// fn main() {
+///     let foo = Foo::default()
+///         .a(true)
+///         .b(10)
+///         .c(100);
+///     assert_eq!(foo.a, true);
+///     assert_eq!(foo.b, 10);
+///     assert_eq!(foo.c, Some(100));
+/// }
+/// ```
+// FIXME(?): Find a proper way to provide function visibility instead of all `pub`.
+#[macro_export]
+macro_rules! setter {
+    ($name:ident ($self_arg:ident, $t:ty)) => {
+        #[allow(clippy::wrong_self_convention)]
+        pub fn $name(mut $self_arg, val: $t) -> Self {
+            $self_arg.$name = val;
+            $self_arg
+        }
+    };
+    ($name:ident ($self_arg:ident, $val:ident : $t:ty) { $init_val:expr }) => {
+        pub fn $name(mut $self_arg, $val: $t) -> Self {
+            $self_arg.$name = $init_val;
+            $self_arg
+        }
+    };
+}
+
 /// Forcefully parsing a `&str` to [`Url`].
 ///
 /// # Panic

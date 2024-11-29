@@ -7,6 +7,7 @@ use std::{
 
 use crate::{
     fingerprint::InstallationRecord,
+    setter,
     toolset_manifest::{ToolInfo, ToolMap, ToolsetManifest},
 };
 
@@ -26,22 +27,6 @@ pub struct Component {
     pub is_toolchain_component: bool,
     /// Indicates whether this component was already installed or not.
     pub installed: bool,
-}
-
-macro_rules! setter {
-    ($name:ident ($self_arg:ident, $t:ty)) => {
-        #[allow(clippy::wrong_self_convention)]
-        fn $name(mut $self_arg, val: $t) -> Self {
-            $self_arg.$name = val;
-            $self_arg
-        }
-    };
-    ($name:ident ($self_arg:ident, $val:ident : $t:ty) { $init_val:expr }) => {
-        fn $name(mut $self_arg, $val: $t) -> Self {
-            $self_arg.$name = $init_val;
-            $self_arg
-        }
-    };
 }
 
 impl Component {
