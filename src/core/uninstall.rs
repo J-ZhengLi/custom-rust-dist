@@ -92,25 +92,35 @@ impl<'a> UninstallConfiguration<'a> {
     fn remove_tools(&mut self, tools: IndexMap<String, ToolRecord>, weight: f32) -> Result<()> {
         let mut tools_to_uninstall = vec![];
         for (name, tool_detail) in &tools {
-            let tool = if tool_detail.use_cargo {
-                Tool::cargo_tool(name, None)
-            } else if let [path] = tool_detail.paths.as_slice() {
-                // don't interrupt uninstallation if the path of some tools cannot be found,
-                // as the user might have manually remove them
-                let Ok(tool) = Tool::from_path(name, path) else {
-                    warn!(
-                        "{}: {}",
-                        t!("uninstall_tool_skipped", tool = name),
-                        t!("path_to_installation_not_found", path = path.display())
-                    );
-                    continue;
-                };
-                tool
-            } else if !tool_detail.paths.is_empty() {
-                Tool::new(name.into(), ToolKind::Executables).path(tool_detail.paths.clone())
-            } else {
-                info!("{}", t!("uninstall_unknown_tool_warn", tool = name));
-                continue;
+            let kind = tool_detail.tool_kind();
+            let tool = match kind {
+                ToolKind::CargoTool => Tool::cargo_tool(name, None),
+                // TODO: (>1.0) We didn't have a proper way to track tool's type,
+                // so we uses a `use-cargo`, then we have to guess it by looking at the content
+                // of the paths if `use-cargo = false`.
+                // After 1.0 release, remove this branch.
+                ToolKind::Unknown => {
+                    if let [path] = tool_detail.paths.as_slice() {
+                        // don't interrupt uninstallation if the path of some tools cannot be found,
+                        // as the user might have manually remove them
+                        let Ok(tool) = Tool::from_path(name, path) else {
+                            warn!(
+                                "{}: {}",
+                                t!("uninstall_tool_skipped", tool = name),
+                                t!("path_to_installation_not_found", path = path.display())
+                            );
+                            continue;
+                        };
+                        tool
+                    } else if !tool_detail.paths.is_empty() {
+                        Tool::new(name.into(), ToolKind::Executables)
+                            .path(tool_detail.paths.clone())
+                    } else {
+                        info!("{}", t!("uninstall_unknown_tool_warn", tool = name));
+                        continue;
+                    }
+                }
+                _ => Tool::new(name.into(), kind).path(tool_detail.paths.clone()),
             };
             tools_to_uninstall.push(tool);
         }

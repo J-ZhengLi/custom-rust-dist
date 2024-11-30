@@ -4,8 +4,9 @@ use std::{
     str::FromStr,
 };
 
-use anyhow::{bail, Result};
-use log::info;
+use anyhow::{anyhow, bail, Result};
+use log::{info, warn};
+use serde::{Deserialize, Serialize};
 
 use super::{
     directories::RimDir, parser::fingerprint::ToolRecord, uninstall::UninstallConfiguration,
@@ -22,10 +23,11 @@ pub(crate) struct Tool<'a> {
     install_args: Option<Vec<&'a str>>,
 }
 
-#[derive(Debug, PartialEq, PartialOrd, Eq, Ord)]
 /// Representing the structure of an (extracted) tool's directory.
 // NB: Mind the order of the variants, they are crucial to installation/uninstallation.
-pub(crate) enum ToolKind {
+#[derive(Debug, Default, PartialEq, PartialOrd, Eq, Ord, Serialize, Deserialize, Clone, Copy)]
+#[serde(rename_all = "kebab-case")]
+pub enum ToolKind {
     /// Directory containing `bin` subfolder:
     /// ```text
     /// tool/
@@ -43,10 +45,13 @@ pub(crate) enum ToolKind {
     /// We have a custom "script" for how to deal with such directory.
     Custom,
     /// Plugin file, such as `.vsix` files for Visual Studio.
-    Plugin(PluginType),
+    Plugin,
     // `Cargo` just don't make any sense
     #[allow(clippy::enum_variant_names)]
     CargoTool,
+    /// Unknown tool, install and uninstall are not fully supported.
+    #[default]
+    Unknown,
 }
 
 impl<'a> Tool<'a> {
@@ -83,19 +88,8 @@ impl<'a> Tool<'a> {
         // Step 2: Identify from file extension (if it's a file ofc).
         if utils::is_executable(path) {
             return Ok(Self::new(name, ToolKind::Executables).path(path));
-        } else if path.is_file() {
-            let maybe_extension = path.extension();
-            if let Some(ext) = maybe_extension.and_then(|ext| ext.to_str()) {
-                match ext {
-                    "vsix" => {
-                        // TODO: When installing, invoke `vscode` plugin install command,
-                        // this must be handled after `VS-Code` has been installed,
-                        // we might need a `requirements` field in the manifest.
-                        return Ok(Self::new(name, ToolKind::Plugin(ext.parse()?)).path(path));
-                    }
-                    _ => bail!("unable to process tool '{name}': unknown file format '{ext}'"),
-                }
-            }
+        } else if Plugin::is_supported(path) {
+            return Ok(Self::new(name, ToolKind::Plugin).path(path));
         }
         // TODO: Well, we got a directory, things are getting complicated, there could be one of this scenarios:
         // 1. Directory contains some executable files and nothing else
@@ -104,7 +98,7 @@ impl<'a> Tool<'a> {
         //      Throw and merge this directories into cargo home. (might be bad, therefore we need a `Manifest.in`!!!)
         // 3. Directory doesn't fit all previous characteristics.
         //      We don't know how to install this tool, throw an error instead.
-        else {
+        else if path.is_dir() {
             // Step 3: read directory to find characteristics.
             let entries = utils::walk_dir(path, false)?;
             // Check if there is any folder that looks like `bin`
@@ -122,7 +116,8 @@ impl<'a> Tool<'a> {
             }
         }
 
-        bail!("unable to process tool '{name}' as it is not supported")
+        warn!("unknown tool '{name}', it's installer doesn't fit any predefined characteristic");
+        Ok(Self::new(name, ToolKind::Unknown).path(path))
     }
 
     /// Specify as a tool that managed by `cargo`.
@@ -133,7 +128,7 @@ impl<'a> Tool<'a> {
     }
 
     pub(crate) fn install(&self, config: &InstallConfiguration) -> Result<ToolRecord> {
-        match self.kind {
+        let paths = match self.kind {
             ToolKind::CargoTool => {
                 if !config.cargo_is_installed {
                     bail!(
@@ -147,35 +142,42 @@ impl<'a> Tool<'a> {
                     self.install_args.as_deref().unwrap_or(&[self.name()]),
                     config.cargo_home(),
                 )?;
-                Ok(ToolRecord::cargo_tool())
+                return Ok(ToolRecord::cargo_tool());
             }
-
             ToolKind::Executables => {
                 let mut res = vec![];
                 for exe in self.path.iter() {
                     res.push(utils::copy_file_to(exe, config.cargo_bin())?);
                 }
-                Ok(ToolRecord::with_paths(res))
+                res
             }
             ToolKind::Custom => {
-                let paths =
-                    custom_instructions::install(self.name(), self.path.expect_single(), config)?;
-                Ok(ToolRecord::with_paths(paths))
+                custom_instructions::install(self.name(), self.path.expect_single(), config)?
             }
             ToolKind::DirWithBin => {
                 let tool_dir =
                     install_dir_with_bin_(config, self.name(), self.path.expect_single())?;
-                Ok(ToolRecord::with_paths(vec![tool_dir]))
+                vec![tool_dir]
             }
-            ToolKind::Plugin(kind) => {
+            ToolKind::Plugin => {
                 let path = self.path.expect_single();
                 // run the installation command.
-                kind.install_plugin(path)?;
+                Plugin::install(path)?;
                 // we need to "cache" to installer, so that we could uninstall with it.
                 let plugin_backup = utils::copy_file_to(path, config.tools_dir())?;
-                Ok(ToolRecord::with_paths(vec![plugin_backup]))
+                vec![plugin_backup]
             }
-        }
+            // Just throw it under `tools` dir
+            ToolKind::Unknown => {
+                vec![move_to_tools(
+                    config,
+                    self.name(),
+                    self.path.expect_single(),
+                )?]
+            }
+        };
+
+        Ok(ToolRecord::new(self.kind).paths(paths))
     }
 
     pub(crate) fn uninstall(&self, config: &UninstallConfiguration) -> Result<()> {
@@ -194,7 +196,8 @@ impl<'a> Tool<'a> {
             }
             ToolKind::Custom => custom_instructions::uninstall(self.name(), config)?,
             ToolKind::DirWithBin => uninstall_dir_with_bin_(self.path.expect_single())?,
-            ToolKind::Plugin(kind) => kind.uninstall_plugin(self.path.expect_single())?,
+            ToolKind::Plugin => Plugin::uninstall(self.path.expect_single())?,
+            ToolKind::Unknown => utils::remove(self.path.expect_single())?,
         }
         Ok(())
     }
@@ -212,6 +215,13 @@ fn cargo_install_or_uninstall(op: &str, args: &[&str], cargo_home: &Path) -> Res
         .run()
 }
 
+/// Move one path (file/dir) to a new folder with `name` under tools dir.
+fn move_to_tools(config: &InstallConfiguration, name: &str, path: &Path) -> Result<PathBuf> {
+    let dir = config.tools_dir().join(name);
+    utils::move_to(path, &dir, true)?;
+    Ok(dir)
+}
+
 /// Installing [`ToolInstaller::DirWithBin`], with a couple steps:
 /// - Move the `tool_dir` to [`tools_dir`](InstallConfiguration::tools_dir).
 /// - Add the `bin_dir` to PATH
@@ -220,10 +230,7 @@ fn install_dir_with_bin_(
     name: &str,
     path: &Path,
 ) -> Result<PathBuf> {
-    let dir = config.tools_dir().join(name);
-
-    utils::move_to(path, &dir, true)?;
-
+    let dir = move_to_tools(config, name, path)?;
     let bin_dir_after_move = dir.join("bin");
     super::os::add_to_path(&bin_dir_after_move)?;
     Ok(dir)
@@ -243,7 +250,7 @@ fn uninstall_dir_with_bin_(tool_path: &Path) -> Result<()> {
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Eq, Ord)]
 #[non_exhaustive]
-pub(crate) enum PluginType {
+pub(crate) enum Plugin {
     Vsix,
 }
 
@@ -260,7 +267,7 @@ pub(crate) static VSCODE_FAMILY: &[&str] = &[
     "code.cmd",
 ];
 
-impl FromStr for PluginType {
+impl FromStr for Plugin {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
@@ -270,10 +277,31 @@ impl FromStr for PluginType {
     }
 }
 
-impl PluginType {
-    fn install_or_uninstall_(&self, plugin_path: &Path, uninstall: bool) -> Result<()> {
-        match self {
-            PluginType::Vsix => {
+impl Plugin {
+    /// Examine the extension of a file path. and return `true` if it's a supported plugin type.
+    fn is_supported(path: &Path) -> bool {
+        let Some(ext) = utils::extension_str(path) else {
+            return false;
+        };
+
+        matches!(ext, "vsix")
+    }
+
+    fn install(plugin_path: &Path) -> Result<()> {
+        Self::install_or_uninstall_(plugin_path, false)
+    }
+
+    fn uninstall(plugin_path: &Path) -> Result<()> {
+        Self::install_or_uninstall_(plugin_path, true)
+    }
+
+    fn install_or_uninstall_(plugin_path: &Path, uninstall: bool) -> Result<()> {
+        let ty = utils::extension_str(plugin_path)
+            .and_then(|ext| Self::from_str(ext).ok())
+            .ok_or_else(|| anyhow!("unsupported plugin file '{}'", plugin_path.display()))?;
+
+        match ty {
+            Plugin::Vsix => {
                 for program in VSCODE_FAMILY {
                     if utils::cmd_exist(program) {
                         let op = if uninstall { "uninstall" } else { "install" };
@@ -318,14 +346,6 @@ impl PluginType {
         }
         Ok(())
     }
-
-    fn install_plugin(&self, plugin_path: &Path) -> Result<()> {
-        self.install_or_uninstall_(plugin_path, false)
-    }
-
-    fn uninstall_plugin(&self, plugin_path: &Path) -> Result<()> {
-        self.install_or_uninstall_(plugin_path, true)
-    }
 }
 
 #[cfg(test)]
@@ -339,7 +359,7 @@ mod tests {
         tools.push(ToolKind::Executables);
         tools.push(ToolKind::CargoTool);
         tools.push(ToolKind::Custom);
-        tools.push(ToolKind::Plugin(PluginType::Vsix));
+        tools.push(ToolKind::Plugin);
         tools.push(ToolKind::DirWithBin);
         tools.push(ToolKind::Executables);
 
@@ -350,10 +370,7 @@ mod tests {
         assert!(matches!(tools_iter.next(), Some(ToolKind::Executables)));
         assert!(matches!(tools_iter.next(), Some(ToolKind::Executables)));
         assert!(matches!(tools_iter.next(), Some(ToolKind::Custom)));
-        assert!(matches!(
-            tools_iter.next(),
-            Some(ToolKind::Plugin(PluginType::Vsix))
-        ));
+        assert!(matches!(tools_iter.next(), Some(ToolKind::Plugin)));
         assert!(matches!(tools_iter.next(), Some(ToolKind::CargoTool)));
         assert!(matches!(tools_iter.next(), None));
     }
@@ -365,7 +382,7 @@ mod tests {
         tools.push(ToolKind::Executables);
         tools.push(ToolKind::CargoTool);
         tools.push(ToolKind::Custom);
-        tools.push(ToolKind::Plugin(PluginType::Vsix));
+        tools.push(ToolKind::Plugin);
         tools.push(ToolKind::DirWithBin);
         tools.push(ToolKind::Executables);
 
@@ -373,10 +390,7 @@ mod tests {
 
         let mut tools_iter = tools.iter();
         assert!(matches!(tools_iter.next(), Some(ToolKind::CargoTool)));
-        assert!(matches!(
-            tools_iter.next(),
-            Some(ToolKind::Plugin(PluginType::Vsix))
-        ));
+        assert!(matches!(tools_iter.next(), Some(ToolKind::Plugin)));
         assert!(matches!(tools_iter.next(), Some(ToolKind::Custom)));
         assert!(matches!(tools_iter.next(), Some(ToolKind::Executables)));
         assert!(matches!(tools_iter.next(), Some(ToolKind::Executables)));

@@ -1,10 +1,10 @@
 use anyhow::{anyhow, Context, Result};
 use indexmap::IndexMap;
 use log::debug;
-use serde::{Deserialize, Serialize};
+use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 
-use crate::utils;
+use crate::{core::tools::ToolKind, setter, utils};
 
 use super::{toolset_manifest::ToolsetManifest, TomlParser};
 
@@ -184,29 +184,74 @@ impl RustRecord {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ToolRecord {
+    #[deprecated(since = "0.3.1", note = "use `.tool_kind()` instead")]
+    #[serde(
+        default,
+        skip_serializing,
+        deserialize_with = "de_deprecated_use_cargo"
+    )]
+    use_cargo: Option<ToolKind>,
+    // TODO: (>1.0) enforce this field, it's optional now only because we
+    // need to support older file when deserializing. Also, make sure we can deserialize
+    // `use-cargo = true` to `kind = 'cargo-tool'`.
     #[serde(default)]
-    pub(crate) use_cargo: bool,
+    kind: ToolKind,
     #[serde(default)]
     pub(crate) paths: Vec<PathBuf>,
 }
 
 impl ToolRecord {
     pub(crate) fn cargo_tool() -> Self {
+        #[allow(deprecated)]
         ToolRecord {
-            use_cargo: true,
+            kind: ToolKind::CargoTool,
+            use_cargo: None,
             paths: vec![],
         }
     }
 
-    pub(crate) fn with_paths(paths: Vec<PathBuf>) -> Self {
-        ToolRecord {
-            use_cargo: false,
-            paths,
+    pub(crate) fn new(kind: ToolKind) -> Self {
+        Self {
+            kind,
+            ..Default::default()
         }
     }
+
+    pub(crate) fn tool_kind(&self) -> ToolKind {
+        #[allow(deprecated)]
+        self.use_cargo.unwrap_or(self.kind)
+    }
+
+    setter!(paths(self, Vec<PathBuf>));
+}
+
+// `use-cargo = true/false` was used during [0.2.0, 0.3.0], in order not to break
+// the compatibility for those versions, we need to deserialize it to the new api.
+fn de_deprecated_use_cargo<'de, D>(deserializer: D) -> Result<Option<ToolKind>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct ToolKindVisitor;
+
+    impl Visitor<'_> for ToolKindVisitor {
+        type Value = Option<ToolKind>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a `true` or `false` string")
+        }
+
+        fn visit_bool<E>(self, v: bool) -> std::result::Result<Self::Value, E>
+        where
+            E: serde::de::Error,
+        {
+            Ok(v.then_some(ToolKind::CargoTool))
+        }
+    }
+
+    deserializer.deserialize_bool(ToolKindVisitor)
 }
 
 #[cfg(test)]
@@ -226,7 +271,10 @@ mod tests {
         let rust_components = vec![String::from("rustfmt"), String::from("cargo")];
 
         fp.add_rust_record("stable", &rust_components);
-        fp.add_tool_record("aaa", ToolRecord::with_paths(vec![install_dir.join("aaa")]));
+        fp.add_tool_record(
+            "aaa",
+            ToolRecord::new(ToolKind::Custom).paths(vec![install_dir.join("aaa")]),
+        );
 
         let v0 = format!(
             "\
@@ -237,7 +285,7 @@ version = \"stable\"
 components = [\"rustfmt\", \"cargo\"]
 
 [tools.aaa]
-use-cargo = false
+kind = \"custom\"
 paths = [{QUOTE}{}{QUOTE}]
 ",
             install_dir.display(),
@@ -257,5 +305,71 @@ root = '/path/to/something'"#;
         assert_eq!(expected.name.unwrap(), "rust bundle (experimental)");
         assert_eq!(expected.version.unwrap(), "0.1");
         assert_eq!(expected.root, PathBuf::from("/path/to/something"));
+    }
+
+    #[test]
+    fn all_tool_kinds() {
+        let input = r#"
+root = '/path/to/something'
+
+[tools]
+a = { kind = 'cargo-tool', paths = [] }
+b = { kind = 'custom', paths = [] }
+c = { kind = 'dir-with-bin', paths = [] }
+d = { kind = 'executables', paths = []}
+e = { kind = 'plugin', paths = []}
+"#;
+
+        let kinds = &[
+            ToolKind::CargoTool,
+            ToolKind::Custom,
+            ToolKind::DirWithBin,
+            ToolKind::Executables,
+            ToolKind::Plugin,
+        ];
+        let expected = InstallationRecord::from_str(input).unwrap();
+        let all_kinds = expected
+            .tools
+            .values()
+            .map(|rec| rec.kind)
+            .collect::<Vec<_>>();
+
+        assert_eq!(all_kinds, kinds);
+    }
+
+    #[test]
+    fn de_use_cargo_and_default_toolkind() {
+        let input = r#"
+        root = '/path/to/something'
+        
+        [tools]
+        a = { use-cargo = true, paths = [] }
+        b = { use-cargo = false, paths = ['some/path'] }
+        c = { paths = ['some/other/path'] }"#;
+
+        let expected = InstallationRecord::from_str(input).unwrap();
+        let mut it = expected.tools.values().map(|rec| rec.tool_kind());
+
+        assert_eq!(it.next(), Some(ToolKind::CargoTool));
+        assert_eq!(it.next(), Some(ToolKind::Unknown));
+        assert_eq!(it.next(), Some(ToolKind::Unknown));
+        assert_eq!(it.next(), None);
+    }
+
+    #[test]
+    fn do_not_ser_use_cargo() {
+        let record = InstallationRecord {
+            root: "/some/path".into(),
+            tools: IndexMap::from([("a".into(), ToolRecord::cargo_tool())]),
+            ..Default::default()
+        };
+        let ser = record.to_toml().unwrap();
+        let expected = r#"root = "/some/path"
+
+[tools.a]
+kind = "cargo-tool"
+paths = []
+"#;
+        assert_eq!(ser, expected);
     }
 }
