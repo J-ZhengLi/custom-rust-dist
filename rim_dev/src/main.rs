@@ -111,7 +111,8 @@ version = '1.80.1'
 components = [\"llvm-tools\", \"rustc-dev\"]
 
 [tools.mingw64]
-use-cargo = false
+kind = 'dir-with-bin'
+version = '13.0.0'
 paths = ['{0}/tools/mingw64']",
                 debug_dir.display()
             ),

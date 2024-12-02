@@ -281,9 +281,11 @@ impl<'a> InstallConfiguration<'a> {
     // TODO: Write version info after installing each tool,
     // which is later used for updating.
     fn install_tool(&mut self, name: &str, tool: &ToolInfo) -> Result<()> {
+        let tool_ver = tool.version();
         let record = match tool {
             ToolInfo::PlainVersion(version) | ToolInfo::DetailedVersion { ver: version, .. } => {
-                Tool::cargo_tool(name, Some(vec![name, "--version", version])).install(self)?
+                Tool::cargo_tool(name, Some(vec![name, "--version", version]))
+                    .install(tool_ver, self)?
             }
             ToolInfo::Git {
                 git,
@@ -303,9 +305,9 @@ impl<'a> InstallConfiguration<'a> {
                     args.extend(["--rev", s]);
                 }
 
-                Tool::cargo_tool(name, Some(args)).install(self)?
+                Tool::cargo_tool(name, Some(args)).install(tool_ver, self)?
             }
-            ToolInfo::Path { path, .. } => self.try_install_from_path(name, path)?,
+            ToolInfo::Path { path, .. } => self.try_install_from_path(name, tool_ver, path)?,
             // TODO: Have a dedicated download folder, do not use temp dir to store downloaded artifacts,
             // so then we can have the `resume download` feature.
             ToolInfo::Url { url, .. } => {
@@ -320,7 +322,7 @@ impl<'a> InstallConfiguration<'a> {
                 let dest = temp_dir.path().join(downloaded_file_name);
                 utils::download_with_proxy(name, url, &dest, self.manifest.proxy.as_ref())?;
 
-                self.try_install_from_path(name, &dest)?
+                self.try_install_from_path(name, tool_ver, &dest)?
             }
         };
 
@@ -329,7 +331,12 @@ impl<'a> InstallConfiguration<'a> {
         Ok(())
     }
 
-    fn try_install_from_path(&self, name: &str, path: &Path) -> Result<ToolRecord> {
+    fn try_install_from_path(
+        &self,
+        name: &str,
+        version: Option<&str>,
+        path: &Path,
+    ) -> Result<ToolRecord> {
         if !path.exists() {
             bail!(
                 "unable to install '{name}' because the path to it's installer '{}' does not exist.",
@@ -341,7 +348,7 @@ impl<'a> InstallConfiguration<'a> {
         let tool_installer_path = self.extract_or_copy_to(path, temp_dir.path())?;
         let tool_installer = Tool::from_path(name, &tool_installer_path)
             .with_context(|| format!("no install method for tool '{name}'"))?;
-        tool_installer.install(self)
+        tool_installer.install(version, self)
     }
 
     /// Configuration options for `cargo`.

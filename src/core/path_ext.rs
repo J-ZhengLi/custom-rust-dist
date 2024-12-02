@@ -1,3 +1,4 @@
+use anyhow::{bail, Result};
 use std::path::{Path, PathBuf};
 
 /// All-in-one rust path type,
@@ -69,16 +70,23 @@ impl IntoIterator for PathExt<'_> {
     }
 }
 
-impl<'p> PathExt<'p> {
-    /// Retrieve single `Path` reference.
+impl PathExt<'_> {
+    /// Retrieve a single `Path` reference.
     ///
-    /// # Panic
-    /// Panic if `self` is not a [`PathExt::Single`] varient.
-    pub fn expect_single(&self) -> &'p Path {
-        if let Self::Single(path) = self {
-            path
-        } else {
-            panic!("internal error: expecting single `Path` type, got '{self:?}' instead.")
+    /// - If this is a [`PathExt::Single`] variant, the enclosed path will be returned.
+    /// - If this is a [`PathExt::MultiOwned`] variant, but only one path is in the vector
+    ///     the first element in the vector will be returned.
+    ///
+    /// # Error
+    /// Returns error if `self` contains multiple path values.
+    pub fn single(&self) -> Result<&Path> {
+        match self {
+            Self::Single(path) => Ok(path),
+            Self::MultiOwned(paths) if paths.len() == 1 => {
+                // safe to unwrap, `paths` was proven not empty
+                Ok(paths.iter().map(|pb| pb.as_path()).next().unwrap())
+            }
+            _ => bail!("expecting single `Path` type, got '{self:?}' instead."),
         }
     }
 

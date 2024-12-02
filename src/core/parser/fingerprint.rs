@@ -143,16 +143,19 @@ impl InstallationRecord {
     }
 
     /// Return an iterator of installed tools' names.
-    pub fn installed_tools(&self) -> impl Iterator<Item = &String> {
-        self.tools.keys()
+    pub fn installed_tools(&self) -> impl Iterator<Item = &str> {
+        self.tools.keys().map(|k| k.as_str())
     }
 
     /// Returns the rust toolchain channel name (such as `stable`, `nightly`, `1.80.1`, etc.),
     /// and an iterator of installed components.
-    pub fn installed_toolchain(&self) -> Option<(&str, impl Iterator<Item = &String>)> {
-        self.rust
-            .as_ref()
-            .map(|rr| (rr.version.as_str(), rr.components.iter()))
+    pub fn installed_toolchain(&self) -> Option<(&str, impl Iterator<Item = &str>)> {
+        self.rust.as_ref().map(|rr| {
+            (
+                rr.version.as_str(),
+                rr.components.iter().map(|s| s.as_str()),
+            )
+        })
     }
 
     pub(crate) fn print_installation(&self) -> String {
@@ -164,6 +167,10 @@ impl InstallationRecord {
             installed.push_str(&format!("tools: {:?} \n", tool.0));
         }
         installed
+    }
+
+    pub fn get_tool_version(&self, name: &str) -> Option<&str> {
+        self.tools.get(name).and_then(|rec| rec.version.as_deref())
     }
 }
 
@@ -194,22 +201,18 @@ pub struct ToolRecord {
         deserialize_with = "de_deprecated_use_cargo"
     )]
     use_cargo: Option<ToolKind>,
-    // TODO: (>1.0) enforce this field, it's optional now only because we
-    // need to support older file when deserializing. Also, make sure we can deserialize
-    // `use-cargo = true` to `kind = 'cargo-tool'`.
     #[serde(default)]
     kind: ToolKind,
+    version: Option<String>,
     #[serde(default)]
     pub(crate) paths: Vec<PathBuf>,
 }
 
 impl ToolRecord {
     pub(crate) fn cargo_tool() -> Self {
-        #[allow(deprecated)]
         ToolRecord {
             kind: ToolKind::CargoTool,
-            use_cargo: None,
-            paths: vec![],
+            ..Default::default()
         }
     }
 
@@ -226,6 +229,7 @@ impl ToolRecord {
     }
 
     setter!(paths(self, Vec<PathBuf>));
+    setter!(version(self, ver: Option<impl Into<String>>) { ver.map(Into::into) });
 }
 
 // `use-cargo = true/false` was used during [0.2.0, 0.3.0], in order not to break
@@ -340,12 +344,12 @@ e = { kind = 'plugin', paths = []}
     #[test]
     fn de_use_cargo_and_default_toolkind() {
         let input = r#"
-        root = '/path/to/something'
-        
-        [tools]
-        a = { use-cargo = true, paths = [] }
-        b = { use-cargo = false, paths = ['some/path'] }
-        c = { paths = ['some/other/path'] }"#;
+root = '/path/to/something'
+
+[tools]
+a = { use-cargo = true, paths = [] }
+b = { use-cargo = false, paths = ['some/path'] }
+c = { paths = ['some/other/path'] }"#;
 
         let expected = InstallationRecord::from_str(input).unwrap();
         let mut it = expected.tools.values().map(|rec| rec.tool_kind());
@@ -371,5 +375,23 @@ kind = "cargo-tool"
 paths = []
 "#;
         assert_eq!(ser, expected);
+    }
+
+    #[test]
+    fn with_tool_version() {
+        let input = r#"
+root = '/path/to/something'
+
+[tools]
+a = { kind = "custom", version = "1.2.0", paths = ["/some/path"] }
+[tools.b]
+kind = "executables"
+paths = ["/some/other/path"]"#;
+
+        let rec = InstallationRecord::from_str(input).unwrap();
+        let mut tools = rec.tools.values().map(|r| r.version.as_deref());
+        assert_eq!(tools.next(), Some(Some("1.2.0")));
+        assert_eq!(tools.next(), Some(None));
+        assert_eq!(tools.next(), None);
     }
 }

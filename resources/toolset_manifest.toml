@@ -2,7 +2,7 @@ name = "XuanWu Rust Development Kit"
 version = "stable v1.81.0"
 
 [rust]
-version = "stable"
+version = "1.81.0"
 group = "Rust"
 components = ["clippy", "rustfmt", "rust-src", "rust-docs"]
 optional-components = ["llvm-tools", "rustc-dev"]

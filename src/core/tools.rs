@@ -127,7 +127,11 @@ impl<'a> Tool<'a> {
         Self::new(name.to_string(), ToolKind::CargoTool).install_args(extra_args)
     }
 
-    pub(crate) fn install(&self, config: &InstallConfiguration) -> Result<ToolRecord> {
+    pub(crate) fn install(
+        &self,
+        version: Option<&str>,
+        config: &InstallConfiguration,
+    ) -> Result<ToolRecord> {
         let paths = match self.kind {
             ToolKind::CargoTool => {
                 if !config.cargo_is_installed {
@@ -142,7 +146,7 @@ impl<'a> Tool<'a> {
                     self.install_args.as_deref().unwrap_or(&[self.name()]),
                     config.cargo_home(),
                 )?;
-                return Ok(ToolRecord::cargo_tool());
+                return Ok(ToolRecord::cargo_tool().version(version));
             }
             ToolKind::Executables => {
                 let mut res = vec![];
@@ -152,15 +156,14 @@ impl<'a> Tool<'a> {
                 res
             }
             ToolKind::Custom => {
-                custom_instructions::install(self.name(), self.path.expect_single(), config)?
+                custom_instructions::install(self.name(), self.path.single()?, config)?
             }
             ToolKind::DirWithBin => {
-                let tool_dir =
-                    install_dir_with_bin_(config, self.name(), self.path.expect_single())?;
+                let tool_dir = install_dir_with_bin_(config, self.name(), self.path.single()?)?;
                 vec![tool_dir]
             }
             ToolKind::Plugin => {
-                let path = self.path.expect_single();
+                let path = self.path.single()?;
                 // run the installation command.
                 Plugin::install(path)?;
                 // we need to "cache" to installer, so that we could uninstall with it.
@@ -169,15 +172,11 @@ impl<'a> Tool<'a> {
             }
             // Just throw it under `tools` dir
             ToolKind::Unknown => {
-                vec![move_to_tools(
-                    config,
-                    self.name(),
-                    self.path.expect_single(),
-                )?]
+                vec![move_to_tools(config, self.name(), self.path.single()?)?]
             }
         };
 
-        Ok(ToolRecord::new(self.kind).paths(paths))
+        Ok(ToolRecord::new(self.kind).paths(paths).version(version))
     }
 
     pub(crate) fn uninstall(&self, config: &UninstallConfiguration) -> Result<()> {
@@ -195,9 +194,9 @@ impl<'a> Tool<'a> {
                 }
             }
             ToolKind::Custom => custom_instructions::uninstall(self.name(), config)?,
-            ToolKind::DirWithBin => uninstall_dir_with_bin_(self.path.expect_single())?,
-            ToolKind::Plugin => Plugin::uninstall(self.path.expect_single())?,
-            ToolKind::Unknown => utils::remove(self.path.expect_single())?,
+            ToolKind::DirWithBin => uninstall_dir_with_bin_(self.path.single()?)?,
+            ToolKind::Plugin => Plugin::uninstall(self.path.single()?)?,
+            ToolKind::Unknown => utils::remove(self.path.single()?)?,
         }
         Ok(())
     }
