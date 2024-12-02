@@ -6,7 +6,7 @@ use tauri::api::dialog::FileDialogBuilder;
 
 use super::{common, INSTALL_DIR};
 use crate::error::Result;
-use rim::components::{get_component_list_from_manifest, Component};
+use rim::components::Component;
 use rim::toolset_manifest::{get_toolset_manifest, ToolsetManifest};
 use rim::{try_it, utils};
 
@@ -97,8 +97,7 @@ fn check_install_path(path: String) -> Option<String> {
 /// Get full list of supported components
 #[tauri::command]
 fn get_component_list() -> Result<Vec<Component>> {
-    let manifest = cached_manifest();
-    Ok(get_component_list_from_manifest(manifest, None)?)
+    Ok(cached_manifest().current_target_components(true)?)
 }
 
 #[tauri::command]

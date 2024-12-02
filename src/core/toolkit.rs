@@ -2,8 +2,8 @@ use std::sync::OnceLock;
 
 use crate::core::parser::dist_manifest::DistManifest;
 use crate::core::parser::TomlParser;
+use crate::fingerprint::InstallationRecord;
 use crate::{components, utils};
-use crate::{fingerprint::InstallationRecord, toolset_manifest::ToolsetManifest};
 use anyhow::Result;
 use log::info;
 use semver::Version;
@@ -53,29 +53,20 @@ impl Toolkit {
             return Ok(None);
         }
 
-        // Right now we already know user has installed a toolkit,
-        // just don't know the details yet, so let's create a "blank" installed toolkit
-        // then try to collect the missing details later.
-        let mut tk = Self {
-            name: t!("unknown_toolkit").to_string(),
-            version: "N/A".to_string(),
+        let fp = InstallationRecord::load_from_install_dir()?;
+        let components = components::all_components_from_installation(&fp)?;
+
+        let tk = Self {
+            name: fp
+                .name
+                .clone()
+                .unwrap_or_else(|| t!("unknown_toolkit").to_string()),
+            version: fp.version.as_deref().unwrap_or("N/A").to_string(),
             desc: None,
             info: None,
             manifest_url: None,
-            components: vec![],
+            components,
         };
-        let fp = InstallationRecord::load_from_install_dir()?;
-        let manifest = ToolsetManifest::load_from_install_dir()?;
-
-        if let Some(name) = &fp.name {
-            name.clone_into(&mut tk.name);
-        }
-        if let Some(ver) = &fp.version {
-            ver.clone_into(&mut tk.version);
-        }
-
-        let components = components::get_component_list_from_manifest(&manifest, Some(&fp))?;
-        tk.components = components;
 
         // Make a clone and cache the final result
         let cached = INSTALLED_KIT.get_or_init(|| tk);

@@ -11,7 +11,7 @@ use crate::{
 use anyhow::Context;
 use rim::UninstallConfiguration;
 use rim::{
-    components::{self, Component},
+    components::Component,
     toolkit::{self, Toolkit},
     toolset_manifest::{get_toolset_manifest, ToolsetManifest},
     update::{self, UpdateOpt},
@@ -165,6 +165,10 @@ fn maybe_self_update(app: AppHandle) -> Result<()> {
     Ok(())
 }
 
+/// When the `install` button in a toolkit's card was clicked,
+/// the URL of that toolkit was pass to this function. Which will be used to
+/// download its manifest from the server, and we can then return a list of
+/// components that are loaded from it.
 #[tauri::command]
 fn handle_toolkit_install_click(url: String) -> Result<Vec<Component>> {
     // the `url` input was converted from `Url`, so it will definitely be convert back without issue,
@@ -173,7 +177,7 @@ fn handle_toolkit_install_click(url: String) -> Result<Vec<Component>> {
 
     // load the manifest for components information
     let manifest = get_toolset_manifest(Some(&url_))?;
-    let components = components::get_component_list_from_manifest(&manifest, None)?;
+    let components = manifest.current_target_components(false)?;
 
     // cache the selected toolset manifest
     let mut guard = selected_toolset();

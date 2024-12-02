@@ -325,3 +325,8 @@ pub fn make_temp_file(prefix: &str, root: Option<&Path>) -> Result<NamedTempFile
             .context("unable to create temporary file")
     }
 }
+
+/// Try getting the extension of a `path` as `str`.
+pub fn extension_str(path: &Path) -> Option<&str> {
+    path.extension().and_then(|ext| ext.to_str())
+}
