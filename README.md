@@ -1,5 +1,7 @@
 # R.I.M (Rust Installation Manager)
 
+[![dev_docs](https://img.shields.io/badge/dev-rustdoc-blue)](https://j-zhengli.github.io/rim)
+
 An interactive program to install & manage Rust toolchain and third-party tools, supports graphical user interface (**GUI**) and a basic commandline interface (**CLI**).
 
 ## Demo

@@ -33,7 +33,7 @@ impl TomlParser for InstallationRecord {
 
     /// Load fingerprint from a given root.
     ///
-    /// Note that the fingerprint filename is fixed, as defined as [`FILENAME`],
+    /// Note that the fingerprint filename is fixed, as defined as [`FILENAME`](Self::FILENAME),
     /// hense why the parameter of this function is a root directory rather than dest path.
     fn load<P: AsRef<Path>>(root: P) -> Result<InstallationRecord>
     where
@@ -75,7 +75,7 @@ impl InstallationRecord {
     /// # Note
     /// Use this instead of [`InstallationRecord::load`] in **manager** mod.
     // TODO: Cache the result using a `Cell` or `RwLock` or combined.
-    pub fn load_from_install_dir() -> Result<Self> {
+    pub(crate) fn load_from_install_dir() -> Result<Self> {
         let root = super::get_installed_dir();
         Self::load(root)
     }

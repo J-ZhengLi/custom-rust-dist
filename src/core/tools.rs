@@ -221,7 +221,7 @@ fn move_to_tools(config: &InstallConfiguration, name: &str, path: &Path) -> Resu
     Ok(dir)
 }
 
-/// Installing [`ToolInstaller::DirWithBin`], with a couple steps:
+/// Install [`ToolKind::DirWithBin`], with a couple steps:
 /// - Move the `tool_dir` to [`tools_dir`](InstallConfiguration::tools_dir).
 /// - Add the `bin_dir` to PATH
 fn install_dir_with_bin_(
