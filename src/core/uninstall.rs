@@ -24,7 +24,7 @@ pub(crate) trait Uninstallation {
     fn remove_self(&self) -> Result<()>;
 }
 
-/// Configurations to use when installing.
+/// Contains every information that the uninstallation process needs.
 pub struct UninstallConfiguration<'a> {
     /// The installation directory that holds every tools, configuration files,
     /// including the manager binary.

@@ -18,7 +18,7 @@ use crate::utils;
 static INSTALL_DIR_ONCE: OnceLock<PathBuf> = OnceLock::new();
 
 #[allow(unused)]
-pub(crate) trait TomlParser {
+pub trait TomlParser {
     const FILENAME: &str;
 
     /// Deserialize a certain type from [`str`] value.

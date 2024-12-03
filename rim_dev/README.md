@@ -19,7 +19,7 @@ cargo dev run-manager --cli
 check for more manager-mode help
 
 ```bash
-cargo dev run-manager --cli --help
+cargo dev run-manager --help
 ```
 
 ### Generate release binaries

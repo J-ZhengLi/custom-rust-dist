@@ -508,8 +508,8 @@ fn baked_in_manifest_raw() -> &'static str {
 
 /// Get a [`ToolsetManifest`] by either:
 ///
-/// - Download from specific url.
-/// - Load from [`baked_in_manifest_raw`].
+/// - Download from specific url, which could have file schema.
+/// - Load from `baked_in_manifest_raw`.
 ///
 pub fn get_toolset_manifest(url: Option<&Url>) -> Result<ToolsetManifest> {
     if let Some(url) = url {

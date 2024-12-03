@@ -59,15 +59,16 @@ pub trait EnvConfig {
     fn config_env_vars(&self) -> Result<()>;
 }
 
+/// Contains every information that the installation process needs.
 pub struct InstallConfiguration<'a> {
     pub cargo_registry: Option<(String, String)>,
     /// Path to install everything.
     ///
     /// Note that this folder will includes `.cargo` and `.rustup` folders as well.
-    /// And the default location will be `$HOME` directory (`%USERPROFILE%` on windows).
+    /// And the default location will under `$HOME` directory (`%USERPROFILE%` on windows).
     /// So, even if the user didn't specify any install path, a pair of env vars will still
-    /// be written (CARGO_HOME and RUSTUP_HOME), as they will be located in a sub folder of `$HOME`,
-    /// which is [`installer_home`](utils::installer_home).
+    /// be written (CARGO_HOME and RUSTUP_HOME), which will be under the defult location
+    /// defined by [`default_install_dir`].
     pub install_dir: PathBuf,
     pub rustup_dist_server: Url,
     pub rustup_update_root: Url,

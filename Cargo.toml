@@ -12,10 +12,10 @@ gui = []
 
 [[bin]]
 name = "rim-cli"
-path = "src/bin/installer.rs"
+path = "src/bin/rim_cli.rs"
 
 [workspace]
-members = ["installer/src-tauri", "rim_dev"]
+members = ["rim_gui/src-tauri", "rim_dev"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

@@ -15,7 +15,7 @@ npm install pnpm -g
 
 **下载前端依赖**
 ```
-cd ./installer
+cd ./rim_gui
 pnpm install
 ```
 
@@ -40,7 +40,7 @@ pnpm add prettier -g
 ```
 嫌麻烦也可以添加到项目依赖中
 ```
-cd ./installer
+cd ./rim_gui
 pnpm add --save-dev --save-exact prettier
 ```
 
@@ -50,7 +50,7 @@ import { invoke } from '@tauri-apps/api';
 import { event } from '@tauri-apps/api';
 ```
 
-- 页面代码在文件夹 `installer/scr/view` 中
+- 页面代码在文件夹 `rim_gui/scr/view` 中
 ```
 --install
   --src
