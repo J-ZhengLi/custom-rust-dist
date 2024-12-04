@@ -16,6 +16,57 @@ use log::warn;
 
 use crate::components::Component;
 
+/// A "convenient" helper macro to [`question_single_choice`].
+///
+/// This wraps all things one typically needs, such as storing user's input
+/// then handling the action of each individual choice.
+///
+/// # Example
+/// ```ignore
+/// let s: &str;
+///
+/// handle_user_choice!(
+///     "choose a word to greet",
+///     // 1 is the default value
+///     1,
+///     s => {
+///         1 "world" => { "hello world!" },
+///         2 "rust" => { "hello rust!" },
+///         3 "rim" => { "hello rim!" }
+///     }
+/// );
+///
+/// // if user enter 2, then this assertion succeed:
+/// assert_eq!(s, "hello rust!");
+/// ```
+///
+/// **The user will see a prompt as below:**
+///
+/// ```console
+/// choose a word to greet
+///
+/// 1) world
+/// 2) rust
+/// 3) rim
+///
+/// please enter your choice below [default: 1]
+/// >
+/// ```
+macro_rules! handle_user_choice {
+    ($ques:expr, $default:expr, $assign:expr => { $($idx:literal $choice:expr => $action:block),+ }) => {
+        #[allow(clippy::needless_late_init)]
+        {
+            let choices__ = &[ $($choice),* ];
+            let choice__ = $crate::cli::common::question_single_choice($ques, choices__, $default)?;
+            $assign = match choice__ {
+                $($idx => $action),*
+                _ => unreachable!("`question_single_choice` ensures choice's range")
+            };
+        }
+    };
+}
+pub(crate) use handle_user_choice;
+
 /// A map containing a component's version difference.
 ///
 /// The keys of this map is the name of the component, the value is a pair of (maybe) strings
@@ -254,12 +305,17 @@ pub(crate) fn confirm_install() -> Result<Confirm> {
 }
 
 #[cfg(windows)]
-pub(crate) fn pause() -> Result<()> {
+pub fn pause() -> Result<()> {
     let mut stdout = io::stdout();
     writeln!(&mut stdout, "\n{}", t!("pause_prompt"))?;
     _ = stdout.flush();
 
     readline()?;
+    Ok(())
+}
+
+#[cfg(not(windows))]
+pub fn pause() -> Result<()> {
     Ok(())
 }
 

@@ -6,7 +6,8 @@
     "manager_title": "%{product} Manager",
 
     "install": "install",
-    "uninstall": "uninstall",
+    "update": "Update",
+    "uninstall": "Uninstall",
 
     "install_init": "Initalizing & Creating directory '%{dir}'...",
     "install_env_config": "Configuring environment variables...",
@@ -108,5 +109,14 @@
     "question_components_profile": "Choose a component profile",
     "install_default": "default",
     "install_everything": "everything",
-    "install_custom": "customize"
+    "install_custom": "customize",
+
+    "ask_manager_option": "Update & Uninstall",
+    "ask_update_option": "Choose an update option",
+    "update_all": "Update all (including toolkit and toolkit manager)",
+    "update_self_only": "Update toolkit manager",
+    "update_toolkit_only": "Update toolkit",
+    "ask_uninstall_option": "Choose an uninstall option",
+    "uninstall_all": "Uninstall all (including toolkit and toolkit manager)",
+    "uninstall_toolkit_only": "Uninstall toolkit"
 }

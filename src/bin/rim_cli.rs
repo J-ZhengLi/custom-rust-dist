@@ -33,5 +33,12 @@ impl Mode {
 }
 
 fn main() -> Result<()> {
-    Mode::detect().run()
+    Mode::detect().run()?;
+
+    // pause the console in case the user launch
+    // the program with double click, which most people do.
+    #[cfg(windows)]
+    rim::cli::pause()?;
+
+    Ok(())
 }
