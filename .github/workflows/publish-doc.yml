@@ -5,7 +5,7 @@ on:
   push:
     branches: [ "master" ]
     paths:
-      - '*.rs'
+      - '**.rs'
 
 permissions:
   contents: read
