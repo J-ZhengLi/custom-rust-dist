@@ -106,6 +106,10 @@ impl Command {
             }
         }
 
+        // FIXME: (J-ZhengLi) somehow this doesn't stream output anymore, wtf happend?
+        // I clearly remember it did work, I **TESTED** it! I made sure it worked
+        // then I made a PR specifically for it (https://github.com/J-ZhengLi/rim/pull/159).
+        // So how the F that this doesn't work anymore...
         output_to_log(child.stdout.as_mut());
         output_to_log(child.stderr.as_mut());
 

@@ -80,8 +80,6 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
     if let Some(cmd) = crate::core::os::unix::source_command() {
         println!("\n{}", t!("linux_source_hint", cmd = cmd));
     }
-    #[cfg(windows)]
-    common::pause()?;
 
     Ok(())
 }

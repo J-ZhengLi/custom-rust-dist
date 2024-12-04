@@ -5,6 +5,7 @@
     "manager_title": "%{product}管理工具",
 
     "install": "安装",
+    "update": "更新",
     "uninstall": "卸载",
 
     "install_init": "初始化安装目录 '%{dir}' 中...",
@@ -102,5 +103,14 @@
     "question_components_profile": "选择要安装的组件",
     "install_default": "默认安装",
     "install_everything": "全量安装",
-    "install_custom": "自定义组件选择"
+    "install_custom": "自定义组件选择",
+
+    "ask_manager_option": "更新和卸载",
+    "ask_update_option": "更新选项",
+    "update_all": "全部更新 (包括套件及此管理工具)",
+    "update_self_only": "更新管理工具",
+    "update_toolkit_only": "更新工具套件",
+    "ask_uninstall_option": "卸载选项",
+    "uninstall_all": "全部卸载 (包括套件及此管理工具)",
+    "uninstall_toolkit_only": "卸载工具套件"
 }
