@@ -1,9 +1,8 @@
-//! This module contains implementations of core functionalities,
-//! each submodule must implement traits defined in [`core`](crate::core).
-//! such as [`Installation`](crate::core::Installation).
+//! This module contains OS specific implementations of core functionalities,
+//! each submodule must implement the below traits:
 //!
-//! Note: If you add/remove sub mods here to add/remove support for certain OS,
-//! make sure to update `build.rs` as well.
+//! 1. [`EnvConfig`](crate::core::install::EnvConfig)
+//! 2. [`UninstallConfiguration`](crate::core::uninstall::UninstallConfiguration)
 
 #[cfg(unix)]
 pub(crate) mod unix;

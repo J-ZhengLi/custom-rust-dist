@@ -1,8 +1,15 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::{
+    collections::HashSet,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
-use crate::toolset_manifest::{ToolInfo, ToolMap, ToolsetManifest};
+use crate::{
+    fingerprint::InstallationRecord,
+    setter,
+    toolset_manifest::{ToolInfo, ToolMap, ToolsetManifest},
+};
 
 static COMPONENTS_COUNTER: AtomicU32 = AtomicU32::new(0);
 
@@ -22,25 +29,9 @@ pub struct Component {
     pub installed: bool,
 }
 
-macro_rules! setter {
-    ($name:ident ($self_arg:ident, $t:ty)) => {
-        #[allow(clippy::wrong_self_convention)]
-        fn $name(mut $self_arg, val: $t) -> Self {
-            $self_arg.$name = val;
-            $self_arg
-        }
-    };
-    ($name:ident ($self_arg:ident, $val:ident : $t:ty) { $init_val:expr }) => {
-        fn $name(mut $self_arg, $val: $t) -> Self {
-            $self_arg.$name = $init_val;
-            $self_arg
-        }
-    };
-}
-
 impl Component {
     #[must_use]
-    fn new(name: &str, desc: &str) -> Self {
+    pub fn new(name: &str, desc: &str) -> Self {
         let comp = Component {
             id: COMPONENTS_COUNTER.load(Ordering::Relaxed),
             group_name: None,
@@ -67,58 +58,42 @@ impl Component {
     setter!(version(self, version: Option<&str>) { version.map(ToOwned::to_owned) });
 }
 
-pub fn get_component_list_from_manifest(
-    manifest: &ToolsetManifest,
-    ignore_installed: bool,
+/// Get a combined list of tools and toolchain components in Vec<[Component]> format,
+/// whether it's installed or not.
+///
+/// A toolset manifest located under installation dir (`toolset-manifest.toml`)
+/// will be loaded in order to retrieve component's full info.
+///
+/// # Panic
+/// This should only be called in manager mode, otherwise it will panic.
+pub(crate) fn all_components_from_installation(
+    record: &InstallationRecord,
 ) -> Result<Vec<Component>> {
-    let profile = manifest.toolchain_profile().cloned().unwrap_or_default();
-    let profile_name = profile.verbose_name.as_deref().unwrap_or(&profile.name);
-    // Add a component that represents rust toolchain
-    let mut components = vec![Component::new(
-        profile_name,
-        profile.description.as_deref().unwrap_or_default(),
-    )
-    .group_name(Some(manifest.toolchain_group_name()))
-    .is_toolchain_component(true)
-    .required(true)
-    .version(Some(manifest.rust_version()))];
+    let mut full_components =
+        ToolsetManifest::load_from_install_dir()?.current_target_components(false)?;
 
-    for component in manifest.optional_toolchain_components() {
-        components.push(
-            Component::new(
-                component,
-                manifest.get_tool_description(component).unwrap_or_default(),
-            )
-            .group_name(Some(manifest.toolchain_group_name()))
-            .optional(true)
-            .is_toolchain_component(true)
-            .version(Some(manifest.rust_version())),
-        );
-    }
+    // components that are installed by rim previously.
+    let installed_toolchain = record.installed_toolchain().map(|(name, _)| name);
+    let installed_tools: HashSet<&str> = record.installed_tools().collect();
 
-    let already_installed_tools = if !ignore_installed {
-        manifest.already_installed_tools()
-    } else {
-        vec![]
-    };
-    if let Some(tools) = manifest.current_target_tools() {
-        for (tool_name, tool_info) in tools {
-            components.push(
-                Component::new(
-                    tool_name,
-                    manifest.get_tool_description(tool_name).unwrap_or_default(),
-                )
-                .group_name(manifest.group_name(tool_name))
-                .tool_installer(tool_info)
-                .required(tool_info.is_required())
-                .optional(tool_info.is_optional())
-                .installed(already_installed_tools.contains(&tool_name))
-                .version(tool_info.version()),
-            );
+    for comp in &mut full_components {
+        if comp.is_toolchain_component {
+            if let Some(tc) = installed_toolchain {
+                comp.version = Some(tc.into());
+                comp.installed = true;
+            }
+            continue;
+        }
+        // third-party tools
+        if installed_tools.contains(comp.name.as_str()) {
+            comp.installed = true;
+            if let Some(ver) = record.get_tool_version(&comp.name) {
+                comp.version = Some(ver.into());
+            }
         }
     }
 
-    Ok(components)
+    Ok(full_components)
 }
 
 pub fn component_list_to_tool_map(list: Vec<&Component>) -> ToolMap {

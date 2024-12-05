@@ -9,6 +9,7 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use url::Url;
 
+use crate::components::Component;
 use crate::core::custom_instructions;
 use crate::utils;
 
@@ -29,7 +30,7 @@ pub struct ToolsetManifest {
     #[serde(default)]
     pub(crate) tools: Tools,
     /// Proxy settings that used for download.
-    pub proxy: Option<utils::Proxy>,
+    pub proxy: Option<Proxy>,
     /// Path to the manifest file.
     #[serde(skip)]
     path: Option<PathBuf>,
@@ -102,18 +103,88 @@ impl ToolsetManifest {
             .map_err(|_| anyhow!("path '{}' cannot be converted to URL", full_path.display()))
     }
 
-    /// Get a map of [`Tool`] that are available only in current target.
+    /// Get the tools that are only available in current target.
     pub fn current_target_tools(&self) -> Option<&ToolMap> {
         let cur_target = env!("TARGET");
         self.tools.target.get(cur_target)
     }
 
-    /// Get a mut reference to the map of [`Tool`] that are available only in current target.
+    /// Get the mut reference to the tools that are only available in current target.
     ///
     /// Return `None` if there are no available tools in the current target.
     pub fn current_target_tools_mut(&mut self) -> Option<&mut ToolMap> {
         let cur_target = env!("TARGET");
         self.tools.target.get_mut(cur_target)
+    }
+
+    /// Like `current_target_tools` but instead of getting a map of tools,
+    /// this will get a list of tools and components in [`Component`] format.
+    ///
+    /// If `fresh_install` is `true`, this function will look through user's environment to see if
+    /// a specific tool is already installed or not.
+    pub fn current_target_components(&self, fresh_install: bool) -> Result<Vec<Component>> {
+        let tc_channel = self.rust_version();
+
+        let profile = self.toolchain_profile().cloned().unwrap_or_default();
+        let profile_name = profile.verbose_name.as_deref().unwrap_or(&profile.name);
+        // Add a component that represents rust toolchain
+        let mut components = vec![Component::new(
+            profile_name,
+            profile.description.as_deref().unwrap_or_default(),
+        )
+        .group_name(Some(self.toolchain_group_name()))
+        .is_toolchain_component(true)
+        .required(true)
+        .version(Some(tc_channel))];
+
+        for component in self.optional_toolchain_components() {
+            components.push(
+                Component::new(
+                    component,
+                    self.get_tool_description(component).unwrap_or_default(),
+                )
+                .group_name(Some(self.toolchain_group_name()))
+                .optional(true)
+                .is_toolchain_component(true)
+                // toolchain component's version are unified
+                .version(Some(tc_channel)),
+            );
+        }
+
+        if let Some(tools) = self.current_target_tools() {
+            let installed_in_env = if fresh_install {
+                // components that are already installed in user's machine, such as vscode, or mingw.
+                self.already_installed_tools()
+            } else {
+                vec![]
+            };
+
+            for (tool_name, tool_info) in tools {
+                let installed = installed_in_env.contains(&tool_name);
+                let version = if fresh_install && installed {
+                    // if the tool is already installed but we are doing a fresh install here,
+                    // which means it was installed by user not by `rim`,
+                    // therefore we don't know the version.
+                    None
+                } else {
+                    tool_info.version()
+                };
+                components.push(
+                    Component::new(
+                        tool_name,
+                        self.get_tool_description(tool_name).unwrap_or_default(),
+                    )
+                    .group_name(self.group_name(tool_name))
+                    .tool_installer(tool_info)
+                    .required(tool_info.is_required())
+                    .optional(tool_info.is_optional())
+                    .installed(installed)
+                    .version(version),
+                );
+            }
+        }
+
+        Ok(components)
     }
 
     /// Get a list of tool names if those are already installed in current target.
@@ -174,6 +245,36 @@ impl ToolsetManifest {
 
     pub fn rust_version(&self) -> &str {
         self.rust.version.as_str()
+    }
+}
+
+/// The proxy for download
+#[derive(Debug, Deserialize, Default, Serialize, PartialEq, Eq, Clone)]
+pub struct Proxy {
+    pub http: Option<Url>,
+    pub https: Option<Url>,
+    #[serde(alias = "no-proxy")]
+    pub no_proxy: Option<String>,
+}
+
+impl TryFrom<Proxy> for reqwest::Proxy {
+    type Error = anyhow::Error;
+    fn try_from(value: Proxy) -> std::result::Result<Self, Self::Error> {
+        let base = match (value.http, value.https) {
+            // When nothing provided, use env proxy if there is.
+            (None, None) => reqwest::Proxy::custom(|url| env_proxy::for_url(url).to_url()),
+            // When both are provided, use the provided https proxy.
+            (Some(_), Some(https)) => reqwest::Proxy::all(https)?,
+            (Some(http), None) => reqwest::Proxy::http(http)?,
+            (None, Some(https)) => reqwest::Proxy::https(https)?,
+        };
+        let with_no_proxy = if let Some(no_proxy) = value.no_proxy {
+            base.no_proxy(reqwest::NoProxy::from_string(&no_proxy))
+        } else {
+            // Fallback to using env var
+            base.no_proxy(reqwest::NoProxy::from_env())
+        };
+        Ok(with_no_proxy)
     }
 }
 
@@ -407,8 +508,8 @@ fn baked_in_manifest_raw() -> &'static str {
 
 /// Get a [`ToolsetManifest`] by either:
 ///
-/// - Download from specific url.
-/// - Load from an attached source file.
+/// - Download from specific url, which could have file schema.
+/// - Load from `baked_in_manifest_raw`.
 ///
 pub fn get_toolset_manifest(url: Option<&Url>) -> Result<ToolsetManifest> {
     if let Some(url) = url {
@@ -930,7 +1031,7 @@ no-proxy = "localhost,some.domain.com"
         let expected = ToolsetManifest::from_str(input).unwrap();
         assert_eq!(
             expected.proxy.unwrap(),
-            utils::Proxy {
+            Proxy {
                 http: Some(Url::parse("http://username:password@proxy.example.com:8080").unwrap()),
                 https: Some(
                     Url::parse("https://username:password@proxy.example.com:8080").unwrap()

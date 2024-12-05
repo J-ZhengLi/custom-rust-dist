@@ -1,16 +1,26 @@
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { onMounted, ref } from 'vue';
 // import { installConf } from './utils';
 import { RouterView } from 'vue-router';
+import Titlebar from './components/Titlebar.vue';
+import { invokeCommand } from './utils';
+
+const appTitle = ref('');
 
 onMounted(() => {
-  // FIXME: need to test if this actually affects anything
-  // installConf.loadAll();
+  invokeCommand("window_title").then((res) => {
+    if (typeof res === 'string') {
+      appTitle.value = res
+    }
+  });
 });
 </script>
 
 <template>
-  <RouterView />
+  <div>
+    <Titlebar :title="appTitle" />
+    <RouterView style="margin-top: 41px;" />
+  </div>
 </template>
 
 <style>

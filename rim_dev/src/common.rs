@@ -6,8 +6,6 @@ use anyhow::{anyhow, bail, Context, Result};
 // NB: If we end up using too many util functions from `rim`,
 // consider separate the `utils` module as a separated crate.
 /// Copy file or directory into an existing directory.
-///
-/// Similar to [`copy_file_to`], except this will recursively copy directory as well.
 pub fn copy_into<P, Q>(from: P, to: Q) -> Result<PathBuf>
 where
     P: AsRef<Path>,
@@ -69,6 +67,12 @@ where
     }
 }
 
+/// An [`fs::copy`] wrapper that only copies a file if:
+///
+/// - `to` does not exist yet.
+/// - `to` exists but have different modified date.
+///
+/// Also, this function make sure the parent directory of `to` exists by creating one if not.
 pub fn copy<P, Q>(from: P, to: Q) -> Result<()>
 where
     P: AsRef<Path>,

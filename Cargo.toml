@@ -1,6 +1,6 @@
 [package]
 name = "rim"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 description = "An interactive Rust installation manager"
 rust-version = "1.73.0" # Minimal required version to use `zip`
@@ -12,10 +12,10 @@ gui = []
 
 [[bin]]
 name = "rim-cli"
-path = "src/bin/installer.rs"
+path = "src/bin/rim_cli.rs"
 
 [workspace]
-members = ["installer/src-tauri", "rim_dev"]
+members = ["rim_gui/src-tauri", "rim_dev"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }

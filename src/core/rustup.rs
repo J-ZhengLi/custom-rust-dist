@@ -12,7 +12,8 @@ use super::uninstall::UninstallConfiguration;
 use super::CARGO_HOME;
 use super::RUSTUP_DIST_SERVER;
 use super::RUSTUP_HOME;
-use crate::utils::{self, download, force_url_join, set_exec_permission, Proxy};
+use crate::toolset_manifest::Proxy;
+use crate::utils::{self, download_with_proxy, set_exec_permission, url_join};
 
 #[cfg(windows)]
 pub(crate) const RUSTUP_INIT: &str = "rustup-init.exe";
@@ -52,13 +53,9 @@ impl ToolchainInstaller {
             utils::Command::new(rustup)
                 .args(&args)
                 .env(RUSTUP_DIST_SERVER, local_server.as_str())
-                .output_to_file()
                 .run()
         } else {
-            utils::Command::new(rustup)
-                .args(&args)
-                .output_to_file()
-                .run()
+            utils::Command::new(rustup).args(&args).run()
         }
     }
 
@@ -101,11 +98,9 @@ impl ToolchainInstaller {
         let tc_ver = manifest.rust_version();
         utils::Command::new(&rustup)
             .args(&["toolchain", "add", tc_ver])
-            .output_to_file()
             .run()?;
         utils::Command::new(&rustup)
             .args(&["default", tc_ver])
-            .output_to_file()
             .run()?;
         Ok(())
     }
@@ -117,7 +112,6 @@ impl ToolchainInstaller {
             .args(&["self", "uninstall", "-y"])
             .env(CARGO_HOME, config.cargo_home())
             .env(RUSTUP_HOME, config.rustup_home())
-            .output_to_file()
             .run()
     }
 }
@@ -158,9 +152,10 @@ fn ensure_rustup(config: &InstallConfiguration, manifest: &ToolsetManifest) -> R
 fn download_rustup_init(dest: &Path, server: &Url, proxy: Option<&Proxy>) -> Result<()> {
     info!("{}", t!("downloading_rustup_init"));
 
-    let download_url = force_url_join(server, &format!("dist/{}/{RUSTUP_INIT}", env!("TARGET")))
+    let download_url = url_join(server, &format!("dist/{}/{RUSTUP_INIT}", env!("TARGET")))
         .context("Failed to init rustup download url.")?;
-    download(RUSTUP_INIT, &download_url, dest, proxy).context("Failed to download rustup.")
+    download_with_proxy(RUSTUP_INIT, &download_url, dest, proxy)
+        .context("Failed to download rustup.")
 }
 
 fn install_rustup(rustup_init: &PathBuf) -> Result<()> {
@@ -176,8 +171,5 @@ fn install_rustup(rustup_init: &PathBuf) -> Result<()> {
         env!("TARGET"),
         "-vy",
     ];
-    utils::Command::new(rustup_init)
-        .args(&args)
-        .output_to_file()
-        .run()
+    utils::Command::new(rustup_init).args(&args).run()
 }

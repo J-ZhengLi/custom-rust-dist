@@ -6,14 +6,19 @@ pub mod components;
 mod custom_instructions;
 pub(crate) mod directories;
 pub mod install;
+mod locales;
 pub(crate) mod os;
 pub(crate) mod parser;
+mod path_ext;
 pub(crate) mod rustup;
 pub mod toolkit;
 pub(crate) mod tools;
 pub mod try_it;
 pub(crate) mod uninstall;
 pub mod update;
+
+pub use locales::Language;
+pub(crate) use path_ext::PathExt;
 
 macro_rules! declare_env_vars {
     ($($key:ident),+) => {

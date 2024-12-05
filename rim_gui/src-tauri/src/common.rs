@@ -104,3 +104,52 @@ pub(crate) fn spawn_gui_update_thread(
         }
     })
 }
+
+#[derive(serde::Serialize)]
+pub struct Language {
+    pub id: String,
+    pub name: String,
+}
+
+#[tauri::command]
+pub(crate) fn supported_languages() -> Vec<Language> {
+    rim::Language::possible_values()
+        .iter()
+        .map(|lang| {
+            let id = lang.as_str();
+            match lang {
+                rim::Language::EN => Language {
+                    id: id.to_string(),
+                    name: "English".to_string(),
+                },
+                rim::Language::CN => Language {
+                    id: id.to_string(),
+                    name: "简体中文".to_string(),
+                },
+                _ => Language {
+                    id: id.to_string(),
+                    name: id.to_string(),
+                },
+            }
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub(crate) fn set_locale(language: String) -> Result<()> {
+    let lang: rim::Language = language.parse()?;
+    utils::set_locale(lang.locale_str());
+    Ok(())
+}
+
+/// Add back rounded corners (on Windows) and shadow effects.
+///
+// TODO: This is not needed if we migrate to tauri@2, also make sure to get rid
+// of the `window_shadows` dependency at the time since it adds 6 dependencies in total.
+#[allow(unused_variables)]
+pub(crate) fn set_window_shadow(window: &tauri::Window) {
+    #[cfg(any(windows, target_os = "macos"))]
+    if let Err(e) = window_shadows::set_shadow(window, true) {
+        log::error!("unable to apply window effects: {e}");
+    }
+}

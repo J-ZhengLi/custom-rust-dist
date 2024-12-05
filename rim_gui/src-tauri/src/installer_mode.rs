@@ -4,9 +4,9 @@ use std::sync::OnceLock;
 use anyhow::Context;
 use tauri::api::dialog::FileDialogBuilder;
 
-use super::INSTALL_DIR;
+use super::{common, INSTALL_DIR};
 use crate::error::Result;
-use rim::components::{get_component_list_from_manifest, Component};
+use rim::components::Component;
 use rim::toolset_manifest::{get_toolset_manifest, ToolsetManifest};
 use rim::{try_it, utils};
 
@@ -24,27 +24,37 @@ pub(super) fn main() -> Result<()> {
             run_app,
             welcome_label,
             load_manifest_and_ret_version,
+            window_title,
+            common::supported_languages,
+            common::set_locale,
         ])
         .setup(|app| {
-            let version = env!("CARGO_PKG_VERSION");
-            tauri::WindowBuilder::new(
+            let window = tauri::WindowBuilder::new(
                 app,
                 "installer_window",
                 tauri::WindowUrl::App("index.html/#/installer".into()),
             )
             .inner_size(800.0, 600.0)
             .min_inner_size(640.0, 480.0)
-            .title(format!(
-                "{} v{version}",
-                t!("installer_title", product = t!("product"))
-            ))
+            .decorations(false)
+            .transparent(true)
             .build()?;
 
+            common::set_window_shadow(&window);
             Ok(())
         })
         .run(tauri::generate_context!())
         .context("unknown error occurs while running tauri application")?;
     Ok(())
+}
+
+#[tauri::command]
+fn window_title() -> String {
+    format!(
+        "{} v{}",
+        t!("installer_title", product = t!("product")),
+        env!("CARGO_PKG_VERSION")
+    )
 }
 
 #[tauri::command]
@@ -87,8 +97,7 @@ fn check_install_path(path: String) -> Option<String> {
 /// Get full list of supported components
 #[tauri::command]
 fn get_component_list() -> Result<Vec<Component>> {
-    let manifest = cached_manifest();
-    Ok(get_component_list_from_manifest(manifest, false)?)
+    Ok(cached_manifest().current_target_components(true)?)
 }
 
 #[tauri::command]
@@ -115,7 +124,7 @@ fn install_toolchain(
     install_dir: String,
 ) -> Result<()> {
     let install_dir = PathBuf::from(install_dir);
-    super::common::install_components(
+    common::install_components(
         window,
         components_list,
         install_dir,

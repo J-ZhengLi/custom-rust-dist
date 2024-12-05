@@ -1,12 +1,11 @@
-use std::collections::HashSet;
 use std::sync::OnceLock;
 
 use crate::core::parser::dist_manifest::DistManifest;
 use crate::core::parser::TomlParser;
+use crate::fingerprint::InstallationRecord;
 use crate::{components, utils};
-use crate::{fingerprint::InstallationRecord, toolset_manifest::ToolsetManifest};
 use anyhow::Result;
-use log::{debug, info};
+use log::info;
 use semver::Version;
 use serde::Serialize;
 use url::Url;
@@ -35,9 +34,7 @@ pub struct Toolkit {
 
 impl PartialEq for Toolkit {
     fn eq(&self, other: &Self) -> bool {
-        self.name == other.name
-            && self.version == other.version
-            && self.manifest_url == other.manifest_url
+        self.name == other.name && self.version == other.version
     }
 }
 
@@ -48,7 +45,6 @@ impl Toolkit {
     /// what components it has.
     pub fn installed() -> Result<Option<&'static Self>> {
         if let Some(cached) = INSTALLED_KIT.get() {
-            debug!("using cached INSTALLED_KIT: {:#?}", cached);
             return Ok(Some(cached));
         }
 
@@ -57,49 +53,20 @@ impl Toolkit {
             return Ok(None);
         }
 
-        // Right now we already know user has installed a toolkit,
-        // just don't know the details yet, so let's create a "blank" installed toolkit
-        // then try to collect the missing details later.
-        let mut tk = Self {
-            name: t!("unknown_toolkit").to_string(),
-            version: "N/A".to_string(),
+        let fp = InstallationRecord::load_from_install_dir()?;
+        let components = components::all_components_from_installation(&fp)?;
+
+        let tk = Self {
+            name: fp
+                .name
+                .clone()
+                .unwrap_or_else(|| t!("unknown_toolkit").to_string()),
+            version: fp.version.as_deref().unwrap_or("N/A").to_string(),
             desc: None,
             info: None,
             manifest_url: None,
-            components: vec![],
+            components,
         };
-        let fp = InstallationRecord::load_from_install_dir()?;
-        let manifest = ToolsetManifest::load_from_install_dir()?;
-
-        if let Some(name) = &fp.name {
-            name.clone_into(&mut tk.name);
-        }
-        if let Some(ver) = &fp.version {
-            ver.clone_into(&mut tk.version);
-        }
-
-        let installed_comps = fp.installed_components();
-        let installed_tools = fp.installed_tools();
-        let installed_set: HashSet<&&str> =
-            HashSet::from_iter(installed_comps.iter().chain(installed_tools.iter()));
-        debug!("all installed tools: {:?}", &installed_set);
-        let components = components::get_component_list_from_manifest(&manifest, true)?;
-        tk.components = components;
-
-        // get installed toolchain version, to adjust components version later.
-        // FIXME: this should be returned from `installed_components`
-        let channel = fp.installed_toolchain_channel();
-
-        for c in &mut tk.components {
-            if installed_set.contains(&c.name.as_str()) {
-                c.installed = true;
-            }
-            // FIXME: the components are from manifest,
-            // so there's this hack to make sure they reflect the actual installed version.
-            if c.is_toolchain_component {
-                c.version = channel.map(ToOwned::to_owned);
-            }
-        }
 
         // Make a clone and cache the final result
         let cached = INSTALLED_KIT.get_or_init(|| tk);
@@ -173,6 +140,8 @@ pub fn installable_toolkits() -> Result<Vec<&'static Toolkit>> {
 
 /// Return the latest available toolkit if it's not already installed.
 pub fn latest_installable_toolkit() -> Result<Option<&'static Toolkit>> {
+    info!("{}", t!("checking_toolkit_updates"));
+
     let all_toolkits = toolkits_from_server()?;
     if let Some(installed) = Toolkit::installed()? {
         let Some(maybe_latest) = all_toolkits
@@ -180,6 +149,7 @@ pub fn latest_installable_toolkit() -> Result<Option<&'static Toolkit>> {
             // make sure they are the same **product**
             .find(|tk| tk.name == installed.name)
         else {
+            info!("{}", t!("no_available_updates"));
             return Ok(None);
         };
         // For some reason, the version might contains prefixes such as "stable 1.80.1",
@@ -199,6 +169,14 @@ pub fn latest_installable_toolkit() -> Result<Option<&'static Toolkit>> {
         if target_version > cur_version {
             Ok(Some(maybe_latest))
         } else {
+            info!(
+                "{}",
+                t!(
+                    "latest_toolkit_installed",
+                    name = installed.name,
+                    version = cur_version
+                )
+            );
             Ok(None)
         }
     } else {

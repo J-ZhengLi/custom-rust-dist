@@ -12,7 +12,7 @@ use crate::core::install::{
 };
 use crate::core::try_it;
 use crate::toolset_manifest::get_toolset_manifest;
-use crate::{components, default_install_dir, utils};
+use crate::{default_install_dir, utils};
 
 use super::common::{
     question_single_choice, ComponentChoices, ComponentDecoration, ComponentListBuilder,
@@ -44,7 +44,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
     let mut manifest = get_toolset_manifest(manifest_url.as_ref())?;
     manifest.adjust_paths()?;
 
-    let component_list = components::get_component_list_from_manifest(&manifest, false)?;
+    let component_list = manifest.current_target_components(true)?;
     let user_opt = CustomInstallOpt::collect_from_user(
         prefix.as_deref().unwrap_or(&default_install_dir()),
         component_list,
@@ -80,8 +80,6 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
     if let Some(cmd) = crate::core::os::unix::source_command() {
         println!("\n{}", t!("linux_source_hint", cmd = cmd));
     }
-    #[cfg(windows)]
-    common::pause()?;
 
     Ok(())
 }

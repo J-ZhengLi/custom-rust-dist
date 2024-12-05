@@ -59,15 +59,16 @@ pub trait EnvConfig {
     fn config_env_vars(&self) -> Result<()>;
 }
 
+/// Contains every information that the installation process needs.
 pub struct InstallConfiguration<'a> {
     pub cargo_registry: Option<(String, String)>,
     /// Path to install everything.
     ///
     /// Note that this folder will includes `.cargo` and `.rustup` folders as well.
-    /// And the default location will be `$HOME` directory (`%USERPROFILE%` on windows).
+    /// And the default location will under `$HOME` directory (`%USERPROFILE%` on windows).
     /// So, even if the user didn't specify any install path, a pair of env vars will still
-    /// be written (CARGO_HOME and RUSTUP_HOME), as they will be located in a sub folder of `$HOME`,
-    /// which is [`installer_home`](utils::installer_home).
+    /// be written (CARGO_HOME and RUSTUP_HOME), which will be under the defult location
+    /// defined by [`default_install_dir`].
     pub install_dir: PathBuf,
     pub rustup_dist_server: Url,
     pub rustup_update_root: Url,
@@ -281,9 +282,11 @@ impl<'a> InstallConfiguration<'a> {
     // TODO: Write version info after installing each tool,
     // which is later used for updating.
     fn install_tool(&mut self, name: &str, tool: &ToolInfo) -> Result<()> {
+        let tool_ver = tool.version();
         let record = match tool {
             ToolInfo::PlainVersion(version) | ToolInfo::DetailedVersion { ver: version, .. } => {
-                Tool::cargo_tool(name, Some(vec![name, "--version", version])).install(self)?
+                Tool::cargo_tool(name, Some(vec![name, "--version", version]))
+                    .install(tool_ver, self)?
             }
             ToolInfo::Git {
                 git,
@@ -303,9 +306,9 @@ impl<'a> InstallConfiguration<'a> {
                     args.extend(["--rev", s]);
                 }
 
-                Tool::cargo_tool(name, Some(args)).install(self)?
+                Tool::cargo_tool(name, Some(args)).install(tool_ver, self)?
             }
-            ToolInfo::Path { path, .. } => self.try_install_from_path(name, path)?,
+            ToolInfo::Path { path, .. } => self.try_install_from_path(name, tool_ver, path)?,
             // TODO: Have a dedicated download folder, do not use temp dir to store downloaded artifacts,
             // so then we can have the `resume download` feature.
             ToolInfo::Url { url, .. } => {
@@ -318,9 +321,9 @@ impl<'a> InstallConfiguration<'a> {
                     .filter(|seg| !seg.is_empty())
                     .ok_or_else(|| anyhow!("'{url}' doesn't appear to be a downloadable file"))?;
                 let dest = temp_dir.path().join(downloaded_file_name);
-                utils::download(name, url, &dest, self.manifest.proxy.as_ref())?;
+                utils::download_with_proxy(name, url, &dest, self.manifest.proxy.as_ref())?;
 
-                self.try_install_from_path(name, &dest)?
+                self.try_install_from_path(name, tool_ver, &dest)?
             }
         };
 
@@ -329,7 +332,12 @@ impl<'a> InstallConfiguration<'a> {
         Ok(())
     }
 
-    fn try_install_from_path(&self, name: &str, path: &Path) -> Result<ToolRecord> {
+    fn try_install_from_path(
+        &self,
+        name: &str,
+        version: Option<&str>,
+        path: &Path,
+    ) -> Result<ToolRecord> {
         if !path.exists() {
             bail!(
                 "unable to install '{name}' because the path to it's installer '{}' does not exist.",
@@ -341,7 +349,7 @@ impl<'a> InstallConfiguration<'a> {
         let tool_installer_path = self.extract_or_copy_to(path, temp_dir.path())?;
         let tool_installer = Tool::from_path(name, &tool_installer_path)
             .with_context(|| format!("no install method for tool '{name}'"))?;
-        tool_installer.install(self)
+        tool_installer.install(version, self)
     }
 
     /// Configuration options for `cargo`.
@@ -389,7 +397,7 @@ impl<'a> InstallConfiguration<'a> {
 }
 
 // For updates
-impl<'a> InstallConfiguration<'a> {
+impl InstallConfiguration<'_> {
     pub fn update(mut self, components: Vec<Component>) -> Result<()> {
         let (_, tools) = split_components(components);
         // setup env for current process

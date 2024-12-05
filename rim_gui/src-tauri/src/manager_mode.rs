@@ -5,13 +5,13 @@ use std::{
 };
 
 use crate::{
-    common::{spawn_gui_update_thread, ON_COMPLETE_EVENT, PROGRESS_UPDATE_EVENT},
+    common::{self, spawn_gui_update_thread, ON_COMPLETE_EVENT, PROGRESS_UPDATE_EVENT},
     error::Result,
 };
 use anyhow::Context;
 use rim::UninstallConfiguration;
 use rim::{
-    components::{self, Component},
+    components::Component,
     toolkit::{self, Toolkit},
     toolset_manifest::{get_toolset_manifest, ToolsetManifest},
     update::{self, UpdateOpt},
@@ -39,27 +39,37 @@ pub(super) fn main() -> Result<()> {
             install_toolkit,
             maybe_self_update,
             handle_toolkit_install_click,
+            window_title,
+            common::supported_languages,
+            common::set_locale,
         ])
         .setup(|app| {
-            tauri::WindowBuilder::new(
+            let window = tauri::WindowBuilder::new(
                 app,
                 "manager_window",
                 tauri::WindowUrl::App("index.html/#/manager".into()),
             )
             .inner_size(800.0, 600.0)
             .min_inner_size(640.0, 480.0)
-            .title(format!(
-                "{} v{}",
-                t!("manager_title", product = t!("product")),
-                env!("CARGO_PKG_VERSION")
-            ))
+            .decorations(false)
+            .transparent(true)
             .build()?;
 
+            common::set_window_shadow(&window);
             Ok(())
         })
         .run(tauri::generate_context!())
         .context("unknown error occurs while running tauri application")?;
     Ok(())
+}
+
+#[tauri::command]
+fn window_title() -> String {
+    format!(
+        "{} v{}",
+        t!("installer_title", product = t!("product")),
+        env!("CARGO_PKG_VERSION")
+    )
 }
 
 #[tauri::command]
@@ -121,13 +131,7 @@ fn install_toolkit(window: tauri::Window, components_list: Vec<Component>) -> Re
         let manifest = guard
             .as_ref()
             .expect("internal error: a toolkit must be selected to install");
-        super::common::install_components(
-            window,
-            components_list,
-            p.to_path_buf(),
-            manifest,
-            true,
-        )?;
+        common::install_components(window, components_list, p.to_path_buf(), manifest, true)?;
         Ok(())
     })?;
     Ok(())
@@ -161,6 +165,10 @@ fn maybe_self_update(app: AppHandle) -> Result<()> {
     Ok(())
 }
 
+/// When the `install` button in a toolkit's card was clicked,
+/// the URL of that toolkit was pass to this function. Which will be used to
+/// download its manifest from the server, and we can then return a list of
+/// components that are loaded from it.
 #[tauri::command]
 fn handle_toolkit_install_click(url: String) -> Result<Vec<Component>> {
     // the `url` input was converted from `Url`, so it will definitely be convert back without issue,
@@ -169,7 +177,7 @@ fn handle_toolkit_install_click(url: String) -> Result<Vec<Component>> {
 
     // load the manifest for components information
     let manifest = get_toolset_manifest(Some(&url_))?;
-    let components = components::get_component_list_from_manifest(&manifest, true)?;
+    let components = manifest.current_target_components(false)?;
 
     // cache the selected toolset manifest
     let mut guard = selected_toolset();

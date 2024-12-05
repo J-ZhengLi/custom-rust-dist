@@ -15,7 +15,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub use download::{download, DownloadOpt, Proxy};
+pub use download::{download, download_with_proxy, DownloadOpt};
 pub use extraction::Extractable;
 pub use file_system::*;
 pub use log::{log_file_path, Logger};
@@ -56,6 +56,51 @@ macro_rules! exe {
 }
 pub(crate) use exe;
 
+/// Struct member variables setter.
+///
+/// # Usage
+///
+/// ```rust
+/// # use rim::setter;
+/// #[derive(Default)]
+/// struct Foo {
+///     a: bool,
+///     b: u32,
+///     c: Option<u8>,
+/// }
+///
+/// impl Foo {
+///     setter!(a(self, bool));
+///     setter!(b(self, u32));
+///     setter!(c(self, value: u8) { Some(value) });
+/// }
+///
+/// let foo = Foo::default()
+///     .a(true)
+///     .b(10)
+///     .c(100);
+/// assert_eq!(foo.a, true);
+/// assert_eq!(foo.b, 10);
+/// assert_eq!(foo.c, Some(100));
+/// ```
+// FIXME(?): Find a proper way to provide function visibility instead of all `pub`.
+#[macro_export]
+macro_rules! setter {
+    ($name:ident ($self_arg:ident, $t:ty)) => {
+        #[allow(clippy::wrong_self_convention)]
+        pub fn $name(mut $self_arg, val: $t) -> Self {
+            $self_arg.$name = val;
+            $self_arg
+        }
+    };
+    ($name:ident ($self_arg:ident, $val:ident : $t:ty) { $init_val:expr }) => {
+        pub fn $name(mut $self_arg, $val: $t) -> Self {
+            $self_arg.$name = $init_val;
+            $self_arg
+        }
+    };
+}
+
 /// Forcefully parsing a `&str` to [`Url`].
 ///
 /// # Panic
@@ -65,11 +110,11 @@ pub fn force_parse_url(url: &str) -> Url {
     Url::parse(url).unwrap_or_else(|e| panic!("failed to parse url '{url}': {e}"))
 }
 
-/// Basically [`Url::join`], but will insert a forward slash (`/`) to the root if necessary.
+/// Basically [`Url::join`], but will push a forward slash (`/`) to the root if necessary.
 ///
 /// [`Url::join`] will replace the last part of a root if the root does not have trailing slash,
 /// and this function is to make sure of that, so the `root` will always join with `s`.
-pub fn force_url_join(root: &Url, s: &str) -> Result<Url> {
+pub fn url_join(root: &Url, s: &str) -> Result<Url> {
     let result = if root.as_str().ends_with('/') {
         root.join(s)?
     } else {
@@ -131,7 +176,11 @@ pub fn to_string_lossy<S: AsRef<OsStr>>(s: S) -> String {
 /// Allowing the i18n framework to use the current system locale.
 pub fn use_current_locale() {
     let locale = sys_locale::get_locale().unwrap_or_else(|| "en".to_string());
-    rust_i18n::set_locale(&locale);
+    set_locale(&locale);
+}
+
+pub fn set_locale(loc: &str) {
+    rust_i18n::set_locale(loc);
 }
 
 #[cfg(test)]

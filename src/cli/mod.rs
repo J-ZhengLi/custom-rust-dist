@@ -10,13 +10,15 @@ mod update;
 
 use anyhow::{anyhow, bail, Result};
 use clap::{Parser, Subcommand, ValueHint};
+use common::handle_user_choice;
 use std::{
     path::{Path, PathBuf},
     str::FromStr,
 };
 use url::Url;
 
-use crate::utils;
+use crate::{core::Language, utils};
+pub use common::pause;
 
 /// Install rustup, rust toolchain, and various tools.
 // NOTE: If you changed anything in this struct, or any other child types that related to
@@ -38,6 +40,9 @@ pub struct Installer {
     #[arg(hide = true, long)]
     pub no_gui: bool,
 
+    /// Specify another language to display
+    #[arg(short, long, value_name = "LANG", value_parser = Language::possible_values())]
+    pub lang: Option<String>,
     /// Set another path to install Rust.
     #[arg(long, value_name = "PATH", value_hint = ValueHint::DirPath)]
     prefix: Option<PathBuf>,
@@ -98,7 +103,6 @@ impl PathOrUrl {
 // this struct, make sure the README doc is updated as well,
 #[derive(Parser, Debug)]
 #[command(version, about)]
-#[cfg_attr(not(feature = "gui"), command(arg_required_else_help(true)))]
 pub struct Manager {
     /// Enable verbose output
     #[arg(hide = true, short, long, conflicts_with = "quiet")]
@@ -113,6 +117,10 @@ pub struct Manager {
     /// Don't show GUI when running the program.
     #[arg(hide = true, long)]
     pub no_gui: bool,
+
+    /// Specify another language to display
+    #[arg(short, long, value_name = "LANG", value_parser = Language::possible_values())]
+    pub lang: Option<String>,
     #[command(subcommand)]
     command: Option<ManagerSubcommands>,
 }
@@ -127,11 +135,7 @@ impl Installer {
     }
 
     pub fn execute(&self) -> Result<()> {
-        // Setup logger
-        utils::Logger::new()
-            .verbose(self.verbose)
-            .quiet(self.quiet)
-            .setup()?;
+        setup(self.verbose, self.quiet, self.lang.as_deref())?;
 
         install::execute_installer(self)
     }
@@ -139,14 +143,10 @@ impl Installer {
 
 impl Manager {
     pub fn execute(&self) -> Result<()> {
-        // Setup logger
-        utils::Logger::new()
-            .verbose(self.verbose)
-            .quiet(self.quiet)
-            .setup()?;
+        setup(self.verbose, self.quiet, self.lang.as_deref())?;
 
         let Some(subcmd) = &self.command else {
-            return Ok(());
+            return ManagerSubcommands::from_interaction()?.execute();
         };
         subcmd.execute()
     }
@@ -224,6 +224,90 @@ impl ManagerSubcommands {
         }
         Ok(())
     }
+
+    fn from_interaction() -> Result<Self> {
+        loop {
+            let Some(mut manager_opt) = Self::question_manager_option_()? else {
+                // user choose to cancel, exit the program
+                std::process::exit(0);
+            };
+
+            match manager_opt {
+                Self::Update { .. } => {
+                    if !manager_opt.question_update_option_()? {
+                        continue;
+                    }
+                }
+                Self::Uninstall { .. } => {
+                    if !manager_opt.question_uninstall_option_()? {
+                        continue;
+                    }
+                }
+                _ => unimplemented!(
+                    "manager interaction currently only have `update` and `install` \
+                    options available"
+                ),
+            }
+
+            return Ok(manager_opt);
+        }
+    }
+
+    fn question_manager_option_() -> Result<Option<Self>> {
+        let maybe_cmd;
+
+        // NOTE: If more option added, make sure to add the corresponding match pattern
+        // to `from_interaction` function., otherwise it may cause `unimplemented` error.
+        handle_user_choice!(
+            t!("ask_manager_option"), 3,
+            maybe_cmd => {
+                1 t!("update") => {
+                    Some(Self::Update { toolkit_only: false, manager_only: false })
+                },
+                2 t!("uninstall") => { Some(Self::Uninstall { keep_self: false }) },
+                3 t!("cancel") => { None }
+            }
+        );
+
+        Ok(maybe_cmd)
+    }
+
+    /// Ask user about the update options, return a `bool` indicates whether the
+    /// user wishs to continue.
+    fn question_update_option_(&mut self) -> Result<bool> {
+        handle_user_choice!(
+            t!("ask_update_option"), 1,
+            *self => {
+                1 t!("update_all") => {
+                    Self::Update { toolkit_only: false, manager_only: false }
+                },
+                2 t!("update_self_only") => {
+                    Self::Update { toolkit_only: false, manager_only: true }
+                },
+                3 t!("update_toolkit_only") => {
+                    Self::Update { toolkit_only: true, manager_only: false }
+                },
+                4 t!("back") => { return Ok(false) }
+            }
+        );
+
+        Ok(true)
+    }
+
+    /// Ask user about uninstallation options, return a `bool` indicates whether the
+    /// user wishs to continue.
+    fn question_uninstall_option_(&mut self) -> Result<bool> {
+        handle_user_choice!(
+            t!("ask_uninstall_option"), 1,
+            *self => {
+                1 t!("uninstall_all") => { Self::Uninstall { keep_self: false } },
+                2 t!("uninstall_toolkit_only") => { Self::Uninstall { keep_self: true } },
+                3 t!("back") => { return Ok(false) }
+            }
+        );
+
+        Ok(true)
+    }
 }
 
 pub fn parse_installer_cli() -> Installer {
@@ -232,4 +316,18 @@ pub fn parse_installer_cli() -> Installer {
 
 pub fn parse_manager_cli() -> Manager {
     Manager::parse()
+}
+
+fn setup(verbose: bool, quiet: bool, lang: Option<&str>) -> Result<()> {
+    // Setup locale
+    if let Some(lang_str) = lang {
+        let parsed: Language = lang_str.parse()?;
+        utils::set_locale(parsed.locale_str());
+    } else {
+        utils::use_current_locale();
+    }
+    // Setup logger
+    utils::Logger::new().verbose(verbose).quiet(quiet).setup()?;
+
+    Ok(())
 }

@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use std::path::Path;
 use url::Url;
 
-use crate::components::{get_component_list_from_manifest, Component};
+use crate::components::Component;
 use crate::core::toolkit::Toolkit;
 use crate::core::update::UpdateOpt;
 use crate::toolkit::latest_installable_toolkit;
@@ -40,10 +40,8 @@ fn update_toolkit_(install_dir: &Path) -> Result<()> {
         return Ok(());
     };
 
-    info!("{}", t!("checking_toolkit_updates"));
     // get possible update
     let Some(latest_toolkit) = latest_installable_toolkit()? else {
-        info!("{}", t!("no_available_updates"));
         return Ok(());
     };
 
@@ -59,7 +57,7 @@ fn update_toolkit_(install_dir: &Path) -> Result<()> {
             )
         })?;
     let manifest = get_toolset_manifest(Some(&manifest_url))?;
-    let new_components = get_component_list_from_manifest(&manifest, false)?;
+    let new_components = manifest.current_target_components(false)?;
 
     // notify user that we will install the latest update to replace their current installation
     info!(
