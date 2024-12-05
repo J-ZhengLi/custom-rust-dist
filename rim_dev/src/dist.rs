@@ -185,7 +185,7 @@ fn pnpm_install() {
     let fail_msg = "unable to run `pnpm i`, \
             please manually cd to `rim_gui/` then run the command manually";
 
-    let gui_crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_file_name("installer");
+    let gui_crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_file_name("rim_gui");
     assert!(gui_crate_dir.exists());
 
     cfg_if! {

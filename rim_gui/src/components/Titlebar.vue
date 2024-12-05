@@ -16,16 +16,16 @@ interface Language {
 }
 
 const languages: Ref<Language[]> = ref([]);
-const showLangs = ref(false);
+// const showLangs = ref(false);
 
 function minimize() { appWindow.minimize(); }
 function maximize() { appWindow.toggleMaximize() }
 function close() { appWindow.close() }
-function onLangSelected(value: string) {
-    invokeCommand("set_locale", { language: value }).then(() => {
-        location.reload();
-    });
-}
+// function onLangSelected(value: string) {
+//     invokeCommand("set_locale", { language: value }).then(() => {
+//         location.reload();
+//     });
+// }
 
 onMounted(() => {
     invokeCommand("supported_languages").then((list) => {
