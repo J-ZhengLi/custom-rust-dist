@@ -11,7 +11,6 @@ use crate::core::install::InstallConfiguration;
 use crate::core::uninstall::UninstallConfiguration;
 use crate::{core::os::add_to_path, utils};
 use anyhow::Result;
-use log::warn;
 
 #[derive(Debug)]
 pub(crate) struct VSCodeInstaller<'a> {

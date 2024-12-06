@@ -1,7 +1,6 @@
 use crate::core::tools::VSCODE_FAMILY;
 use crate::utils;
 use anyhow::Result;
-use log::info;
 use std::{
     env,
     path::{Path, PathBuf},

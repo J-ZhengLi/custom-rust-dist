@@ -6,7 +6,6 @@ use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
 use crate::utils;
 use anyhow::Result;
 
-use log::{info, warn};
 pub(crate) use rustup::*;
 
 impl EnvConfig for InstallConfiguration<'_> {

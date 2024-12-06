@@ -5,7 +5,6 @@ use crate::core::parser::TomlParser;
 use crate::fingerprint::InstallationRecord;
 use crate::{components, utils};
 use anyhow::Result;
-use log::info;
 use semver::Version;
 use serde::Serialize;
 use url::Url;

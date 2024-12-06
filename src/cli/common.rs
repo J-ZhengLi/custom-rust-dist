@@ -12,7 +12,6 @@ use std::{
 
 use anyhow::{Context, Result};
 use indexmap::IndexMap;
-use log::warn;
 
 use crate::components::Component;
 

@@ -11,7 +11,6 @@ tauri-build = { version = "1", features = [] }
 [dependencies]
 tauri = { version = "1", features = [ "window-all", "dialog-all", "shell-open"] }
 window-shadows = "0.2.2"
-serde.workspace = true
 serde_json = "1"
 ###
 anyhow.workspace = true
@@ -21,8 +20,9 @@ tempfile.workspace = true
 rim = { path = "../..", features = [ "gui" ] }
 indexmap.workspace = true
 rust-i18n.workspace = true
-log.workspace = true
-fern.workspace = true
+serde.workspace = true
+tokio.workspace = true
+tracing.workspace = true
 
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!

@@ -1,4 +1,5 @@
 use std::{
+    path::Path,
     sync::{mpsc, Arc, Mutex, MutexGuard, OnceLock},
     thread,
     time::Duration,
@@ -36,7 +37,7 @@ pub(super) fn main() -> Result<()> {
             get_available_kits,
             get_install_dir,
             uninstall_toolkit,
-            install_toolkit,
+            // install_toolkit,
             maybe_self_update,
             handle_toolkit_install_click,
             window_title,
@@ -91,7 +92,7 @@ fn get_install_dir() -> String {
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
+async fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
     let (msg_sendr, msg_recvr) = mpsc::channel::<String>();
     // config logger to use the `msg_sendr` we just created, use OnceLock to make sure it run
     // exactly once.
@@ -100,40 +101,39 @@ fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
     let window = Arc::new(window);
     let window_clone = Arc::clone(&window);
 
-    let uninstall_thread = thread::spawn(move || -> anyhow::Result<()> {
-        // FIXME: this is needed to make sure the other thread could recieve the first couple messages
-        // we sent in this thread. But it feels very wrong, there has to be better way.
-        thread::sleep(Duration::from_millis(500));
-
+    let uninstall_thread = tokio::spawn(async move {
         let pos_cb =
             |pos: f32| -> anyhow::Result<()> { Ok(window.emit(PROGRESS_UPDATE_EVENT, pos)?) };
         let progress = Progress::new(&pos_cb);
 
         let config = UninstallConfiguration::init(Some(progress))?;
-        config.uninstall(remove_self)?;
+        config.uninstall(remove_self).await?;
 
         window.emit(ON_COMPLETE_EVENT, ())?;
         Ok(())
     });
 
-    let gui_thread = spawn_gui_update_thread(window_clone, uninstall_thread, msg_recvr);
+    let gui_thread = spawn_gui_update_thread(window_clone, uninstall_thread, msg_recvr).await;
 
     if gui_thread.is_finished() {
-        gui_thread.join().expect("failed to join GUI thread")?;
+        gui_thread.await.expect("failed to join GUI thread")?;
     }
     Ok(())
 }
 
-#[tauri::command(rename_all = "snake_case")]
-fn install_toolkit(window: tauri::Window, components_list: Vec<Component>) -> Result<()> {
-    UpdateOpt::new().update_toolkit(|p| {
-        let guard = selected_toolset();
-        let manifest = guard
-            .as_ref()
-            .expect("internal error: a toolkit must be selected to install");
-        common::install_components(window, components_list, p.to_path_buf(), manifest, true)?;
-        Ok(())
-    })?;
+// #[tauri::command(rename_all = "snake_case")]
+async fn install_toolkit(window: tauri::Window, components_list: Vec<Component>) -> Result<()> {
+    UpdateOpt::new()
+        .update_toolkit(|p| async {
+            let guard = selected_toolset();
+            let manifest = guard
+                .as_ref()
+                .expect("internal error: a toolkit must be selected to install");
+            common::install_components(window, components_list, p.to_path_buf(), manifest, true)
+                .await?;
+            Ok(())
+        })
+        .await?;
     Ok(())
 }
 

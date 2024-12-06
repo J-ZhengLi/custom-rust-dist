@@ -18,7 +18,7 @@ use std::{
 pub use download::{download, download_with_proxy, DownloadOpt};
 pub use extraction::Extractable;
 pub use file_system::*;
-pub use log::{log_file_path, Logger};
+pub use log::Logger;
 pub use process::*;
 pub use progress_bar::Progress;
 

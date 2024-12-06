@@ -1,55 +1,50 @@
 use anyhow::Result;
-use chrono::Local;
-use fern::colors::{Color, ColoredLevelConfig};
-use log::LevelFilter;
-use std::io;
+use tracing::level_filters::LevelFilter;
+use tracing::Subscriber;
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::registry::LookupSpan;
+use tracing_subscriber::{Layer, Registry};
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::Sender;
 use std::sync::OnceLock;
 
-#[derive(Debug)]
-pub struct Logger {
-    output_sender: Option<Sender<String>>,
-    dispatcher_: fern::Dispatch,
-}
+static FILE_LOG_HANDLE: OnceLock<WorkerGuard> = OnceLock::new();
+static LOG_DIR_PATH: OnceLock<PathBuf> = OnceLock::new();
 
-impl Default for Logger {
-    fn default() -> Self {
-        Self::new()
-    }
+pub struct Logger {
+    level_filter: LevelFilter,
 }
 
 impl Logger {
     pub fn new() -> Self {
         #[cfg(not(debug_assertions))]
-        let level = LevelFilter::Info;
+        let default_level = LevelFilter::INFO;
         #[cfg(debug_assertions)]
-        let level = LevelFilter::Debug;
+        let default_level = LevelFilter::DEBUG;
 
         Self {
-            output_sender: None,
-            dispatcher_: fern::Dispatch::new().level(level),
+            level_filter: default_level,
         }
     }
     /// Set verbose output, this will print `debug!` messages as well.
     pub fn verbose(mut self, v: bool) -> Self {
         if v {
-            self.dispatcher_ = self.dispatcher_.level(LevelFilter::Debug);
+            self.level_filter = LevelFilter::DEBUG;
         }
         self
     }
     /// Ignore most output, keep only the `error` messages.
     pub fn quiet(mut self, q: bool) -> Self {
         if q {
-            self.dispatcher_ = self.dispatcher_.level(LevelFilter::Error);
+            self.level_filter = LevelFilter::ERROR;
         }
         self
     }
-    /// Send output using a specific sender rather than printing on `stdout`.
-    pub fn sender(mut self, sender: Sender<String>) -> Self {
-        self.output_sender = Some(sender);
-        self
-    }
+    // /// Send output using a specific sender rather than printing on `stdout`.
+    // pub fn sender(mut self, sender: Sender<String>) -> Self {
+    //     self.output_sender = Some(sender);
+    //     self
+    // }
 
     /// Setup logger using [`log`] and [`fern`], this must be called first before
     /// any of the `info!`, `warn!`, `trace!`, `debug!`, `error!` macros.
@@ -59,48 +54,68 @@ impl Logger {
     /// - If [`quiet`](Logger::quiet) was called with `true`, this will not output any message
     ///     on `stdout`, but will still output them into log file.
     pub fn setup(self) -> Result<()> {
+        let registry = Registry::default()
+            .with(file_logger()?);
         // decide if `Sender` or `Stdout` should be used as message medium.
-        let output = if let Some(sender) = self.output_sender {
-            self.dispatcher_
-                .format(|out, msg, rec| {
-                    out.finish(format_args!(
-                        "{}: {msg}",
-                        rec.level().to_string().to_lowercase()
-                    ));
-                })
-                .chain(sender)
-        } else {
-            self.dispatcher_
-                .format(|out, msg, rec| {
-                    out.finish(format_args!(
-                        "{}: {msg}",
-                        ColoredLevelConfig::new()
-                            .info(Color::BrightBlue)
-                            .debug(Color::Magenta)
-                            .color(rec.level())
-                            .to_string()
-                            .to_lowercase(),
-                    ));
-                })
-                .chain(io::stdout())
-        };
+        // let output = if let Some(sender) = self.output_sender {
+        //     self.dispatcher_
+        //         .format(|out, msg, rec| {
+        //             out.finish(format_args!(
+        //                 "{}: {msg}",
+        //                 rec.level().to_string().to_lowercase()
+        //             ));
+        //         })
+        //         .chain(sender)
+        // } else {
+        //     self.dispatcher_
+        //         .format(|out, msg, rec| {
+        //             out.finish(format_args!(
+        //                 "{}: {msg}",
+        //                 ColoredLevelConfig::new()
+        //                     .info(Color::BrightBlue)
+        //                     .debug(Color::Magenta)
+        //                     .color(rec.level())
+        //                     .to_string()
+        //                     .to_lowercase(),
+        //             ));
+        //         })
+        //         .chain(io::stdout())
+        // };
 
-        let file_config = fern::Dispatch::new()
-            .format(|out, msg, rec| {
-                out.finish(format_args!(
-                    "[{} {}] {msg}",
-                    Local::now().to_rfc3339(),
-                    rec.target(),
-                ))
-            })
-            .chain(fern::log_file(log_file_path()?)?);
+        // let file_config = fern::Dispatch::new()
+        //     .format(|out, msg, rec| {
+        //         out.finish(format_args!(
+        //             "[{} {}] {msg}",
+        //             Local::now().to_rfc3339(),
+        //             rec.target(),
+        //         ))
+        //     })
+        //     .chain(fern::log_file(log_file_path()?)?);
 
-        output.chain(file_config).apply()?;
+        // output.chain(file_config).apply()?;
         Ok(())
     }
 }
 
-static LOG_FILE_PATH: OnceLock<PathBuf> = OnceLock::new();
+fn file_logger<S>() -> Result<impl Layer<S>>
+where
+    S: Subscriber + for<'span> LookupSpan<'span>,
+{
+    let prefix = super::lowercase_program_name()
+        .unwrap_or(env!("CARGO_PKG_NAME").to_string());
+    let appender =tracing_appender::rolling::daily(log_dir(), prefix);
+    let (writer, guard) = tracing_appender::non_blocking(appender);
+
+    // The `WorkerGuard` is essential for outputing log to file,
+    // we can no longer do that if it ended up being dropped.
+    // Therefore we lock it as static, keeping it alive during the entire process.
+    FILE_LOG_HANDLE
+        .set(guard)
+        .expect("internal error: file logger should be configured exactly once");
+
+    Ok(tracing_subscriber::fmt::Layer::default().with_writer(writer))
+}
+
 /// Get the path to log file to write.
 ///
 /// We put the log directory besides current binary, so that it should be easier for users to find them.
@@ -113,13 +128,16 @@ static LOG_FILE_PATH: OnceLock<PathBuf> = OnceLock::new();
 ///
 /// Because this will attemp to create a directory named `log` to place the actual log file,
 /// this function might fail if it cannot be created.
-pub fn log_file_path() -> Result<&'static Path> {
+pub fn log_dir() -> &'static Path {
     let mut log_dir = super::parent_dir_of_cur_exe().unwrap_or(PathBuf::from("."));
     log_dir.push("log");
-    super::ensure_dir(&log_dir)?;
+    if super::ensure_dir(&log_dir).is_err() {
+        panic!(
+            "unable to create log directory, \
+            try manually create '{}' then run this program again.",
+            log_dir.display()
+        );
+    }
 
-    let bin_name = super::lowercase_program_name().unwrap_or(env!("CARGO_PKG_NAME").to_string());
-
-    Ok(LOG_FILE_PATH
-        .get_or_init(|| log_dir.join(format!("{bin_name}-{}.log", Local::now().date_naive()))))
+    LOG_DIR_PATH.get_or_init(|| log_dir)
 }

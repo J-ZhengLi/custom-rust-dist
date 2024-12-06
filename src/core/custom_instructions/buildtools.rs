@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 use anyhow::Result;
 use cc::windows_registry;
-use log::{info, warn};
 use crate::core::directories::RimDir;
 use crate::core::install::InstallConfiguration;
 

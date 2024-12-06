@@ -1,6 +1,5 @@
 use anyhow::bail;
 use anyhow::{anyhow, Context, Result};
-use log::warn;
 use std::env;
 use std::fs;
 use std::io::Write;
@@ -14,9 +13,9 @@ use tempfile::NamedTempFile;
 ///
 /// Will panic if such directory cannot be determined,
 /// which could be the result of missing certain environment variable at runtime,
-/// check [`home::home_dir`] for more information.
+/// check [`dirs::home_dir`] for more information.
 pub fn home_dir() -> PathBuf {
-    home::home_dir().expect("home directory cannot be determined.")
+    dirs::home_dir().expect("home directory cannot be determined.")
 }
 
 /// Wrapper to [`std::fs::read_to_string`] but with additional error context.

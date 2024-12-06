@@ -1,9 +1,9 @@
 use std::env;
+use std::future::Future;
 use std::path::Path;
 use std::sync::OnceLock;
 
 use anyhow::{Context, Result};
-use log::{debug, info, warn};
 use semver::Version;
 use url::Url;
 
@@ -35,12 +35,15 @@ impl UpdateOpt {
     /// internal work.
     // TODO: find a way to generalize this, so we can write a shared logic here instead of
     // creating update functions for both CLI and GUI.
-    pub fn update_toolkit<F>(&self, callback: F) -> Result<()>
+    pub async fn update_toolkit<'a, Fut>(
+        &'a self,
+        callback: impl FnOnce(&'a Path) -> Fut,
+    ) -> Result<()>
     where
-        F: FnOnce(&Path) -> Result<()>,
+        Fut: Future<Output = Result<()>>,
     {
         let dir = self.install_dir();
-        callback(dir).context("unable to update toolkit")
+        callback(dir).await.context("unable to update toolkit")
     }
 
     /// Update self when applicable.

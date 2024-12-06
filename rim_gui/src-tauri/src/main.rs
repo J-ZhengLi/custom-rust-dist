@@ -49,20 +49,21 @@ impl Mode {
         }
     }
 
-    fn run(&self) -> Result<()> {
+    async fn run(&self) -> Result<()> {
         match self {
-            Mode::Manager(cli) if cli.no_gui => cli.execute()?,
+            Mode::Manager(cli) if cli.no_gui => cli.execute().await?,
             Mode::Manager(_) => manager_mode::main()?,
-            Mode::Installer(cli) if cli.no_gui => cli.execute()?,
+            Mode::Installer(cli) if cli.no_gui => cli.execute().await?,
             Mode::Installer(_) => installer_mode::main()?,
         }
         Ok(())
     }
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     utils::use_current_locale();
-    Mode::detect().run()
+    Mode::detect().run().await
 }
 
 #[tauri::command]
