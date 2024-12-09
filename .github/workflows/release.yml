@@ -11,99 +11,72 @@ on:
 
 jobs:
   release:
+    name: "Job - ${{ matrix.name }}"
+    runs-on: "${{ matrix.os }}"
+    env:
+      CI_JOB_NAME: "${{ matrix.name }}"
+    
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
-          - os: 'ubuntu-20.04'
+          - name: dist-aarch64-linux
+            os: ubuntu-20.04
+            target: aarch64-unknown-linux-gnu
+
+          - name: dist-x86-64-linux
+            os: ubuntu-20.04
             target: x86_64-unknown-linux-gnu
-          - os: 'windows-latest'
+
+          - name: dist-windows-msvc
+            os: windows-latest
             target: x86_64-pc-windows-msvc
             target-gnu: x86_64-pc-windows-gnu
 
-    runs-on: ${{ matrix.os }}
-
     steps:
-    - uses: actions/checkout@v4
+      - name: checkout the source code
+        uses: actions/checkout@v4
 
-    - name: setup node
-      uses: actions/setup-node@v4
-      with:
-        node-version: lts/*
+      - name: Set up QEMU for ARM64
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: aarch64
 
-    - name: setup pnpm
-      uses: pnpm/action-setup@v4
-      with:
-        version: 9
+      - name: run build job
+        run: bash ci/run.sh
 
-    - name: install Rust toolchain
-      run: rustup toolchain install stable --profile minimal --no-self-update
+      - name: prepare packages (windows)
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          set -x
+          export LANG=C.UTF-8
+          NAME=$(grep -Po 'vendor_en": "\K[^"]*' locales/en.json)
+          mkdir ./dist/binaries/
+          mv ./dist/${{ matrix.target-gnu }}/$NAME-installer.exe ./dist/binaries/$NAME-installer-${{ matrix.target-gnu }}.exe
+          mv ./dist/${{ matrix.target }}/$NAME-installer.exe ./dist/binaries/$NAME-installer-${{ matrix.target }}.exe
+          cd ./dist/${{ matrix.target-gnu }}
+          rm -f $NAME-${{ matrix.target-gnu }}/$NAME-installer-cli.exe
+          7z a ../binaries/$NAME-${{ matrix.target-gnu }}.zip $NAME-${{ matrix.target-gnu }}
+          cd ../${{ matrix.target }}
+          rm -f $NAME-${{ matrix.target }}/$NAME-installer-cli.exe
+          7z a ../binaries/$NAME-${{ matrix.target }}.zip $NAME-${{ matrix.target }}
 
-    - name: install dependencies (ubuntu only)
-      if: matrix.os == 'ubuntu-20.04'
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: prepare packages (unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          set -x
+          NAME=$(grep -Po 'vendor_en": "\K[^"]*' locales/en.json)
+          sudo mkdir ./dist/binaries/
+          sudo mv ./dist/${{ matrix.target }}/$NAME-installer-cli ./dist/binaries/$NAME-installer-cli-${{ matrix.target }}
+          sudo mv ./dist/${{ matrix.target }}/$NAME-installer ./dist/binaries/$NAME-installer-${{ matrix.target }}
+          cd ./dist/${{ matrix.target }}
+          sudo tar cjf ../binaries/$NAME-${{ matrix.target }}.tar.xz $NAME-${{ matrix.target }}
 
-    - name: setup tauri-cli
-      shell: bash
-      run: |
-        mkdir ./cargo_tauri
-        if [[ ${{ matrix.os }} == 'windows-latest' ]]; then
-          curl -OL https://github.com/tauri-apps/tauri/releases/download/tauri-cli-v1.6.3/cargo-tauri-x86_64-pc-windows-msvc.zip
-          unzip cargo-tauri-x86_64-pc-windows-msvc.zip -d ./cargo_tauri
-          mv ./cargo_tauri/cargo-tauri.exe ~/.cargo/bin
-        fi
-        if [[ ${{ matrix.os }} == 'ubuntu-20.04' ]]; then
-          curl -OL https://github.com/tauri-apps/tauri/releases/download/tauri-cli-v1.6.3/cargo-tauri-x86_64-unknown-linux-gnu.tgz
-          tar -xf cargo-tauri-x86_64-unknown-linux-gnu.tgz -C ./cargo_tauri
-          mv ./cargo_tauri/cargo-tauri ~/.cargo/bin
-        fi
-
-    - name: configure cache
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          resources/packages/
-          target/
-        key: ${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
-    
-    - name: dist
-      run: |
-        cargo dev vendor
-        cargo dev dist
-
-    - name: prepare packages (windows)
-      if: matrix.os == 'windows-latest'
-      shell: bash
-      run: |
-        set -x
-        export LANG=C.UTF-8
-        NAME=$(grep -Po 'vendor_en": "\K[^"]*' locales/en.json)
-        mkdir ./dist/binaries/
-        mv ./dist/${{ matrix.target-gnu }}/$NAME-installer.exe ./dist/binaries/$NAME-installer-${{ matrix.target-gnu }}.exe
-        mv ./dist/${{ matrix.target }}/$NAME-installer.exe ./dist/binaries/$NAME-installer-${{ matrix.target }}.exe
-        cd ./dist/${{ matrix.target-gnu }}
-        rm -f $NAME-${{ matrix.target-gnu }}/$NAME-installer-cli.exe
-        7z a ../binaries/$NAME-${{ matrix.target-gnu }}.zip $NAME-${{ matrix.target-gnu }}
-        cd ../${{ matrix.target }}
-        rm -f $NAME-${{ matrix.target }}/$NAME-installer-cli.exe
-        7z a ../binaries/$NAME-${{ matrix.target }}.zip $NAME-${{ matrix.target }}
-    - name: prepare packages (unix)
-      if: matrix.os != 'windows-latest'
-      run: |
-        set -x
-        NAME=$(grep -Po 'vendor_en": "\K[^"]*' locales/en.json)
-        mkdir ./dist/binaries/
-        mv ./dist/${{ matrix.target }}/$NAME-installer-cli ./dist/binaries/$NAME-installer-cli-${{ matrix.target }}
-        mv ./dist/${{ matrix.target }}/$NAME-installer ./dist/binaries/$NAME-installer-${{ matrix.target }}
-        cd ./dist/${{ matrix.target }}
-        tar cjf ../binaries/$NAME-${{ matrix.target }}.tar.xz $NAME-${{ matrix.target }}
-
-    - name: upload release
-      uses: ncipollo/release-action@v1
-      with:
-        allowUpdates: true
-        generateReleaseNotes: true
-        artifacts: "./dist/binaries/*"
+      - name: upload release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          generateReleaseNotes: true
+          artifacts: "./dist/binaries/*"
