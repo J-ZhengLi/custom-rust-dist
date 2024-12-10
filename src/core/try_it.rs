@@ -38,11 +38,8 @@ pub fn try_it(path: Option<&Path>) -> Result<()> {
         .iter()
         .find_map(|p| utils::cmd_exist(p).then_some(*p))
         .unwrap_or(file_explorer);
-    // Try to open the project, but don't do anything if it fails cuz it's pretty noisy.
-    _ = utils::Command::new_shell_command(program)
-        .arg(example_dir)
-        .run();
-
+    // Try to open the project, but don't do anything if it fails cuz it's not critical.
+    _ = utils::run!(program, example_dir);
     Ok(())
 }
 
