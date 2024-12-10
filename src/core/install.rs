@@ -140,16 +140,16 @@ impl<'a> InstallConfiguration<'a> {
         })
     }
 
-    pub fn install(mut self, components: Vec<Component>) -> Result<()> {
+    pub async fn install(mut self, components: Vec<Component>) -> Result<()> {
         let (tc_components, tools) = split_components(components);
 
         self.config_env_vars()?;
         self.config_cargo()?;
         // This step taking cares of requirements, such as `MSVC`, also third-party app such as `VS Code`.
-        self.install_tools(&tools)?;
-        self.install_rust(&tc_components)?;
+        self.install_tools(&tools).await?;
+        self.install_rust(&tc_components).await?;
         // install third-party tools via cargo that got installed by rustup
-        self.cargo_install(&tools)?;
+        self.cargo_install(&tools).await?;
         Ok(())
     }
 
@@ -212,7 +212,7 @@ impl<'a> InstallConfiguration<'a> {
         Ok(env_vars)
     }
 
-    fn install_tools_(&mut self, use_cargo: bool, tools: &ToolMap, weight: f32) -> Result<()> {
+    async fn install_tools_(&mut self, use_cargo: bool, tools: &ToolMap, weight: f32) -> Result<()> {
         let to_install = tools
             .into_iter()
             .filter(|(_, t)| {
@@ -237,7 +237,7 @@ impl<'a> InstallConfiguration<'a> {
             };
             info!("{info}");
 
-            self.install_tool(name, tool)?;
+            self.install_tool(name, tool).await?;
 
             self.inc_progress(sub_progress_delta)?;
         }
@@ -247,22 +247,22 @@ impl<'a> InstallConfiguration<'a> {
         Ok(())
     }
 
-    pub fn install_tools(&mut self, tools: &ToolMap) -> Result<()> {
+    pub async fn install_tools(&mut self, tools: &ToolMap) -> Result<()> {
         info!("{}", t!("install_tools"));
-        self.install_tools_(false, tools, 30.0)
+        self.install_tools_(false, tools, 30.0).await
     }
 
-    pub fn cargo_install(&mut self, tools: &ToolMap) -> Result<()> {
+    pub async fn cargo_install(&mut self, tools: &ToolMap) -> Result<()> {
         info!("{}", t!("install_via_cargo"));
-        self.install_tools_(true, tools, 30.0)
+        self.install_tools_(true, tools, 30.0).await
     }
 
-    pub fn install_rust(&mut self, optional_components: &[String]) -> Result<()> {
+    pub async fn install_rust(&mut self, optional_components: &[String]) -> Result<()> {
         info!("{}", t!("install_toolchain"));
 
         let manifest = self.manifest;
 
-        ToolchainInstaller::init().install(self, manifest, optional_components)?;
+        ToolchainInstaller::init().install(self, manifest, optional_components).await?;
         add_to_path(self.cargo_bin())?;
         self.cargo_is_installed = true;
 
@@ -281,12 +281,12 @@ impl<'a> InstallConfiguration<'a> {
 
     // TODO: Write version info after installing each tool,
     // which is later used for updating.
-    fn install_tool(&mut self, name: &str, tool: &ToolInfo) -> Result<()> {
+    async fn install_tool(&mut self, name: &str, tool: &ToolInfo) -> Result<()> {
         let tool_ver = tool.version();
         let record = match tool {
             ToolInfo::PlainVersion(version) | ToolInfo::DetailedVersion { ver: version, .. } => {
                 Tool::cargo_tool(name, Some(vec![name, "--version", version]))
-                    .install(tool_ver, self)?
+                    .install(tool_ver, self).await?
             }
             ToolInfo::Git {
                 git,
@@ -306,9 +306,9 @@ impl<'a> InstallConfiguration<'a> {
                     args.extend(["--rev", s]);
                 }
 
-                Tool::cargo_tool(name, Some(args)).install(tool_ver, self)?
+                Tool::cargo_tool(name, Some(args)).install(tool_ver, self).await?
             }
-            ToolInfo::Path { path, .. } => self.try_install_from_path(name, tool_ver, path)?,
+            ToolInfo::Path { path, .. } => self.try_install_from_path(name, tool_ver, path).await?,
             // TODO: Have a dedicated download folder, do not use temp dir to store downloaded artifacts,
             // so then we can have the `resume download` feature.
             ToolInfo::Url { url, .. } => {
@@ -323,7 +323,7 @@ impl<'a> InstallConfiguration<'a> {
                 let dest = temp_dir.path().join(downloaded_file_name);
                 utils::download_with_proxy(name, url, &dest, self.manifest.proxy.as_ref())?;
 
-                self.try_install_from_path(name, tool_ver, &dest)?
+                self.try_install_from_path(name, tool_ver, &dest).await?
             }
         };
 
@@ -332,7 +332,7 @@ impl<'a> InstallConfiguration<'a> {
         Ok(())
     }
 
-    fn try_install_from_path(
+    async fn try_install_from_path(
         &self,
         name: &str,
         version: Option<&str>,
@@ -349,7 +349,7 @@ impl<'a> InstallConfiguration<'a> {
         let tool_installer_path = self.extract_or_copy_to(path, temp_dir.path())?;
         let tool_installer = Tool::from_path(name, &tool_installer_path)
             .with_context(|| format!("no install method for tool '{name}'"))?;
-        tool_installer.install(version, self)
+        tool_installer.install(version, self).await
     }
 
     /// Configuration options for `cargo`.
@@ -398,7 +398,7 @@ impl<'a> InstallConfiguration<'a> {
 
 // For updates
 impl InstallConfiguration<'_> {
-    pub fn update(mut self, components: Vec<Component>) -> Result<()> {
+    pub async fn update(mut self, components: Vec<Component>) -> Result<()> {
         let (_, tools) = split_components(components);
         // setup env for current process
         for (key, val) in self.env_vars()? {
@@ -406,17 +406,17 @@ impl InstallConfiguration<'_> {
         }
         self.inc_progress(10.0)?;
 
-        self.update_toolchain()?;
-        self.update_tools(&tools)?;
+        self.update_toolchain().await?;
+        self.update_tools(&tools).await?;
         Ok(())
     }
 
-    fn update_toolchain(&mut self) -> Result<()> {
+    async fn update_toolchain(&mut self) -> Result<()> {
         info!("{}", t!("update_toolchain"));
 
         let manifest = self.manifest;
 
-        ToolchainInstaller::init().update(self, manifest)?;
+        ToolchainInstaller::init().update(self, manifest).await?;
 
         // Add the rust info to the fingerprint.
         self.install_record.update_rust(manifest.rust_version());
@@ -429,10 +429,10 @@ impl InstallConfiguration<'_> {
         self.inc_progress(60.0)
     }
 
-    fn update_tools(&mut self, tools: &ToolMap) -> Result<()> {
+    async fn update_tools(&mut self, tools: &ToolMap) -> Result<()> {
         info!("{}", t!("update_tools"));
-        self.install_tools_(false, tools, 15.0)?;
-        self.install_tools_(true, tools, 15.0)?;
+        self.install_tools_(false, tools, 15.0).await?;
+        self.install_tools_(true, tools, 15.0).await?;
         Ok(())
     }
 }

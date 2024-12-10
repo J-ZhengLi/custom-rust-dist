@@ -14,7 +14,7 @@ use crate::InstallConfiguration;
 use super::common::{ComponentChoices, ComponentDecoration, ComponentListBuilder, VersionDiffMap};
 use super::{common, ManagerSubcommands};
 
-pub(super) fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
+pub(super) async fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
     let ManagerSubcommands::Update {
         toolkit_only,
         manager_only,
@@ -25,7 +25,7 @@ pub(super) fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
 
     let update_opt = UpdateOpt;
     if !manager_only {
-        update_opt.update_toolkit(update_toolkit_)?;
+        update_opt.update_toolkit(update_toolkit_).await?;
     }
     if !toolkit_only {
         update_opt.self_update()?;
@@ -34,7 +34,7 @@ pub(super) fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
     Ok(true)
 }
 
-fn update_toolkit_(install_dir: &Path) -> Result<()> {
+async fn update_toolkit_(install_dir: &Path) -> Result<()> {
     let Some(installed) = Toolkit::installed()? else {
         info!("{}", t!("no_toolkit_installed"));
         return Ok(());
@@ -74,7 +74,7 @@ fn update_toolkit_(install_dir: &Path) -> Result<()> {
     if let UpdateOption::Yes(components) = updater.get_user_choices()? {
         // install update for selected components
         let config = InstallConfiguration::init(install_dir, None, &manifest, true)?;
-        config.update(components.into_keys().cloned().collect())
+        config.update(components.into_keys().cloned().collect()).await
     } else {
         Ok(())
     }

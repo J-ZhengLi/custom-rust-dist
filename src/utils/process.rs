@@ -1,9 +1,10 @@
 use log::{error, info, warn};
 use std::ffi::OsStr;
-use std::io::{BufRead, BufReader};
-use std::process::{Command as StdCommand, ExitStatus, Stdio};
+use std::process::{ExitStatus, Stdio};
 use std::sync::Mutex;
-use std::{env, io};
+use std::env;
+use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
+use tokio::process::Command as AsyncCommand;
 
 use anyhow::Result;
 
@@ -24,7 +25,7 @@ cfg_if::cfg_if! {
 
 /// A [`std::process::Command`] wrapper type that supports better error reporting.
 pub struct Command {
-    cmd_: StdCommand,
+    cmd_: AsyncCommand,
 }
 
 impl Command {
@@ -33,7 +34,7 @@ impl Command {
         *guard = vec![to_string_lossy(&program)];
 
         Self {
-            cmd_: StdCommand::new(program),
+            cmd_: AsyncCommand::new(program),
         }
     }
     /// Create a command that will be execute using a separated shell.
@@ -43,7 +44,7 @@ impl Command {
         let mut guard = COMMAND_STRING.lock().unwrap();
         *guard = vec![to_string_lossy(&program)];
 
-        let mut inner = StdCommand::new(SHELL);
+        let mut inner = AsyncCommand::new(SHELL);
         inner.arg(START_ARG).arg(program);
 
         Self { cmd_: inner }
@@ -78,16 +79,16 @@ impl Command {
         self.cmd_.env(key, val);
         self
     }
-    pub fn run(&mut self) -> Result<()> {
-        self.execute_command(true)?;
+    pub async fn run(&mut self) -> Result<()> {
+        self.execute_command(true).await?;
         Ok(())
     }
 
-    pub fn run_with_ret_code(&mut self) -> Result<i32> {
-        self.execute_command(false)
+    pub async fn run_with_ret_code(&mut self) -> Result<i32> {
+        self.execute_command(false).await
     }
 
-    fn execute_command(&mut self, expect_success: bool) -> Result<i32> {
+    async fn execute_command(&mut self, expect_success: bool) -> Result<i32> {
         cfg_if::cfg_if! {
             if #[cfg(windows)] {
                 use std::os::windows::process::CommandExt;
@@ -97,34 +98,41 @@ impl Command {
                     .creation_flags(CREATE_NO_WINDOW)
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
+                    .kill_on_drop(true)
                     .spawn()?;
             } else {
                 let mut child = self.cmd_
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
+                    .kill_on_drop(true)
                     .spawn()?;
             }
         }
 
-        // FIXME: (J-ZhengLi) somehow this doesn't stream output anymore, wtf happend?
-        // I clearly remember it did work, I **TESTED** it! I made sure it worked
-        // then I made a PR specifically for it (https://github.com/J-ZhengLi/rim/pull/159).
-        // So how the F that this doesn't work anymore...
-        output_to_log(child.stdout.as_mut());
-        output_to_log(child.stderr.as_mut());
+        let stdout = child.stdout.take();
+        let stderr = child.stderr.take();
 
-        let status = child.wait()?;
-        let ret_code = get_ret_code(&status);
-        if expect_success && !status.success() {
-            let command = COMMAND_STRING.lock().unwrap();
-            anyhow::bail!(
-                "programm exited with code {ret_code}. \n\
-                Command: {}",
-                (*command).join(" "),
-            );
-        } else {
-            Ok(ret_code)
-        }
+        let handle = tokio::spawn(async move {
+            let status = child.wait().await?;
+            let ret_code = get_ret_code(&status);
+            if expect_success && !status.success() {
+                let command = COMMAND_STRING.lock().unwrap();
+                anyhow::bail!(
+                    "programm exited with code {ret_code}. \n\
+                    Command: {}",
+                    (*command).join(" "),
+                );
+            } else {
+                Ok(ret_code)
+            }
+        });
+
+        output_to_log(stdout).await?;
+        output_to_log(stderr).await?;
+
+        handle
+            .await
+            .expect("async task failed to execute to completion")
     }
 }
 
@@ -141,10 +149,10 @@ fn get_ret_code(status: &ExitStatus) -> i32 {
 }
 
 /// Log the command output
-fn output_to_log<R: io::Read>(from: Option<&mut R>) {
-    let Some(out) = from else { return };
-    let reader = BufReader::new(out);
-    for line in reader.lines().map_while(Result::ok) {
+async fn output_to_log<R: AsyncRead + Unpin>(from: Option<R>) -> Result<()> {
+    let Some(out) = from else { return Ok(()) };
+    let mut lines = BufReader::new(out).lines();
+    while let Some(line) = lines.next_line().await? {
         // prevent double 'info|warn|error:' labels, although this might be a dumb way to do it
         if let Some(info) = line.strip_prefix("info: ") {
             info!("{info}");
@@ -156,6 +164,7 @@ fn output_to_log<R: io::Read>(from: Option<&mut R>) {
             info!("{line}");
         }
     }
+    Ok(())
 }
 
 /// Check if a command/program exist in the `PATH`.

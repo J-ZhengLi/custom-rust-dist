@@ -127,10 +127,10 @@ impl<'a> Tool<'a> {
         Self::new(name.to_string(), ToolKind::CargoTool).install_args(extra_args)
     }
 
-    pub(crate) fn install(
+    pub(crate) async fn install(
         &self,
         version: Option<&str>,
-        config: &InstallConfiguration,
+        config: &InstallConfiguration<'_>,
     ) -> Result<ToolRecord> {
         let paths = match self.kind {
             ToolKind::CargoTool => {
@@ -145,7 +145,7 @@ impl<'a> Tool<'a> {
                     "install",
                     self.install_args.as_deref().unwrap_or(&[self.name()]),
                     config.cargo_home(),
-                )?;
+                ).await?;
                 return Ok(ToolRecord::cargo_tool().version(version));
             }
             ToolKind::Executables => {
@@ -165,7 +165,7 @@ impl<'a> Tool<'a> {
             ToolKind::Plugin => {
                 let path = self.path.single()?;
                 // run the installation command.
-                Plugin::install(path)?;
+                Plugin::install(path).await?;
                 // we need to "cache" to installer, so that we could uninstall with it.
                 let plugin_backup = utils::copy_file_to(path, config.tools_dir())?;
                 vec![plugin_backup]
@@ -179,14 +179,14 @@ impl<'a> Tool<'a> {
         Ok(ToolRecord::new(self.kind).paths(paths).version(version))
     }
 
-    pub(crate) fn uninstall(&self, config: &UninstallConfiguration) -> Result<()> {
+    pub(crate) async fn uninstall(&self, config: &UninstallConfiguration<'_>) -> Result<()> {
         match self.kind {
             ToolKind::CargoTool => {
                 cargo_install_or_uninstall(
                     "uninstall",
                     self.install_args.as_deref().unwrap_or(&[self.name()]),
                     config.cargo_home(),
-                )?;
+                ).await?;
             }
             ToolKind::Executables => {
                 for binary in self.path.iter() {
@@ -195,14 +195,14 @@ impl<'a> Tool<'a> {
             }
             ToolKind::Custom => custom_instructions::uninstall(self.name(), config)?,
             ToolKind::DirWithBin => uninstall_dir_with_bin_(self.path.single()?)?,
-            ToolKind::Plugin => Plugin::uninstall(self.path.single()?)?,
+            ToolKind::Plugin => Plugin::uninstall(self.path.single()?).await?,
             ToolKind::Unknown => utils::remove(self.path.single()?)?,
         }
         Ok(())
     }
 }
 
-fn cargo_install_or_uninstall(op: &str, args: &[&str], cargo_home: &Path) -> Result<()> {
+async fn cargo_install_or_uninstall(op: &str, args: &[&str], cargo_home: &Path) -> Result<()> {
     let mut cargo_bin = cargo_home.to_path_buf();
     cargo_bin.push("bin");
     cargo_bin.push(utils::exe!("cargo"));
@@ -212,6 +212,7 @@ fn cargo_install_or_uninstall(op: &str, args: &[&str], cargo_home: &Path) -> Res
         .args(args)
         .env(CARGO_HOME, cargo_home)
         .run()
+        .await
 }
 
 /// Move one path (file/dir) to a new folder with `name` under tools dir.
@@ -286,15 +287,15 @@ impl Plugin {
         matches!(ext, "vsix")
     }
 
-    fn install(plugin_path: &Path) -> Result<()> {
-        Self::install_or_uninstall_(plugin_path, false)
+    async fn install(plugin_path: &Path) -> Result<()> {
+        Self::install_or_uninstall_(plugin_path, false).await
     }
 
-    fn uninstall(plugin_path: &Path) -> Result<()> {
-        Self::install_or_uninstall_(plugin_path, true)
+    async fn uninstall(plugin_path: &Path) -> Result<()> {
+        Self::install_or_uninstall_(plugin_path, true).await
     }
 
-    fn install_or_uninstall_(plugin_path: &Path, uninstall: bool) -> Result<()> {
+    async fn install_or_uninstall_(plugin_path: &Path, uninstall: bool) -> Result<()> {
         let ty = utils::extension_str(plugin_path)
             .and_then(|ext| Self::from_str(ext).ok())
             .ok_or_else(|| anyhow!("unsupported plugin file '{}'", plugin_path.display()))?;
@@ -318,6 +319,7 @@ impl Plugin {
                             .arg(arg_opt)
                             .arg(plugin_path)
                             .run()
+                            .await
                         {
                             Ok(()) => continue,
                             // Ignore error when uninstalling.

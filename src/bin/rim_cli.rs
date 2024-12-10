@@ -24,16 +24,17 @@ impl Mode {
         }
     }
 
-    fn run(&self) -> Result<()> {
+    async fn run(&self) -> Result<()> {
         match self {
-            Mode::Installer(cli) => cli.execute(),
-            Mode::Manager(cli) => cli.execute(),
+            Mode::Installer(cli) => cli.execute().await,
+            Mode::Manager(cli) => cli.execute().await,
         }
     }
 }
 
-fn main() -> Result<()> {
-    Mode::detect().run()?;
+#[tokio::main]
+async fn main() -> Result<()> {
+    Mode::detect().run().await?;
 
     // pause the console in case the user launch
     // the program with double click, which most people do.

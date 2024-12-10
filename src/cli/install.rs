@@ -25,7 +25,7 @@ use log::warn;
 /// Perform installer actions.
 ///
 /// This will setup the environment and install user selected components.
-pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
+pub(super) async fn execute_installer(installer: &Installer) -> Result<()> {
     let Installer {
         prefix,
         registry_url,
@@ -68,7 +68,8 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
                 .clone()
                 .unwrap_or_else(|| default_rustup_update_root().clone()),
         )
-        .install(user_opt.components)?;
+        .install(user_opt.components)
+        .await?;
 
     println!("\n{}\n", t!("install_finish_info"));
 

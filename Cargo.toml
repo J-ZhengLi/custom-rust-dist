@@ -15,7 +15,8 @@ name = "rim-cli"
 path = "src/bin/rim_cli.rs"
 
 [workspace]
-members = ["rim_gui/src-tauri", "rim_dev"]
+# members = ["rim_gui/src-tauri", "rim_dev"]
+members = ["rim_dev"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -56,26 +57,9 @@ fern.workspace = true
 chrono = "0.4.38"
 semver = "1.0.23"
 self-replace = "1"
+tokio = { version = "1.42.0", features = ["macros", "rt-multi-thread", "process"] }
 
 [target."cfg(windows)".dependencies]
 winreg = "0.52.0"
 winapi = { version = "0.3", features = ["winuser", "winbase"] }
 cc = "1"
-
-[target."cfg(windows)".dependencies.windows-sys]
-features = [
-  "Win32_Foundation",
-  "Win32_Security",
-  "Win32_Storage_FileSystem",
-  "Win32_System_Diagnostics_ToolHelp",
-  "Win32_System_IO",
-  "Win32_System_Ioctl",
-  "Win32_System_JobObjects",
-  "Win32_System_Kernel",
-  "Win32_System_LibraryLoader",
-  "Win32_System_SystemInformation",
-  "Win32_System_SystemServices",
-  "Win32_System_Threading",
-  "Win32_System_WindowsProgramming",
-]
-version = "0.52.0"

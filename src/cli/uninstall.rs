@@ -7,7 +7,7 @@ use super::{common, ManagerSubcommands};
 use anyhow::Result;
 
 /// Execute `uninstall` command.
-pub(super) fn execute(subcommand: &ManagerSubcommands) -> Result<bool> {
+pub(super) async fn execute(subcommand: &ManagerSubcommands) -> Result<bool> {
     let ManagerSubcommands::Uninstall { keep_self } = subcommand else {
         return Ok(false);
     };
@@ -29,7 +29,7 @@ pub(super) fn execute(subcommand: &ManagerSubcommands) -> Result<bool> {
         return Ok(true);
     }
 
-    config.uninstall(!keep_self)?;
+    config.uninstall(!keep_self).await?;
 
     Ok(true)
 }

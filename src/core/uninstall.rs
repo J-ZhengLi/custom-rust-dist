@@ -56,15 +56,15 @@ impl<'a> UninstallConfiguration<'a> {
         Ok(())
     }
 
-    pub fn uninstall(mut self, remove_self: bool) -> Result<()> {
+    pub async fn uninstall(mut self, remove_self: bool) -> Result<()> {
         // remove all tools.
         info!("{}", t!("uninstalling_third_party_tools"));
-        self.remove_tools(installed_tools_fresh(&self.install_dir)?, 40.0)?;
+        self.remove_tools(installed_tools_fresh(&self.install_dir)?, 40.0).await?;
 
         // Remove rust toolchain via rustup.
         if self.install_record.rust.is_some() {
             info!("{}", t!("uninstalling_rust_toolchain"));
-            ToolchainInstaller::init().remove_self(&self)?;
+            ToolchainInstaller::init().remove_self(&self).await?;
             self.install_record.remove_rust_record();
             self.install_record.write()?;
         }
@@ -89,7 +89,7 @@ impl<'a> UninstallConfiguration<'a> {
     }
 
     /// Uninstall all tools
-    fn remove_tools(&mut self, tools: IndexMap<String, ToolRecord>, weight: f32) -> Result<()> {
+    async fn remove_tools(&mut self, tools: IndexMap<String, ToolRecord>, weight: f32) -> Result<()> {
         let mut tools_to_uninstall = vec![];
         for (name, tool_detail) in &tools {
             let kind = tool_detail.tool_kind();
@@ -134,7 +134,7 @@ impl<'a> UninstallConfiguration<'a> {
 
         for tool in tools_to_uninstall {
             info!("{}", t!("uninstalling_for", name = tool.name()));
-            if tool.uninstall(self).is_err() {
+            if tool.uninstall(self).await.is_err() {
                 info!(
                     "{}: {}",
                     t!("uninstall_tool_skipped", tool = tool.name()),

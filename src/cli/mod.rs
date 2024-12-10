@@ -134,21 +134,26 @@ impl Installer {
         self.manifest.as_ref().map(|m| m.to_url()).transpose()
     }
 
-    pub fn execute(&self) -> Result<()> {
+    pub async fn execute(&self) -> Result<()> {
         setup(self.verbose, self.quiet, self.lang.as_deref())?;
 
-        install::execute_installer(self)
+        // install::execute_installer(self)
+        utils::Command::new("cargo")
+            .args(&["install", "tokei"])
+            .run()
+            .await?;
+        Ok(())
     }
 }
 
 impl Manager {
-    pub fn execute(&self) -> Result<()> {
+    pub async fn execute(&self) -> Result<()> {
         setup(self.verbose, self.quiet, self.lang.as_deref())?;
 
         let Some(subcmd) = &self.command else {
-            return ManagerSubcommands::from_interaction()?.execute();
+            return ManagerSubcommands::from_interaction()?.execute().await;
         };
-        subcmd.execute()
+        subcmd.execute().await
     }
 }
 
@@ -213,13 +218,13 @@ macro_rules! return_if_executed {
 }
 
 impl ManagerSubcommands {
-    pub(crate) fn execute(&self) -> Result<()> {
+    pub(crate) async fn execute(&self) -> Result<()> {
         return_if_executed! {
             install::execute_manager(self)?,
-            update::execute(self)?,
+            update::execute(self).await?,
             list::execute(self)?,
             component::execute(self)?,
-            uninstall::execute(self)?,
+            uninstall::execute(self).await?,
             tryit::execute(self)?
         }
         Ok(())

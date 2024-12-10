@@ -33,7 +33,7 @@ impl ToolchainInstaller {
         Self
     }
 
-    fn install_toolchain_via_rustup(
+    async fn install_toolchain_via_rustup(
         &self,
         rustup: &Path,
         manifest: &ToolsetManifest,
@@ -54,19 +54,20 @@ impl ToolchainInstaller {
                 .args(&args)
                 .env(RUSTUP_DIST_SERVER, local_server.as_str())
                 .run()
+                .await
         } else {
-            utils::Command::new(rustup).args(&args).run()
+            utils::Command::new(rustup).args(&args).run().await
         }
     }
 
     /// Install rust toolchain & components via rustup.
-    pub(crate) fn install(
+    pub(crate) async fn install(
         &self,
-        config: &InstallConfiguration,
+        config: &InstallConfiguration<'_>,
         manifest: &ToolsetManifest,
         optional_components: &[String],
     ) -> Result<()> {
-        let rustup = ensure_rustup(config, manifest)?;
+        let rustup = ensure_rustup(config, manifest).await?;
 
         let components_to_install = manifest
             .rust
@@ -75,7 +76,7 @@ impl ToolchainInstaller {
             .map(|s| s.as_str())
             .chain(optional_components.iter().map(|s| s.as_str()))
             .collect();
-        self.install_toolchain_via_rustup(&rustup, manifest, components_to_install)?;
+        self.install_toolchain_via_rustup(&rustup, manifest, components_to_install).await?;
 
         // Remove the `rustup` uninstall entry on windows, because we don't want users to
         // accidently uninstall `rustup` thus removing the tools installed by this program.
@@ -88,35 +89,36 @@ impl ToolchainInstaller {
     }
 
     /// Update rust toolchain by invoking `rustup toolchain add`, then `rustup default`
-    pub(crate) fn update(
+    pub(crate) async fn update(
         &self,
-        config: &InstallConfiguration,
+        config: &InstallConfiguration<'_>,
         manifest: &ToolsetManifest,
     ) -> Result<()> {
-        let rustup = ensure_rustup(config, manifest)?;
+        let rustup = ensure_rustup(config, manifest).await?;
 
         let tc_ver = manifest.rust_version();
         utils::Command::new(&rustup)
             .args(&["toolchain", "add", tc_ver])
-            .run()?;
+            .run().await?;
         utils::Command::new(&rustup)
             .args(&["default", tc_ver])
-            .run()?;
+            .run().await?;
         Ok(())
     }
 
     // Rustup self uninstall all the components and toolchains.
-    pub(crate) fn remove_self(&self, config: &UninstallConfiguration) -> Result<()> {
+    pub(crate) async fn remove_self(&self, config: &UninstallConfiguration<'_>) -> Result<()> {
         let rustup = config.cargo_bin().join(RUSTUP);
         utils::Command::new(rustup)
             .args(&["self", "uninstall", "-y"])
             .env(CARGO_HOME, config.cargo_home())
             .env(RUSTUP_HOME, config.rustup_home())
             .run()
+            .await
     }
 }
 
-fn ensure_rustup(config: &InstallConfiguration, manifest: &ToolsetManifest) -> Result<PathBuf> {
+async fn ensure_rustup(config: &InstallConfiguration<'_>, manifest: &ToolsetManifest) -> Result<PathBuf> {
     let rustup_bin = config.cargo_bin().join(RUSTUP);
     if rustup_bin.exists() {
         return Ok(rustup_bin);
@@ -142,7 +144,7 @@ fn ensure_rustup(config: &InstallConfiguration, manifest: &ToolsetManifest) -> R
             (rustup_init, Some(temp_dir))
         };
 
-    install_rustup(&rustup_init)?;
+    install_rustup(&rustup_init).await?;
     // We don't need the rustup-init anymore, drop the whole temp dir containing it.
     drop(maybe_temp_dir);
 
@@ -158,7 +160,7 @@ fn download_rustup_init(dest: &Path, server: &Url, proxy: Option<&Proxy>) -> Res
         .context("Failed to download rustup.")
 }
 
-fn install_rustup(rustup_init: &PathBuf) -> Result<()> {
+async fn install_rustup(rustup_init: &PathBuf) -> Result<()> {
     // make sure it can be executed
     set_exec_permission(rustup_init)?;
 
@@ -171,5 +173,5 @@ fn install_rustup(rustup_init: &PathBuf) -> Result<()> {
         env!("TARGET"),
         "-vy",
     ];
-    utils::Command::new(rustup_init).args(&args).run()
+    utils::Command::new(rustup_init).args(&args).run().await
 }
