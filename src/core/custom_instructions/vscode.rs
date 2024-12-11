@@ -68,11 +68,7 @@ impl VSCodeInstaller<'_> {
                 utils::path_to_str(&shortcut_path)?,
                 utils::path_to_str(&target_path)?,
             );
-            if utils::Command::new("powershell")
-                .arg(weird_powershell_cmd)
-                .run()
-                .is_err()
-            {
+            if utils::run!("powershell", weird_powershell_cmd).is_err() {
                 warn!(
                     "unable to create a shortcut for '{}', skipping...",
                     self.tool_name

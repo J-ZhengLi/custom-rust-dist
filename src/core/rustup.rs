@@ -49,14 +49,13 @@ impl ToolchainInstaller {
             args.push("--component");
             args.extend(components);
         }
-        if let Some(local_server) = manifest.offline_dist_server()? {
-            utils::Command::new(rustup)
-                .args(&args)
-                .env(RUSTUP_DIST_SERVER, local_server.as_str())
-                .run()
+        let mut cmd = if let Some(local_server) = manifest.offline_dist_server()? {
+            utils::cmd!([RUSTUP_DIST_SERVER=local_server.as_str()] rustup)
         } else {
-            utils::Command::new(rustup).args(&args).run()
-        }
+            utils::cmd!(rustup)
+        };
+        cmd.args(args);
+        utils::execute(cmd)
     }
 
     /// Install rust toolchain & components via rustup.
@@ -94,25 +93,15 @@ impl ToolchainInstaller {
         manifest: &ToolsetManifest,
     ) -> Result<()> {
         let rustup = ensure_rustup(config, manifest)?;
-
         let tc_ver = manifest.rust_version();
-        utils::Command::new(&rustup)
-            .args(&["toolchain", "add", tc_ver])
-            .run()?;
-        utils::Command::new(&rustup)
-            .args(&["default", tc_ver])
-            .run()?;
-        Ok(())
+
+        utils::run!(&rustup, "toolchain", "add", tc_ver)
     }
 
     // Rustup self uninstall all the components and toolchains.
     pub(crate) fn remove_self(&self, config: &UninstallConfiguration) -> Result<()> {
         let rustup = config.cargo_bin().join(RUSTUP);
-        utils::Command::new(rustup)
-            .args(&["self", "uninstall", "-y"])
-            .env(CARGO_HOME, config.cargo_home())
-            .env(RUSTUP_HOME, config.rustup_home())
-            .run()
+        utils::run!([CARGO_HOME=config.cargo_home(), RUSTUP_HOME=config.rustup_home()] rustup, "self", "uninstall", "-y")
     }
 }
 
@@ -171,5 +160,7 @@ fn install_rustup(rustup_init: &PathBuf) -> Result<()> {
         env!("TARGET"),
         "-vy",
     ];
-    utils::Command::new(rustup_init).args(&args).run()
+    let mut cmd = utils::cmd!(rustup_init);
+    cmd.args(args);
+    utils::execute(cmd)
 }

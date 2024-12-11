@@ -1,131 +1,105 @@
 use log::{error, info, warn};
-use std::ffi::OsStr;
 use std::io::{BufRead, BufReader};
-use std::process::{Command as StdCommand, ExitStatus, Stdio};
-use std::sync::Mutex;
+use std::process::{Command, ExitStatus};
 use std::{env, io};
 
 use anyhow::Result;
 
-use super::to_string_lossy;
+/// Convenient macro to run a [`Command`], check [`cmd`] for help of the syntax.
+macro_rules! run {
+    ([$($key:tt = $val:expr),*] $program:expr $(, $arg:expr )* $(,)?) => {{
+        let cmd__ = $crate::utils::cmd!([$($key=$val),*] $program $(,$arg)*);
+        $crate::utils::execute(cmd__).map(|_| ())
+    }};
+    ($program:expr $(, $arg:expr )* $(,)?) => {
+        $crate::utils::run!([] $program $(, $arg)*)
+    };
+}
+pub(crate) use run;
 
-/// The complete commands in string form, used in error output.
-static COMMAND_STRING: Mutex<Vec<String>> = Mutex::new(Vec::new());
+/// Convenient macro to create a [`Command`], using shell-like command syntax.
+///
+/// # Example
+/// ```ignore
+/// # use rim::utils::cmd;
+/// cmd!("echo", "$HOME/.profile");
+///
+/// let program = "cargo";
+/// cmd!(program, "build", "--release");
+///
+/// // With env vars
+/// cmd!(["FOO"="foo", "BAR"="bar"] program, "cargo", "build");
+/// ```
+macro_rules! cmd {
+    ([$($key:tt = $val:expr),*] $program:expr $(, $arg:expr )* $(,)?) => {{
+        let mut cmd__ = std::process::Command::new($program);
+        $(cmd__.arg($arg);)*
+        $(cmd__.env($key, $val);)*
+        cmd__
+    }};
+    ($program:expr) => {
+        std::process::Command::new($program)
+    };
+    ($program:expr $(, $arg:expr )* $(,)?) => {
+        $crate::utils::cmd!([] $program $(, $arg)*)
+    };
+}
+pub(crate) use cmd;
 
-cfg_if::cfg_if! {
-    if #[cfg(windows)] {
-        const SHELL: &str = "cmd.exe";
-        const START_ARG: &str = "/C";
-    } else {
-        const SHELL: &str = "sh";
-        const START_ARG: &str = "-c";
-    }
+pub(crate) fn execute(cmd: Command) -> Result<()> {
+    execute_command(cmd, true).map(|_| ())
 }
 
-/// A [`std::process::Command`] wrapper type that supports better error reporting.
-pub struct Command {
-    cmd_: StdCommand,
+// Only used for `windows` for now, but... who knows.
+#[allow(unused)]
+pub(crate) fn execute_for_ret_code(cmd: Command) -> Result<i32> {
+    execute_command(cmd, false)
 }
 
-impl Command {
-    pub fn new<P: AsRef<OsStr>>(program: P) -> Self {
-        let mut guard = COMMAND_STRING.lock().unwrap();
-        *guard = vec![to_string_lossy(&program)];
+fn execute_command(mut cmd: Command, expect_success: bool) -> Result<i32> {
+    let (mut reader, stdout) = os_pipe::pipe()?;
+    let stderr = stdout.try_clone()?;
 
-        Self {
-            cmd_: StdCommand::new(program),
-        }
-    }
-    /// Create a command that will be execute using a separated shell.
-    ///
-    /// This prevents a specific program being shut down because the main process exists.
-    pub fn new_shell_command<P: AsRef<OsStr>>(program: P) -> Self {
-        let mut guard = COMMAND_STRING.lock().unwrap();
-        *guard = vec![to_string_lossy(&program)];
-
-        let mut inner = StdCommand::new(SHELL);
-        inner.arg(START_ARG).arg(program);
-
-        Self { cmd_: inner }
-    }
-    pub fn arg<A: AsRef<OsStr>>(&mut self, arg: A) -> &mut Self {
-        let mut guard = COMMAND_STRING.lock().unwrap();
-        (*guard).push(to_string_lossy(&arg));
-
-        self.cmd_.arg(arg);
-        self
-    }
-    pub fn args<S: AsRef<OsStr>>(&mut self, args: &[S]) -> &mut Self {
-        let mut guard = COMMAND_STRING.lock().unwrap();
-        for arg in args {
-            (*guard).push(to_string_lossy(arg));
-        }
-
-        self.cmd_.args(args);
-        self
-    }
-    pub fn env<K, V>(&mut self, key: K, val: V) -> &mut Self
-    where
-        K: AsRef<OsStr>,
-        V: AsRef<OsStr>,
-    {
-        let mut guard = COMMAND_STRING.lock().unwrap();
-        (*guard).insert(
-            0,
-            format!("{}={}", to_string_lossy(&key), to_string_lossy(&val)),
-        );
-
-        self.cmd_.env(key, val);
-        self
-    }
-    pub fn run(&mut self) -> Result<()> {
-        self.execute_command(true)?;
-        Ok(())
-    }
-
-    pub fn run_with_ret_code(&mut self) -> Result<i32> {
-        self.execute_command(false)
-    }
-
-    fn execute_command(&mut self, expect_success: bool) -> Result<i32> {
-        cfg_if::cfg_if! {
-            if #[cfg(windows)] {
-                use std::os::windows::process::CommandExt;
-                // Prevent CMD window popup
-                use winapi::um::winbase::CREATE_NO_WINDOW;
-                let mut child = self.cmd_
-                    .creation_flags(CREATE_NO_WINDOW)
-                    .stdout(Stdio::piped())
-                    .stderr(Stdio::piped())
-                    .spawn()?;
-            } else {
-                let mut child = self.cmd_
-                    .stdout(Stdio::piped())
-                    .stderr(Stdio::piped())
-                    .spawn()?;
-            }
-        }
-
-        // FIXME: (J-ZhengLi) somehow this doesn't stream output anymore, wtf happend?
-        // I clearly remember it did work, I **TESTED** it! I made sure it worked
-        // then I made a PR specifically for it (https://github.com/J-ZhengLi/rim/pull/159).
-        // So how the F that this doesn't work anymore...
-        output_to_log(child.stdout.as_mut());
-        output_to_log(child.stderr.as_mut());
-
-        let status = child.wait()?;
-        let ret_code = get_ret_code(&status);
-        if expect_success && !status.success() {
-            let command = COMMAND_STRING.lock().unwrap();
-            anyhow::bail!(
-                "programm exited with code {ret_code}. \n\
-                Command: {}",
-                (*command).join(" "),
-            );
+    cfg_if::cfg_if! {
+        if #[cfg(windows)] {
+            use std::os::windows::process::CommandExt;
+            // Prevent CMD window popup
+            use winapi::um::winbase::CREATE_NO_WINDOW;
+            let mut child = cmd
+                .creation_flags(CREATE_NO_WINDOW)
+                .stdout(stdout)
+                .stderr(stderr)
+                .spawn()?;
         } else {
-            Ok(ret_code)
+            let mut child = cmd
+                .stdout(stdout)
+                .stderr(stderr)
+                .spawn()?;
         }
     }
+
+    let cmd_content = cmd_to_string(cmd);
+    output_to_log(Some(&mut reader));
+
+    let status = child.wait()?;
+    let ret_code = get_ret_code(&status);
+    if expect_success && !status.success() {
+        anyhow::bail!(
+            "programm exited with code {ret_code}. \n\
+            Command: {cmd_content}"
+        );
+    } else {
+        Ok(ret_code)
+    }
+}
+
+/// Consumes a [`Command`] and turn it into string using debug formatter.
+///
+/// It is important to call this before reading the output from `os_pipe`,
+/// otherwise there will be deadlock. More information can be found in
+/// [`os_pipe`'s documentation](https://docs.rs/os_pipe/1.2.1/os_pipe/#common-deadlocks-related-to-pipes)
+fn cmd_to_string(cmd: Command) -> String {
+    format!("{cmd:?}")
 }
 
 fn get_ret_code(status: &ExitStatus) -> i32 {

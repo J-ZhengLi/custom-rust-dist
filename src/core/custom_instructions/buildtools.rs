@@ -21,7 +21,7 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<Vec<
     let buildtools_exe = any_existing_child_path(path, &["vs_BuildTools.exe", "vs_buildtools.exe"])
         .ok_or_else(|| anyhow!("unable to find the build tools installer binary."))?;
 
-    let mut cmd = vec![
+    let mut args = vec![
         "--wait",
         "--noWeb",
         "--nocache",
@@ -30,8 +30,8 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<Vec<
         "--focusedUi",
     ];
     for component in required_components() {
-        cmd.push("--add");
-        cmd.push(component.component_id());
+        args.push("--add");
+        args.push(component.component_id());
     }
 
     // Step 2: Make a copy of this installer to the `tools` directory,
@@ -42,7 +42,9 @@ pub(super) fn install(path: &Path, config: &InstallConfiguration) -> Result<Vec<
 
     // Step 3: Invoke the install command.
     info!("{}", t!("installing_msvc_info"));
-    let exit_code: VSExitCode = utils::Command::new(buildtools_exe).args(&cmd).run_with_ret_code()?.into();
+    let mut cmd = utils::cmd!(buildtools_exe);
+    cmd.args(args);
+    let exit_code: VSExitCode = utils::execute_for_ret_code(cmd)?.into();
     match exit_code {
         VSExitCode::Success => {
             info!("{}", t!("msvc_installed"));

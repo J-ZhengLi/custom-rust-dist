@@ -207,11 +207,9 @@ fn cargo_install_or_uninstall(op: &str, args: &[&str], cargo_home: &Path) -> Res
     cargo_bin.push("bin");
     cargo_bin.push(utils::exe!("cargo"));
 
-    utils::Command::new(cargo_bin)
-        .arg(op)
-        .args(args)
-        .env(CARGO_HOME, cargo_home)
-        .run()
+    let mut cmd = utils::cmd!([CARGO_HOME=cargo_home] cargo_bin, op);
+    cmd.args(args);
+    utils::execute(cmd)
 }
 
 /// Move one path (file/dir) to a new folder with `name` under tools dir.
@@ -314,11 +312,7 @@ impl Plugin {
                                 program = program
                             )
                         );
-                        match utils::Command::new(program)
-                            .arg(arg_opt)
-                            .arg(plugin_path)
-                            .run()
-                        {
+                        match utils::run!(program, arg_opt, plugin_path) {
                             Ok(()) => continue,
                             // Ignore error when uninstalling.
                             Err(_) if uninstall => {
