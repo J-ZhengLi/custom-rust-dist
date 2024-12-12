@@ -12,7 +12,8 @@ sh ci/scripts/install-nodejs.sh
 npm set strict-ssl false && npm install -g pnpm
 
 # 安装 Tauri CLI
-cargo install tauri-cli@1.6.4
+# cargo install tauri-cli@1.6.4
+sh ci/scripts/install-tauri-cli.sh
 
 echo "Execiting cargo dev vendor"
 cargo dev vendor

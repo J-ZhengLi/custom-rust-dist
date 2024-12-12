@@ -41,9 +41,16 @@ else
     echo "Invalid docker image: $image"
 fi
 
-# run ther docker image.
+# 运行 Docker 容器
 if [[ "$image" == *"aarch64"* ]]; then
-    docker run --platform linux/arm64 --workdir /checkout/obj -v "$source_dir:/checkout/obj" --init --rm rim-ci 
+  # 设置 QEMU_CPUS 环境变量并运行容器，支持多核配置
+  docker run -e QEMU_CPUS=${QEMU_CPUS:-4} --platform linux/arm64 \
+    --workdir /checkout/obj \
+    -v "$source_dir:/checkout/obj" \
+    --init --rm rim-ci
 else
-    docker run --workdir /checkout/obj -v "$source_dir:/checkout/obj" --init --rm rim-ci
+  # 默认处理其他架构
+  docker run --workdir /checkout/obj \
+    -v "$source_dir:/checkout/obj" \
+    --init --rm rim-ci
 fi
