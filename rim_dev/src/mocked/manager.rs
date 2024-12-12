@@ -1,13 +1,5 @@
 use anyhow::Result;
-use std::{
-    env::consts::EXE_SUFFIX,
-    fs,
-    path::{Path, PathBuf},
-    process::Command,
-    sync::OnceLock,
-};
-
-static MANAGER_DIR: OnceLock<PathBuf> = OnceLock::new();
+use std::{env::consts::EXE_SUFFIX, fs, path::PathBuf, process::Command};
 
 struct FakeRim {
     main_rs: String,
@@ -63,7 +55,7 @@ edition = \"2021\"
         let mut binary_path = temp_dir.join("target");
         binary_path.push("release");
         binary_path.push(format!("rim{}", std::env::consts::EXE_SUFFIX));
-        let mut dest_dir = manager_dir().join("archive");
+        let mut dest_dir = super::manager_dir().join("archive");
         dest_dir.push(&self.version);
         dest_dir.push(env!("TARGET"));
         fs::create_dir_all(&dest_dir)?;
@@ -77,18 +69,9 @@ edition = \"2021\"
     }
 }
 
-fn manager_dir() -> &'static Path {
-    MANAGER_DIR.get_or_init(|| {
-        let mut m_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_file_name("resources");
-        m_dir.push("mock");
-        m_dir.push("manager");
-        m_dir
-    })
-}
-
 /// Generate a `release.toml` for self update, that the version will always be newer.
 fn gen_release_toml(version: &str) -> Result<()> {
-    let release_toml = manager_dir().join("release.toml");
+    let release_toml = super::manager_dir().join("release.toml");
 
     let desired_content = format!("version = '{version}'");
     fs::write(release_toml, desired_content)?;
