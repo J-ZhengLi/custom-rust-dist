@@ -5,7 +5,7 @@ import { managerConf, progressFormat } from '@/utils';
 import { useCustomRouter } from '@/router';
 import { message } from '@tauri-apps/api/dialog';
 
-const { routerPush, routerBack } = useCustomRouter();
+const { routerPush, routerPushAndClearCache } = useCustomRouter();
 
 const progress = ref(0);
 const output: Ref<string[]> = ref([]);
@@ -16,7 +16,15 @@ function complete() {
   if (isUninstall.value) {
     routerPush('/manager/complete');
   } else {
-    message('完成更改', { title: '提示' }).then(() => routerBack(-3));
+    message('完成更改', { title: '提示' }).then(() => {
+      // reload installed and available toolkit list before jump back to it
+      managerConf.reloadKits().then(() => {
+        routerPushAndClearCache('/manager');
+        // clear previous progress value and messages
+        progress.value = 0;
+        output.value = [];
+      });
+    });
   }
 }
 

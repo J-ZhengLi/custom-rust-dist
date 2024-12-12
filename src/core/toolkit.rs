@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use crate::core::parser::dist_manifest::DistManifest;
 use crate::core::parser::TomlParser;
@@ -14,7 +14,7 @@ use super::parser::dist_manifest::DistPackage;
 
 /// A cached installed [`Toolkit`] struct to prevent the program doing
 /// excessive IO operations as in [`installed`](Toolkit::installed).
-static INSTALLED_KIT: OnceLock<Toolkit> = OnceLock::new();
+static INSTALLED_KIT: OnceLock<Mutex<Toolkit>> = OnceLock::new();
 /// Cache the list of toolkit provided by the server, this will save the number of times
 /// that we need to make server request, in the exchange of memory usage.
 static ALL_TOOLKITS: OnceLock<Vec<Toolkit>> = OnceLock::new();
@@ -41,11 +41,14 @@ impl PartialEq for Toolkit {
 impl Toolkit {
     /// Try getting the toolkit from installation record and the original manifest for installed toolset.
     ///
-    /// We need the manifest because it contains the details of the toolkit along with
-    /// what components it has.
-    pub fn installed() -> Result<Option<&'static Self>> {
-        if let Some(cached) = INSTALLED_KIT.get() {
-            return Ok(Some(cached));
+    /// The installed kit will be cached to reduce the number of IO operations.
+    /// However, if `reload_cache` is `true`, the cache will be ignored, and will be
+    /// updated once installed kit is being reloaded.
+    pub fn installed(reload_cache: bool) -> Result<Option<MutexGuard<'static, Self>>> {
+        if !reload_cache {
+            if let Some(cached) = INSTALLED_KIT.get() {
+                return Ok(Some(cached.lock().unwrap()));
+            }
         }
 
         if !InstallationRecord::exists()? {
@@ -68,9 +71,16 @@ impl Toolkit {
             components,
         };
 
-        // Make a clone and cache the final result
-        let cached = INSTALLED_KIT.get_or_init(|| tk);
-        Ok(Some(cached))
+        if let Some(existing) = INSTALLED_KIT.get() {
+            // If we already have a cache, update the inner value of it.
+            let mut guard = existing.lock().unwrap();
+            *guard = tk;
+            Ok(Some(guard))
+        } else {
+            // If we are creating a fresh cache, just return the inner mutex guard.
+            let mutex = INSTALLED_KIT.get_or_init(|| Mutex::new(tk));
+            Ok(Some(mutex.lock().unwrap()))
+        }
     }
 }
 
@@ -90,6 +100,8 @@ impl From<DistPackage> for Toolkit {
 /// Download the dist manifest from server to get the list of all provided toolkits.
 ///
 /// Note the retrieved list will be reversed so that the newest toolkit will always be on top.
+///
+/// The collection will always be cached to reduce the number of server requests.
 fn toolkits_from_server() -> Result<&'static [Toolkit]> {
     if let Some(cached) = ALL_TOOLKITS.get() {
         return Ok(cached);
@@ -119,10 +131,13 @@ fn toolkits_from_server() -> Result<&'static [Toolkit]> {
 }
 
 /// Return a list of all toolkits that are not currently installed.
-pub fn installable_toolkits() -> Result<Vec<&'static Toolkit>> {
+pub fn installable_toolkits(reload_cache: bool) -> Result<Vec<&'static Toolkit>> {
     let all_toolkits = toolkits_from_server()?;
-    let installable = if let Some(installed) = Toolkit::installed()? {
-        all_toolkits.iter().filter(|tk| *tk != installed).collect()
+    let installable = if let Some(installed) = Toolkit::installed(reload_cache)? {
+        all_toolkits
+            .iter()
+            .filter(|tk| *tk != &*installed)
+            .collect()
     } else {
         all_toolkits.iter().collect()
     };
@@ -130,11 +145,11 @@ pub fn installable_toolkits() -> Result<Vec<&'static Toolkit>> {
 }
 
 /// Return the latest available toolkit if it's not already installed.
-pub fn latest_installable_toolkit() -> Result<Option<&'static Toolkit>> {
+pub fn latest_installable_toolkit(reload_cache: bool) -> Result<Option<&'static Toolkit>> {
     info!("{}", t!("checking_toolkit_updates"));
 
     let all_toolkits = toolkits_from_server()?;
-    if let Some(installed) = Toolkit::installed()? {
+    if let Some(installed) = Toolkit::installed(reload_cache)? {
         let Some(maybe_latest) = all_toolkits
             .iter()
             // make sure they are the same **product**

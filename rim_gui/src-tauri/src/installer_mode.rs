@@ -13,6 +13,8 @@ use rim::{try_it, utils};
 static TOOLSET_MANIFEST: OnceLock<ToolsetManifest> = OnceLock::new();
 
 pub(super) fn main() -> Result<()> {
+    let msg_recv = common::setup_logger()?;
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             super::close_window,
@@ -41,6 +43,8 @@ pub(super) fn main() -> Result<()> {
             .build()?;
 
             common::set_window_shadow(&window);
+            common::spawn_gui_update_thread(window, msg_recv);
+
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -118,19 +122,15 @@ fn load_manifest_and_ret_version() -> Result<String> {
 }
 
 #[tauri::command(rename_all = "snake_case")]
-fn install_toolchain(
-    window: tauri::Window,
-    components_list: Vec<Component>,
-    install_dir: String,
-) -> Result<()> {
+fn install_toolchain(window: tauri::Window, components_list: Vec<Component>, install_dir: String) {
     let install_dir = PathBuf::from(install_dir);
-    common::install_components(
+    common::install_toolkit_in_new_thread(
         window,
         components_list,
         install_dir,
-        cached_manifest(),
+        cached_manifest().to_owned(),
         false,
-    )
+    );
 }
 
 /// Retrieve cached toolset manifest.

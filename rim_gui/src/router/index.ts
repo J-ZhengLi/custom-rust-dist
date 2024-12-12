@@ -130,6 +130,13 @@ export function useCustomRouter() {
     if (typeof deep === 'number') newRouter.go(deep);
     else newRouter.back();
   }
+  function routerPushAndClearCache(path: RouteLocationRaw) {
+    newRouter.push(path).then(() => {
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    });
+  }
 
-  return { isBack, routerPush, routerBack };
+  return { isBack, routerPush, routerBack, routerPushAndClearCache };
 }

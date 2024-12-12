@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 
 use anyhow::{anyhow, bail, Context, Result};
 
@@ -133,4 +134,36 @@ pub fn ensure_parent_dir<P: AsRef<Path>>(path: P) -> Result<()> {
         ensure_dir(p)?;
     }
     Ok(())
+}
+
+pub fn install_gui_deps() {
+    println!("running `pnpm i`");
+    let fail_msg = "unable to run `pnpm i`, \
+            please manually cd to `rim_gui/` then run the command manually";
+
+    let gui_crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_file_name("rim_gui");
+    assert!(gui_crate_dir.exists());
+
+    cfg_if::cfg_if! {
+        if #[cfg(windows)] {
+            let mut status = Command::new("cmd.exe");
+            status.args(["/C", "pnpm", "i"]);
+        } else {
+            let mut status = Command::new("pnpm");
+            status.arg("i");
+        }
+    }
+    status
+        .current_dir(gui_crate_dir)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
+
+    let Ok(st) = status.status() else {
+        println!("{fail_msg}");
+        return;
+    };
+
+    if !st.success() {
+        println!("{fail_msg}: {}", st.code().unwrap_or(-1));
+    }
 }
