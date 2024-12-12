@@ -31,7 +31,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
 RUN npm set strict-ssl false && npm install -g pnpm
 
 # 安装 Tauri CLI
-RUN cargo install tauri-cli@1.6.4
+# RUN cargo install tauri-cli@1.6.4
+COPY ci/scripts/install-tauri-cli.sh /scripts/
+RUN chmod +x /scripts/install-tauri-cli.sh && \
+    /scripts/install-tauri-cli.sh
 
 # 执行项目构建
 CMD cargo dev vendor && \
