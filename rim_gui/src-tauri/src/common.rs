@@ -1,7 +1,7 @@
 use std::{
     path::PathBuf,
-    sync::{mpsc, Arc},
-    thread::{self, JoinHandle},
+    sync::mpsc::{self, Receiver},
+    thread,
     time::Duration,
 };
 
@@ -18,42 +18,47 @@ pub(crate) const PROGRESS_UPDATE_EVENT: &str = "update-progress";
 pub(crate) const ON_COMPLETE_EVENT: &str = "on-complete";
 pub(crate) const ON_FAILED_EVENT: &str = "on-failed";
 
-pub(crate) fn install_components(
+/// Configure the logger to use a communication channel ([`mpsc`]),
+/// allowing us to send logs accrossing threads.
+///
+/// This will return a log message's receiver which can be used to emitting
+/// messages onto [`tauri::Window`]
+pub(crate) fn setup_logger() -> Result<Receiver<String>> {
+    let (msg_sendr, msg_recvr) = mpsc::channel::<String>();
+    utils::Logger::new().sender(msg_sendr).setup()?;
+    Ok(msg_recvr)
+}
+
+pub(crate) fn spawn_gui_update_thread(window: tauri::Window, msg_recv: Receiver<String>) {
+    thread::spawn(move || loop {
+        // Note: `recv()` will block, therefore it's important to check thread execution atfirst
+        if let Ok(msg) = msg_recv.recv() {
+            if msg.starts_with("error:") {
+                emit(&window, ON_FAILED_EVENT, msg);
+                break;
+            } else {
+                emit(&window, MESSAGE_UPDATE_EVENT, msg);
+            }
+        }
+    });
+}
+
+fn emit(window: &tauri::Window, event: &str, msg: String) {
+    window.emit(event, msg).unwrap_or_else(|e| {
+        log::error!(
+            "unexpected error occurred \
+            while emiting tauri event: {e}"
+        )
+    });
+}
+
+pub(crate) fn install_toolkit_in_new_thread(
     window: tauri::Window,
     components_list: Vec<Component>,
     install_dir: PathBuf,
-    manifest: &ToolsetManifest,
+    manifest: ToolsetManifest,
     is_update: bool,
-) -> Result<()> {
-    let (msg_sendr, msg_recvr) = mpsc::channel::<String>();
-    // config logger to use the `msg_sendr` we just created
-    utils::Logger::new().sender(msg_sendr).setup()?;
-
-    // 使用 Arc 来共享
-    // NB (J-ZhengLi): Threads don't like 'normal' references
-    let window = Arc::new(window);
-    let window_clone = Arc::clone(&window);
-    let manifest = Arc::new(manifest.to_owned());
-
-    // 在一个新线程中执行安装过程
-    let install_thread =
-        spawn_install_thread(window, components_list, install_dir, manifest, is_update);
-    // 在主线程中接收进度并发送事件
-    let gui_thread = spawn_gui_update_thread(window_clone, install_thread, msg_recvr);
-
-    if gui_thread.is_finished() {
-        gui_thread.join().expect("unable to join GUI thread")?;
-    }
-    Ok(())
-}
-
-fn spawn_install_thread(
-    window: Arc<tauri::Window>,
-    components_list: Vec<Component>,
-    install_dir: PathBuf,
-    manifest: Arc<ToolsetManifest>,
-    is_update: bool,
-) -> JoinHandle<anyhow::Result<()>> {
+) {
     thread::spawn(move || -> anyhow::Result<()> {
         // FIXME: this is needed to make sure the other thread could recieve the first couple messages
         // we sent in this thread. But it feels very wrong, there has to be better way.
@@ -77,32 +82,7 @@ fn spawn_install_thread(
         window.emit(ON_COMPLETE_EVENT, ())?;
 
         Ok(())
-    })
-}
-
-pub(crate) fn spawn_gui_update_thread(
-    win: Arc<tauri::Window>,
-    install_handle: thread::JoinHandle<anyhow::Result<()>>,
-    msg_recvr: mpsc::Receiver<String>,
-) -> JoinHandle<anyhow::Result<()>> {
-    thread::spawn(move || loop {
-        for pending_message in msg_recvr.try_iter() {
-            win.emit(MESSAGE_UPDATE_EVENT, pending_message)?;
-        }
-
-        if install_handle.is_finished() {
-            return if let Err(known_error) = install_handle
-                .join()
-                .expect("unexpected error occurs when attempting to join thread.")
-            {
-                let error_str = known_error.to_string();
-                win.emit(ON_FAILED_EVENT, error_str.clone())?;
-                Err(known_error)
-            } else {
-                Ok(())
-            };
-        }
-    })
+    });
 }
 
 #[derive(serde::Serialize)]

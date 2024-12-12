@@ -132,15 +132,14 @@ class ManagerConf {
       this.path.value = dir;
     }
 
-    await this.loadInstalledKit();
-    await this.loadAvailableKits();
+    await this.reloadKits();
     // check self update and ask user if they what to install it.
     await invokeCommand('maybe_self_update');
   }
 
   async loadInstalledKit() {
     const tauriInstalled = (await invokeCommand(
-      'get_installed_kit'
+      'get_installed_kit', { reload: true }
     )) as KitItem | undefined;
     if (tauriInstalled) {
       const installed = {
@@ -157,10 +156,15 @@ class ManagerConf {
 
   async loadAvailableKits() {
     const availableKits = (await invokeCommand(
-      'get_available_kits'
+      'get_available_kits', { reload: true }
     )) as KitItem[];
 
     this.setKits(availableKits);
+  }
+
+  async reloadKits() {
+    await this.loadInstalledKit()
+    await this.loadAvailableKits()
   }
 }
 

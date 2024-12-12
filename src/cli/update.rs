@@ -35,13 +35,13 @@ pub(super) fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
 }
 
 fn update_toolkit_(install_dir: &Path) -> Result<()> {
-    let Some(installed) = Toolkit::installed()? else {
+    let Some(installed) = Toolkit::installed(false)? else {
         info!("{}", t!("no_toolkit_installed"));
         return Ok(());
     };
 
     // get possible update
-    let Some(latest_toolkit) = latest_installable_toolkit()? else {
+    let Some(latest_toolkit) = latest_installable_toolkit(false)? else {
         return Ok(());
     };
 

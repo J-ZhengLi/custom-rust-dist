@@ -130,6 +130,9 @@ export function useCustomRouter() {
     if (typeof deep === 'number') newRouter.go(deep);
     else newRouter.back();
   }
+  function routerReplace(path: RouteLocationRaw) {
+    newRouter.replace(path);
+  }
 
-  return { isBack, routerPush, routerBack };
+  return { isBack, routerPush, routerBack, routerReplace };
 }

@@ -1,11 +1,11 @@
 use std::{
-    sync::{mpsc, Arc, Mutex, MutexGuard, OnceLock},
+    sync::{Arc, Mutex, MutexGuard},
     thread,
     time::Duration,
 };
 
 use crate::{
-    common::{self, spawn_gui_update_thread, ON_COMPLETE_EVENT, PROGRESS_UPDATE_EVENT},
+    common::{self, ON_COMPLETE_EVENT, PROGRESS_UPDATE_EVENT},
     error::Result,
 };
 use anyhow::Context;
@@ -20,7 +20,6 @@ use rim::{
 use tauri::{api::dialog, AppHandle, Manager};
 
 static SELECTED_TOOLSET: Mutex<Option<ToolsetManifest>> = Mutex::new(None);
-static LOGGER_SETUP: OnceLock<()> = OnceLock::new();
 
 fn selected_toolset<'a>() -> MutexGuard<'a, Option<ToolsetManifest>> {
     SELECTED_TOOLSET
@@ -29,6 +28,8 @@ fn selected_toolset<'a>() -> MutexGuard<'a, Option<ToolsetManifest>> {
 }
 
 pub(super) fn main() -> Result<()> {
+    let msg_recv = common::setup_logger()?;
+
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
             super::close_window,
@@ -56,6 +57,8 @@ pub(super) fn main() -> Result<()> {
             .build()?;
 
             common::set_window_shadow(&window);
+            common::spawn_gui_update_thread(window, msg_recv);
+
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -73,13 +76,13 @@ fn window_title() -> String {
 }
 
 #[tauri::command]
-fn get_installed_kit() -> Result<Option<Toolkit>> {
-    Ok(Toolkit::installed()?.cloned())
+fn get_installed_kit(reload: bool) -> Result<Option<Toolkit>> {
+    Ok(Toolkit::installed(reload)?.map(|guard| guard.clone()))
 }
 
 #[tauri::command]
-fn get_available_kits() -> Result<Vec<Toolkit>> {
-    Ok(toolkit::installable_toolkits()?
+fn get_available_kits(reload: bool) -> Result<Vec<Toolkit>> {
+    Ok(toolkit::installable_toolkits(reload)?
         .into_iter()
         .cloned()
         .collect())
@@ -92,15 +95,9 @@ fn get_install_dir() -> String {
 
 #[tauri::command(rename_all = "snake_case")]
 fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
-    let (msg_sendr, msg_recvr) = mpsc::channel::<String>();
-    // config logger to use the `msg_sendr` we just created, use OnceLock to make sure it run
-    // exactly once.
-    LOGGER_SETUP.get_or_init(|| _ = utils::Logger::new().sender(msg_sendr).setup());
-
     let window = Arc::new(window);
-    let window_clone = Arc::clone(&window);
 
-    let uninstall_thread = thread::spawn(move || -> anyhow::Result<()> {
+    thread::spawn(move || -> anyhow::Result<()> {
         // FIXME: this is needed to make sure the other thread could recieve the first couple messages
         // we sent in this thread. But it feels very wrong, there has to be better way.
         thread::sleep(Duration::from_millis(500));
@@ -116,11 +113,6 @@ fn uninstall_toolkit(window: tauri::Window, remove_self: bool) -> Result<()> {
         Ok(())
     });
 
-    let gui_thread = spawn_gui_update_thread(window_clone, uninstall_thread, msg_recvr);
-
-    if gui_thread.is_finished() {
-        gui_thread.join().expect("failed to join GUI thread")?;
-    }
     Ok(())
 }
 
@@ -131,7 +123,13 @@ fn install_toolkit(window: tauri::Window, components_list: Vec<Component>) -> Re
         let manifest = guard
             .as_ref()
             .expect("internal error: a toolkit must be selected to install");
-        common::install_components(window, components_list, p.to_path_buf(), manifest, true)?;
+        common::install_toolkit_in_new_thread(
+            window,
+            components_list,
+            p.to_path_buf(),
+            manifest.to_owned(),
+            true,
+        );
         Ok(())
     })?;
     Ok(())
