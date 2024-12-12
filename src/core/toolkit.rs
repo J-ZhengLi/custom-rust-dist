@@ -111,15 +111,6 @@ fn toolkits_from_server() -> Result<&'static [Toolkit]> {
         false,
     )?;
 
-    // process place-holder text in debug mode
-    #[cfg(debug_assertions)]
-    {
-        use std::fs;
-        let mut dist_m_content = fs::read_to_string(dist_m_file.path())?;
-        dist_m_content = dist_m_content.replace("{{SERVER}}", Url::parse(dist_server)?.as_str());
-        fs::write(dist_m_file.path(), dist_m_content)?;
-    }
-
     // load dist "pacakges" then convert them into `toolkit`s
     let packages = DistManifest::load(dist_m_file.path())?.packages;
     let cached =
