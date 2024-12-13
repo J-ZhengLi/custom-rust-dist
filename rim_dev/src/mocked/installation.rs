@@ -1,5 +1,7 @@
 //! Module to create a fake installation root, useful to test the `manager` utilities.
 
+use crate::common;
+
 use super::TOOLKIT_NAME;
 use anyhow::{bail, Result};
 use std::{env::consts::EXE_SUFFIX, fs, path::PathBuf, process::Command};
@@ -40,6 +42,10 @@ paths = ['{0}/tools/mingw64']
             ["tauri", "build", "--debug", "-b", "none", "--"].to_vec()
         };
         cargo_args.extend(args.iter().map(|s| s.as_str()));
+
+        if !no_gui {
+            common::install_gui_deps();
+        }
 
         // build rim
         let build_status = Command::new("cargo").args(cargo_args).status()?;

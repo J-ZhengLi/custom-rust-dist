@@ -1,12 +1,12 @@
 use env::consts::EXE_SUFFIX;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::{env, fs};
 
 use anyhow::{bail, Result};
 use cfg_if::cfg_if;
 
-use crate::common::*;
+use crate::common::{self, *};
 
 pub const DIST_HELP: &str = r#"
 Generate release binaries
@@ -153,7 +153,7 @@ pub fn dist(mode: DistMode, binary_only: bool) -> Result<()> {
     };
 
     if !matches!(mode, DistMode::Cli) {
-        pnpm_install();
+        common::install_gui_deps();
     }
 
     for worker in workers {
@@ -178,36 +178,4 @@ pub fn dist(mode: DistMode, binary_only: bool) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn pnpm_install() {
-    println!("running `pnpm i`");
-    let fail_msg = "unable to run `pnpm i`, \
-            please manually cd to `rim_gui/` then run the command manually";
-
-    let gui_crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_file_name("rim_gui");
-    assert!(gui_crate_dir.exists());
-
-    cfg_if! {
-        if #[cfg(windows)] {
-            let mut status = Command::new("cmd.exe");
-            status.args(["/C", "pnpm", "i"]);
-        } else {
-            let mut status = Command::new("pnpm");
-            status.arg("i");
-        }
-    }
-    status
-        .current_dir(gui_crate_dir)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit());
-
-    let Ok(st) = status.status() else {
-        println!("{fail_msg}");
-        return;
-    };
-
-    if !st.success() {
-        println!("{fail_msg}: {}", st.code().unwrap_or(-1));
-    }
 }
