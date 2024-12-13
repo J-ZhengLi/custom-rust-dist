@@ -31,7 +31,6 @@ fern = { version = "0.7", features = ["colored"] }
 [dependencies]
 anyhow.workspace = true
 clap = { version = "4", features = ["derive"] }
-home = "0.5.9"
 indicatif = "0.17"
 reqwest = { version = "0.12", features = ["blocking", "native-tls-vendored"] }
 serde.workspace = true
@@ -45,7 +44,6 @@ sevenz-rust = "0.6.1"
 tar = "0.4"
 xz2 = "0.1.7"
 flate2 = "1"
-common-path = "1.0.0"
 cfg-if = "1"
 env_proxy = "0.4.1"
 indexmap.workspace = true
@@ -62,21 +60,3 @@ os_pipe = "1.2.1"
 winreg = "0.52.0"
 winapi = { version = "0.3", features = ["winuser", "winbase"] }
 cc = "1"
-
-[target."cfg(windows)".dependencies.windows-sys]
-features = [
-  "Win32_Foundation",
-  "Win32_Security",
-  "Win32_Storage_FileSystem",
-  "Win32_System_Diagnostics_ToolHelp",
-  "Win32_System_IO",
-  "Win32_System_Ioctl",
-  "Win32_System_JobObjects",
-  "Win32_System_Kernel",
-  "Win32_System_LibraryLoader",
-  "Win32_System_SystemInformation",
-  "Win32_System_SystemServices",
-  "Win32_System_Threading",
-  "Win32_System_WindowsProgramming",
-]
-version = "0.52.0"
