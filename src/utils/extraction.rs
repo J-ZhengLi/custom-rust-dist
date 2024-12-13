@@ -2,7 +2,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use flate2::read::GzDecoder;
 use log::info;
 use sevenz_rust::{Password, SevenZReader};
-use std::borrow::Borrow;
+use std::ffi::OsStr;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -100,6 +100,63 @@ impl<'a> Extractable<'a> {
             ExtractableKind::Xz(archive) => helper.extract_tar(archive),
         }
     }
+
+    /// Extract file into a specific root like [`extract_to`](Extractable::extract_to),
+    /// then look for **solo** nested directory and return the last one.
+    ///
+    /// This works similar to skipping common prefixes, except this does not
+    /// handle common prefixes when extracting. ~~(because I don't know how)~~
+    ///
+    /// If `stop` contains a folder name, this function will stop when encountered that folder and
+    /// return the full extracted path of **its parent** instead.
+    ///
+    /// # Example:
+    /// Suppose we have an archive with entries like this:
+    /// ```text
+    /// Foo
+    ///  |- a
+    ///     |- b
+    ///        |- c
+    ///           |- d1
+    ///           |- d2
+    /// ```
+    /// Then after calling this function, the path to `c` will be returned,
+    /// because it's the last solo directory in the archive
+    /// ```ignore
+    /// let dir = Extractable::load("/path/to/foo.tar.gz")?
+    ///     .extract_then_skip_solo_dir("/path/to/foo", None)?;
+    /// assert_eq!(dir, PathBuf::from("/path/to/foo/a/b/c"));
+    /// ```
+    pub fn extract_then_skip_solo_dir<S: AsRef<OsStr>>(
+        &mut self,
+        root: &Path,
+        stop: Option<S>,
+    ) -> Result<PathBuf> {
+        fn inner_<S: AsRef<OsStr>>(root: &Path, stop: Option<S>) -> Result<PathBuf> {
+            if let [sub_dir] = super::walk_dir(root, false)?.as_slice() {
+                if matches!(stop, Some(ref keyword) if filename_matches_keyword(sub_dir, keyword)) {
+                    Ok(root.to_path_buf())
+                } else {
+                    inner_(sub_dir, stop)
+                }
+            } else {
+                Ok(root.to_path_buf())
+            }
+        }
+
+        // first we need to extract the tarball
+        self.extract_to(root)?;
+        // then find the last solo dir recursively
+        inner_(root, stop)
+    }
+}
+
+fn filename_matches_keyword<S: AsRef<OsStr>>(path: &Path, keyword: S) -> bool {
+    if let Some(name) = path.file_name() {
+        name == keyword.as_ref()
+    } else {
+        false
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -110,15 +167,14 @@ struct ExtractHelper<'a, T: Sized> {
 }
 
 impl<T: Sized> ExtractHelper<'_, T> {
-    fn start_progress_bar(&self, len: u64, style: Style) -> Result<T> {
+    fn start_progress_bar(&self, style: Style) -> Result<T> {
         (self.indicator.start)(
-            len,
             format!("extracting file '{}'", self.file_path.display()),
             style,
         )
     }
 
-    fn update_progress_bar(&self, bar: &T, prog: u64) {
+    fn update_progress_bar(&self, bar: &T, prog: Option<u64>) {
         (self.indicator.update)(bar, prog);
     }
 
@@ -126,71 +182,19 @@ impl<T: Sized> ExtractHelper<'_, T> {
         (self.indicator.stop)(bar, "extraction complete.".into());
     }
 
-    fn count_prefixes_for_tar<R: Read>(entries: &[tar::Entry<R>]) -> Result<usize> {
-        if entries.len() < 2 {
-            return Ok(0);
-        }
-
-        let mut all_files = vec![];
-        for entry in entries {
-            if entry.header().entry_type().is_file() {
-                all_files.push(entry.path()?.to_path_buf());
-            }
-        }
-        let common_prefix = common_path_all(all_files.iter().map(|c| c.borrow()));
-        Ok(common_prefix
-            .map(|p| p.components().count())
-            .unwrap_or_default())
-    }
-
-    fn count_prefixes_for_zip(entries: &Vec<&str>) -> Result<usize> {
-        if entries.len() < 2 {
-            return Ok(0);
-        }
-
-        let all_files = entries
-            .iter()
-            .filter_map(|p| (!p.ends_with('/')).then_some(Path::new(p)));
-        let common_prefix = common_path_all(all_files);
-        Ok(common_prefix
-            .map(|p| p.components().count())
-            .unwrap_or_default())
-    }
-
-    fn count_prefixes_for_7z(entries: &[sevenz_rust::SevenZArchiveEntry]) -> Result<usize> {
-        if entries.len() < 2 {
-            return Ok(0);
-        }
-
-        // NB: `.archive().files` is a fxxking lie, it contains directories as well,
-        // so we still need to filter directories.
-        let all_files = entries
-            .iter()
-            .filter_map(|p| (!p.is_directory()).then_some(Path::new(p.name())));
-        let common_prefix = common_path_all(all_files);
-        Ok(common_prefix
-            .map(|p| p.components().count())
-            .unwrap_or_default())
-    }
-
     fn extract_zip(&self, archive: &mut ZipArchive<File>) -> Result<()> {
         let zip_len = archive.len();
-        let prefix_count = Self::count_prefixes_for_zip(&archive.file_names().collect())?;
 
         // Init progress
-        let bar = self.start_progress_bar(zip_len.try_into()?, Style::Len)?;
+        let bar = self.start_progress_bar(Style::Len(zip_len.try_into()?))?;
 
         for i in 0..zip_len {
             let mut zip_file = archive.by_index(i)?;
-            let out_path = match zip_file.enclosed_name() {
-                Some(path) => {
-                    let skipped = path.components().skip(prefix_count).collect::<PathBuf>();
-                    if skipped == PathBuf::new() {
-                        continue;
-                    }
-                    self.output_dir.join(skipped)
-                }
-                None => continue,
+            let Some(out_path) = zip_file
+                .enclosed_name()
+                .map(|path| self.output_dir.join(path))
+            else {
+                continue;
             };
 
             if zip_file.is_dir() {
@@ -209,7 +213,7 @@ impl<T: Sized> ExtractHelper<'_, T> {
                 }
             }
 
-            self.update_progress_bar(&bar, i.try_into()?);
+            self.update_progress_bar(&bar, Some(i.try_into()?));
         }
         self.end_progress_bar(&bar);
 
@@ -218,7 +222,6 @@ impl<T: Sized> ExtractHelper<'_, T> {
 
     fn extract_7z(&self, archive: &mut SevenZReader<File>) -> Result<()> {
         let entries = &archive.archive().files;
-        let prefix_count = Self::count_prefixes_for_7z(entries)?;
         let sz_len: u64 = entries
             .iter()
             .filter_map(|e| e.has_stream().then_some(e.size()))
@@ -226,16 +229,11 @@ impl<T: Sized> ExtractHelper<'_, T> {
         let mut extracted_len: u64 = 0;
 
         // Init progress bar
-        let bar = self.start_progress_bar(sz_len, Style::Bytes)?;
+        let bar = self.start_progress_bar(Style::Bytes(sz_len))?;
 
         archive.for_each_entries(|entry, reader| {
             let mut buf = [0_u8; 1024];
-            let mut entry_path = PathBuf::from(entry.name());
-            entry_path = entry_path.components().skip(prefix_count).collect();
-
-            if entry_path == PathBuf::new() {
-                return Ok(true);
-            }
+            let entry_path = PathBuf::from(entry.name());
             let out_path = self.output_dir.join(&entry_path);
 
             if entry.is_directory() {
@@ -263,7 +261,7 @@ impl<T: Sized> ExtractHelper<'_, T> {
                     out_file.write_all(&buf[..read_size])?;
                     extracted_len += read_size as u64;
                     // Update progress bar
-                    self.update_progress_bar(&bar, extracted_len);
+                    self.update_progress_bar(&bar, Some(extracted_len));
                 }
             }
             // NB: sevenz-rust does not support `unix-mode` like `zip` does, so we might ended up
@@ -278,28 +276,17 @@ impl<T: Sized> ExtractHelper<'_, T> {
         #[cfg(unix)]
         archive.set_preserve_permissions(true);
 
-        let mut entries = vec![];
-        for maybe_entry in archive.entries()? {
-            let entry = maybe_entry?;
-            entries.push(entry);
-        }
+        let entries = archive.entries()?;
 
-        let prefix_count = Self::count_prefixes_for_tar(&entries)?;
-        let total_len: u64 = entries.len().try_into()?;
-        // Init progress bar
-        let bar = self.start_progress_bar(total_len, Style::Len)?;
+        // Init progress bar, use spinner because the length of entries cannot be retrieved.
+        // NB: DO NOT consume the entries, like collect it into a vec or something,
+        // as it will corrupt the contents within it, causing data loss in some of the files:
+        // https://github.com/J-ZhengLi/rim/issues/161
+        let bar = self.start_progress_bar(Style::Spinner)?;
 
-        for (idx, mut entry) in entries.into_iter().enumerate() {
+        for (idx, mut entry) in entries.into_iter().filter_map(|e| e.ok()).enumerate() {
             let entry_path = entry.path()?;
-            let skipped = entry_path
-                .components()
-                .skip(prefix_count)
-                .collect::<PathBuf>();
-            if skipped == PathBuf::new() {
-                continue;
-            }
-
-            let out_path = self.output_dir.join(&skipped);
+            let out_path = self.output_dir.join(&entry_path);
 
             if entry.header().entry_type().is_dir() {
                 super::ensure_dir(&out_path).with_context(|| {
@@ -321,7 +308,7 @@ impl<T: Sized> ExtractHelper<'_, T> {
             }
 
             // Update progress bar
-            self.update_progress_bar(&bar, u64::try_from(idx)? + 1);
+            self.update_progress_bar(&bar, Some(u64::try_from(idx)? + 1));
         }
 
         // Stop progress bar's progress
