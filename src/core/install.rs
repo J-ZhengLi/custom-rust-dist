@@ -388,7 +388,7 @@ impl<'a> InstallConfiguration<'a> {
     /// otherwise this will copy that file into dest.
     fn extract_or_copy_to(&self, maybe_file: &Path, dest: &Path) -> Result<PathBuf> {
         if let Ok(mut extractable) = Extractable::load(maybe_file) {
-            extractable.extract_to(dest)?;
+            extractable.extract_then_skip_solo_dir(dest, Some("bin"))?;
             Ok(dest.to_path_buf())
         } else {
             utils::copy_into(maybe_file, dest)

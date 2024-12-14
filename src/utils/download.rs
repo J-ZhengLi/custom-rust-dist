@@ -105,9 +105,8 @@ impl<T: Sized> DownloadOpt<T> {
 
         let maybe_indicator = self.handler.as_ref().and_then(|h| {
             (h.start)(
-                total_size,
                 format!("downloading '{}'", &self.name),
-                Style::Bytes,
+                Style::Bytes(total_size),
             )
             .ok()
         });
@@ -139,7 +138,7 @@ impl<T: Sized> DownloadOpt<T> {
                 downloaded_len = min(downloaded_len + bytes_read as u64, total_size);
                 if let Some(indicator) = &maybe_indicator {
                     // safe to unwrap, because indicator won't exist if self.handler is none
-                    (self.handler.as_ref().unwrap().update)(indicator, downloaded_len);
+                    (self.handler.as_ref().unwrap().update)(indicator, Some(downloaded_len));
                 }
                 file.write_all(&buffer[..bytes_read])?;
             } else {
