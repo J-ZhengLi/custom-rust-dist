@@ -45,10 +45,12 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
     manifest.adjust_paths()?;
 
     let component_list = manifest.current_target_components(true)?;
-    let user_opt = CustomInstallOpt::collect_from_user(
-        prefix.as_deref().unwrap_or(&default_install_dir()),
-        component_list,
-    )?;
+    let abs_prefix = if let Some(path) = prefix {
+        utils::to_nomalized_abspath(path, None)?
+    } else {
+        default_install_dir()
+    };
+    let user_opt = CustomInstallOpt::collect_from_user(&abs_prefix, component_list)?;
 
     let (registry_name, registry_value) = registry_url
         .as_deref()

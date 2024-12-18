@@ -13,6 +13,7 @@ use super::{
 };
 use crate::{
     core::os::add_to_path,
+    setter,
     toolset_manifest::ToolMap,
     utils::{self, Extractable, Progress},
 };
@@ -169,15 +170,8 @@ impl<'a> InstallConfiguration<'a> {
         self
     }
 
-    pub fn rustup_dist_server(mut self, url: Url) -> Self {
-        self.rustup_dist_server = url;
-        self
-    }
-
-    pub fn rustup_update_root(mut self, url: Url) -> Self {
-        self.rustup_update_root = url;
-        self
-    }
+    setter!(rustup_dist_server(self, Url));
+    setter!(rustup_update_root(self, Url));
 
     pub(crate) fn env_vars(&self) -> Result<HashMap<&'static str, String>> {
         let cargo_home = self
@@ -437,6 +431,8 @@ impl InstallConfiguration<'_> {
     }
 }
 
+/// Get the default installation directory,
+/// which is a directory under [`home_dir`](utils::home_dir).
 pub fn default_install_dir() -> PathBuf {
     utils::home_dir().join(&*t!("vendor_en"))
 }

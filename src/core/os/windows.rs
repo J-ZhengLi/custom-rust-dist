@@ -11,14 +11,23 @@ pub(crate) use rustup::*;
 
 impl EnvConfig for InstallConfiguration<'_> {
     fn config_env_vars(&self) -> Result<()> {
-        info!("{}", t!("install_env_config"));
-
         let vars_raw = self.env_vars()?;
-        for (key, val) in vars_raw {
-            set_env_var(key, val.encode_utf16().collect())?;
-        }
 
-        update_env();
+        if GlobalOpts::get().no_modify_env {
+            // Update vars for current process, this is a MUST to ensure this installation
+            // can be done correctly.
+            for (key, val) in vars_raw {
+                env::set_var(key, val);
+            }
+        } else {
+            info!("{}", t!("install_env_config"));
+
+            for (key, val) in vars_raw {
+                set_env_var(key, val.encode_utf16().collect())?;
+            }
+
+            update_env();
+        }
 
         self.inc_progress(2.0)
     }

@@ -17,7 +17,10 @@ use std::{
 };
 use url::Url;
 
-use crate::{core::Language, utils};
+use crate::{
+    core::{GlobalOpts, Language},
+    utils,
+};
 pub use common::pause;
 
 /// Install rustup, rust toolchain, and various tools.
@@ -33,12 +36,19 @@ pub struct Installer {
     #[arg(hide = true, short, long, conflicts_with = "verbose")]
     pub quiet: bool,
     /// Disable interaction and answer 'yes' to all prompts
-    #[arg(hide = true, short, long = "yes")]
+    #[arg(short, long = "yes")]
     yes_to_all: bool,
     #[cfg(feature = "gui")]
     /// Don't show GUI when running the program.
     #[arg(hide = true, long)]
     pub no_gui: bool,
+    /// Don't modify user's `PATH` environment variable after installation.
+    #[arg(long)]
+    no_modify_path: bool,
+    /// Don't make any environment modifications on user's machine after installation,
+    /// including Windows registry entries
+    #[arg(long)]
+    no_modify_env: bool,
 
     /// Specify another language to display
     #[arg(short, long, value_name = "LANG", value_parser = Language::possible_values())]
@@ -111,12 +121,15 @@ pub struct Manager {
     #[arg(hide = true, short, long, conflicts_with = "verbose")]
     pub quiet: bool,
     /// Disable interaction and answer 'yes' to all prompts
-    #[arg(hide = true, short, long = "yes")]
+    #[arg(short, long = "yes")]
     yes_to_all: bool,
     #[cfg(feature = "gui")]
     /// Don't show GUI when running the program.
     #[arg(hide = true, long)]
     pub no_gui: bool,
+    /// Don't modify user's `PATH` environment variable after installation.
+    #[arg(long)]
+    no_modify_path: bool,
 
     /// Specify another language to display
     #[arg(short, long, value_name = "LANG", value_parser = Language::possible_values())]
@@ -135,7 +148,14 @@ impl Installer {
     }
 
     pub fn execute(&self) -> Result<()> {
-        setup(self.verbose, self.quiet, self.lang.as_deref())?;
+        setup(
+            self.verbose,
+            self.quiet,
+            self.yes_to_all,
+            self.no_modify_env,
+            self.no_modify_path,
+            self.lang.as_deref(),
+        )?;
 
         install::execute_installer(self)
     }
@@ -143,7 +163,17 @@ impl Installer {
 
 impl Manager {
     pub fn execute(&self) -> Result<()> {
-        setup(self.verbose, self.quiet, self.lang.as_deref())?;
+        // NB: `no_modify_env` was current set to always true, because manager currently only
+        // modifies during self uninstall, thus the `PROGRAM` registry entry for this program
+        // need to be removed, so don't change its value to true or let user override it yet.
+        setup(
+            self.verbose,
+            self.quiet,
+            self.yes_to_all,
+            false,
+            self.no_modify_path,
+            self.lang.as_deref(),
+        )?;
 
         let Some(subcmd) = &self.command else {
             return ManagerSubcommands::from_interaction()?.execute();
@@ -318,7 +348,14 @@ pub fn parse_manager_cli() -> Manager {
     Manager::parse()
 }
 
-fn setup(verbose: bool, quiet: bool, lang: Option<&str>) -> Result<()> {
+fn setup(
+    verbose: bool,
+    quiet: bool,
+    yes: bool,
+    no_modify_env: bool,
+    no_modify_path: bool,
+    lang: Option<&str>,
+) -> Result<()> {
     // Setup locale
     if let Some(lang_str) = lang {
         let parsed: Language = lang_str.parse()?;
@@ -328,6 +365,8 @@ fn setup(verbose: bool, quiet: bool, lang: Option<&str>) -> Result<()> {
     }
     // Setup logger
     utils::Logger::new().verbose(verbose).quiet(quiet).setup()?;
+    // Setup global options
+    GlobalOpts::set(verbose, quiet, yes, no_modify_env, no_modify_path);
 
     Ok(())
 }
