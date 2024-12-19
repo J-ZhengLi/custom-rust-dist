@@ -14,8 +14,17 @@ gui = []
 name = "rim-cli"
 path = "src/bin/rim_cli.rs"
 
+[[bin]]
+name = "rim-dev"
+path = "rim_dev/src/main.rs"
+
 [workspace]
-members = ["rim_gui/src-tauri", "rim_dev"]
+members = [
+    "rim_gui/src-tauri", 
+    "rim_dev",
+    "rim_test/rim-test-macro",
+    "rim_test/rim-test-support",
+]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -27,6 +36,9 @@ indexmap = { version = "2.5", features = ["serde"] }
 rust-i18n = "3"
 log = "0.4"
 fern = { version = "0.7", features = ["colored"] }
+rim-test-macro = { version = "0.1.0", path = "rim_test/rim-test-macro" }
+rim-test-support = { version = "0.1.0", path = "rim_test/rim-test-support" }
+snapbox = { version = "0.6.20", features = ["dir"] }
 
 [dependencies]
 anyhow.workspace = true
@@ -55,6 +67,10 @@ chrono = "0.4.38"
 semver = "1.0.23"
 self-replace = "1"
 os_pipe = "1.2.1"
+
+[dev-dependencies]
+rim-test-support.workspace = true
+snapbox.workspace = true
 
 [target."cfg(windows)".dependencies]
 winreg = "0.52.0"

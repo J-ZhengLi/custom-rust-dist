@@ -659,7 +659,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
 
     #[test]
     fn deserialize_realworld_manifest() {
-        let input = include_str!("../../../tests/data/toolset_manifest.toml");
+        let input = include_str!("../../../tests/assets/toolset_manifest.toml");
         let expected = ToolsetManifest {
             rust: RustToolchain {
                 version: "stable".into(),
@@ -711,7 +711,7 @@ t4 = { git = "https://git.example.com/org/tool", branch = "stable" }
 
     #[test]
     fn current_target_tools_are_correct() {
-        let input = include_str!("../../../tests/data/toolset_manifest.toml");
+        let input = include_str!("../../../tests/assets/toolset_manifest.toml");
         let manifest = ToolsetManifest::from_str(input).unwrap();
         let tools = manifest.current_target_tools();
 
