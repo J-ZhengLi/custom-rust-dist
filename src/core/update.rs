@@ -3,7 +3,7 @@ use std::path::Path;
 use std::sync::OnceLock;
 
 use anyhow::{Context, Result};
-use log::{debug, info, warn};
+use log::{info, trace, warn};
 use semver::Version;
 use url::Url;
 
@@ -161,7 +161,7 @@ fn parse_download_url(source_path: &str) -> Result<Url> {
         .unwrap_or(super::RIM_DIST_SERVER)
         .parse()?;
 
-    debug!("parsing download url for '{source_path}' from server '{base_obs_server}'");
+    trace!("parsing download url for '{source_path}' from server '{base_obs_server}'");
     utils::url_join(&base_obs_server, source_path)
 }
 

@@ -30,10 +30,10 @@ pub use common::pause;
 #[command(version, about)]
 pub struct Installer {
     /// Enable verbose output
-    #[arg(hide = true, short, long, conflicts_with = "quiet")]
+    #[arg(short, long, conflicts_with = "quiet")]
     pub verbose: bool,
     /// Suppress non-critical messages
-    #[arg(hide = true, short, long, conflicts_with = "verbose")]
+    #[arg(short, long, conflicts_with = "verbose")]
     pub quiet: bool,
     /// Disable interaction and answer 'yes' to all prompts
     #[arg(short, long = "yes")]
@@ -42,11 +42,18 @@ pub struct Installer {
     /// Don't show GUI when running the program.
     #[arg(hide = true, long)]
     pub no_gui: bool,
-    /// Don't modify user's `PATH` environment variable after installation.
+    /// Don't modify user's `PATH` environment variable.
+    ///
+    /// Note that some other variables (such as CARGO_HOME, RUSTUP_DIST_SERVER, etc.)
+    /// will still be written to ensure the Rust toolchain can be used correctly.
     #[arg(long)]
     no_modify_path: bool,
-    /// Don't make any environment modifications on user's machine after installation,
-    /// including Windows registry entries
+    /// Don't make any environment modifications on user's machine,
+    /// including Windows registry entries and `PATH` variable.
+    ///
+    /// Note that the installation might not work as intended if some
+    /// of the variables are missing (such as CARGO_HOME, RUSTUP_DIST_SERVER, etc.).
+    /// Do NOT use this if you don't know what you're doing.
     #[arg(long)]
     no_modify_env: bool,
 
@@ -115,10 +122,10 @@ impl PathOrUrl {
 #[command(version, about)]
 pub struct Manager {
     /// Enable verbose output
-    #[arg(hide = true, short, long, conflicts_with = "quiet")]
+    #[arg(short, long, conflicts_with = "quiet")]
     pub verbose: bool,
     /// Suppress non-critical messages
-    #[arg(hide = true, short, long, conflicts_with = "verbose")]
+    #[arg(short, long, conflicts_with = "verbose")]
     pub quiet: bool,
     /// Disable interaction and answer 'yes' to all prompts
     #[arg(short, long = "yes")]
@@ -127,7 +134,7 @@ pub struct Manager {
     /// Don't show GUI when running the program.
     #[arg(hide = true, long)]
     pub no_gui: bool,
-    /// Don't modify user's `PATH` environment variable after installation.
+    /// Don't modify user's `PATH` environment variable.
     #[arg(long)]
     no_modify_path: bool,
 

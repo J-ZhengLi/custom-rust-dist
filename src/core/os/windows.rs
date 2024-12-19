@@ -3,6 +3,7 @@ use std::env::current_exe;
 use crate::core::directories::RimDir;
 use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
+use crate::core::GlobalOpts;
 use crate::utils;
 use anyhow::Result;
 
@@ -17,7 +18,7 @@ impl EnvConfig for InstallConfiguration<'_> {
             // Update vars for current process, this is a MUST to ensure this installation
             // can be done correctly.
             for (key, val) in vars_raw {
-                env::set_var(key, val);
+                std::env::set_var(key, val);
             }
         } else {
             info!("{}", t!("install_env_config"));

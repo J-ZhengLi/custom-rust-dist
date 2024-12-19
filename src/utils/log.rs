@@ -31,10 +31,10 @@ impl Logger {
             dispatcher_: fern::Dispatch::new().level(level),
         }
     }
-    /// Set verbose output, this will print `debug!` messages as well.
+    /// Set verbose output, this will print `trace!` messages as well.
     pub fn verbose(mut self, v: bool) -> Self {
         if v {
-            self.dispatcher_ = self.dispatcher_.level(LevelFilter::Debug);
+            self.dispatcher_ = self.dispatcher_.level(LevelFilter::Trace);
         }
         self
     }
