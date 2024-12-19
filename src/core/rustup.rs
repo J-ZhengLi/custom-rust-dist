@@ -9,6 +9,7 @@ use super::directories::RimDir;
 use super::install::InstallConfiguration;
 use super::parser::toolset_manifest::ToolsetManifest;
 use super::uninstall::UninstallConfiguration;
+use super::GlobalOpts;
 use super::CARGO_HOME;
 use super::RUSTUP_DIST_SERVER;
 use super::RUSTUP_HOME;
@@ -151,15 +152,20 @@ fn install_rustup(rustup_init: &PathBuf) -> Result<()> {
     // make sure it can be executed
     set_exec_permission(rustup_init)?;
 
-    let args = [
+    let mut args = vec![
         // tell rustup not to add `. $HOME/.cargo/env` because we already wrote one for them.
         "--no-modify-path",
         "--default-toolchain",
         "none",
         "--default-host",
         env!("TARGET"),
-        "-vy",
+        "-y",
     ];
+    if GlobalOpts::get().verbose {
+        args.push("-v");
+    } else if GlobalOpts::get().quiet {
+        args.push("-q");
+    }
     let mut cmd = utils::cmd!(rustup_init);
     cmd.args(args);
     utils::execute(cmd)

@@ -12,7 +12,20 @@ pub(crate) mod windows;
 use anyhow::Result;
 use std::path::Path;
 
+use super::GlobalOpts;
+
+/// Add a given path to OS's `PATH` variable.
+///
+/// Note this will do nothing if either
+/// [`no_modify_path`](GlobalOpts::no_modify_path) or [`no_modify_env`](GlobalOpts::no_modify_env)
+/// was set to true.
 pub(crate) fn add_to_path(path: &Path) -> Result<()> {
+    let g_opt = GlobalOpts::get();
+    if g_opt.no_modify_path || g_opt.no_modify_env {
+        // skip PATH modification of user specified not to modify it
+        return Ok(());
+    }
+
     #[cfg(windows)]
     windows::add_to_path(path)?;
 
@@ -22,7 +35,18 @@ pub(crate) fn add_to_path(path: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Remove a given path from OS's `PATH` variable.
+///
+/// Note this will do nothing if either
+/// [`no_modify_path`](GlobalOpts::no_modify_path) or [`no_modify_env`](GlobalOpts::no_modify_env)
+/// was set to true, or if the path is not in the `PATH` variable.
 pub(crate) fn remove_from_path(path: &Path) -> Result<()> {
+    let g_opt = GlobalOpts::get();
+    if g_opt.no_modify_path || g_opt.no_modify_env {
+        // skip PATH modification of user specified not to modify it
+        return Ok(());
+    }
+
     #[cfg(windows)]
     windows::remove_from_path(path)?;
 

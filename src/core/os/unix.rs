@@ -3,6 +3,7 @@ use std::{env, path::Path};
 
 use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
+use crate::core::GlobalOpts;
 use crate::utils;
 use anyhow::{Context, Result};
 use indexmap::IndexSet;
@@ -15,30 +16,35 @@ impl EnvConfig for InstallConfiguration<'_> {
     // because rustup will not write those file if a user has choose to pass `--no-modify-path`.
     // Which is not ideal for env vars such as `RUSTUP_DIST_SERVER`.
     fn config_env_vars(&self) -> Result<()> {
-        info!("{}", t!("install_env_config"));
-
         let vars_raw = self.env_vars()?;
-        let backup_dir = self.install_dir.join("backup");
-        utils::ensure_dir(&backup_dir)?;
-        for sh in shell::get_available_shells() {
-            // This string will be wrapped in a certain identifier comments.
-            for rc in sh.update_rcs() {
-                // Do NOT fail installation if backup fails
-                _ = create_backup_for_rc(&rc, &backup_dir);
 
-                let old_content = utils::read_to_string("rc", &rc).unwrap_or_default();
-                let new_content = rc_content_with_env_vars(sh.as_ref(), &old_content, &vars_raw);
+        if !GlobalOpts::get().no_modify_env {
+            info!("{}", t!("install_env_config"));
 
-                utils::write_file(&rc, &new_content, false).with_context(|| {
-                    format!(
-                        "failed to append environment vars to shell profile: '{}'",
-                        rc.display()
-                    )
-                })?;
+            let backup_dir = self.install_dir.join("backup");
+            utils::ensure_dir(&backup_dir)?;
+            for sh in shell::get_available_shells() {
+                // This string will be wrapped in a certain identifier comments.
+                for rc in sh.update_rcs() {
+                    // Do NOT fail installation if backup fails
+                    _ = create_backup_for_rc(&rc, &backup_dir);
+
+                    let old_content = utils::read_to_string("rc", &rc).unwrap_or_default();
+                    let new_content =
+                        rc_content_with_env_vars(sh.as_ref(), &old_content, &vars_raw);
+
+                    utils::write_file(&rc, &new_content, false).with_context(|| {
+                        format!(
+                            "failed to append environment vars to shell profile: '{}'",
+                            rc.display()
+                        )
+                    })?;
+                }
             }
         }
 
-        // Update vars for current process
+        // Update vars for current process, this is a MUST to ensure this installation
+        // can be done correctly.
         for (key, val) in vars_raw {
             env::set_var(key, val);
         }

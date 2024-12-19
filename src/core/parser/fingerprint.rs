@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context, Result};
 use indexmap::IndexMap;
-use log::debug;
+use log::trace;
 use serde::{de::Visitor, Deserialize, Deserializer, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -85,7 +85,7 @@ impl InstallationRecord {
         let content = self
             .to_toml()
             .context("unable to serialize installation fingerprint")?;
-        debug!("writing installation record into '{}'", path.display());
+        trace!("writing installation record into '{}'", path.display());
         utils::write_bytes(&path, content.as_bytes(), false).with_context(|| {
             anyhow!(
                 "unable to write fingerprint file to the given location: '{}'",
@@ -114,7 +114,7 @@ impl InstallationRecord {
     pub(crate) fn update_rust(&mut self, version: &str) {
         if let Some(rust) = self.rust.as_mut() {
             rust.version = version.into();
-            debug!("toolchain installation record was updated to '{version}'");
+            trace!("toolchain installation record was updated to '{version}'");
         }
     }
 

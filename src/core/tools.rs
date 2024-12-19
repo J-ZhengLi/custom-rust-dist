@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     directories::RimDir, parser::fingerprint::ToolRecord, uninstall::UninstallConfiguration,
-    PathExt, CARGO_HOME,
+    GlobalOpts, PathExt, CARGO_HOME,
 };
 use crate::{core::custom_instructions, setter, utils, InstallConfiguration};
 
@@ -208,7 +208,15 @@ fn cargo_install_or_uninstall(op: &str, args: &[&str], cargo_home: &Path) -> Res
     cargo_bin.push(utils::exe!("cargo"));
 
     let mut cmd = utils::cmd!([CARGO_HOME=cargo_home] cargo_bin, op);
-    cmd.args(args);
+    let mut full_args = vec![];
+
+    if GlobalOpts::get().verbose {
+        full_args.push("-v");
+    } else if GlobalOpts::get().quiet {
+        full_args.push("-q");
+    }
+    full_args.extend_from_slice(args);
+    cmd.args(full_args);
     utils::execute(cmd)
 }
 

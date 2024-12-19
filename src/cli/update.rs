@@ -12,7 +12,7 @@ use crate::toolset_manifest::get_toolset_manifest;
 use crate::InstallConfiguration;
 
 use super::common::{ComponentChoices, ComponentDecoration, ComponentListBuilder, VersionDiffMap};
-use super::{common, ManagerSubcommands};
+use super::{common, GlobalOpts, ManagerSubcommands};
 
 pub(super) fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
     let ManagerSubcommands::Update {
@@ -74,7 +74,7 @@ fn update_toolkit_(install_dir: &Path) -> Result<()> {
     if let UpdateOption::Yes(components) = updater.get_user_choices()? {
         // install update for selected components
         let config = InstallConfiguration::init(install_dir, None, &manifest, true)?;
-        config.update(components.into_keys().cloned().collect())
+        config.update(components.into_values().cloned().collect())
     } else {
         Ok(())
     }
@@ -133,7 +133,7 @@ impl<'c> ComponentsUpdater<'c> {
         self.target
             .iter()
             .enumerate()
-            .filter_map(|(idx, c)| diff_ver_comps.contains(c.name.as_str()).then_some((c, idx)))
+            .filter(|(_, c)| diff_ver_comps.contains(c.name.as_str()))
             .collect()
     }
 
@@ -143,7 +143,7 @@ impl<'c> ComponentsUpdater<'c> {
             .show_desc(true)
             .build();
         let defult_choices = orig
-            .values()
+            .keys()
             .map(|idx| (idx + 1).to_string())
             .collect::<Vec<_>>()
             .join(" ");
@@ -162,14 +162,18 @@ impl<'c> ComponentsUpdater<'c> {
             .target
             .iter()
             .enumerate()
-            .filter_map(|(idx, c)| index_set.contains(&(idx + 1)).then_some((c, idx)))
+            .filter(|(idx, _)| index_set.contains(&(idx + 1)))
             .collect())
     }
 
     // recursively ask for user input
     fn handle_update_interaction_(&self, list: ComponentChoices<'c>) -> Result<UpdateOption<'c>> {
+        if GlobalOpts::get().yes_to_all {
+            return Ok(UpdateOption::Yes(list));
+        }
+
         let choices = vec![t!("continue"), t!("customize"), t!("cancel")];
-        let comp_list = ComponentListBuilder::new(list.keys().copied())
+        let comp_list = ComponentListBuilder::new(list.values().copied())
             .decorate(ComponentDecoration::VersionDiff(&self.version_diff))
             .build()
             .join("\n");

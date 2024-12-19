@@ -67,6 +67,8 @@ macro_rules! handle_user_choice {
 }
 pub(crate) use handle_user_choice;
 
+use super::GlobalOpts;
+
 /// A map containing a component's version difference.
 ///
 /// The keys of this map is the name of the component, the value is a pair of (maybe) strings
@@ -75,7 +77,7 @@ pub(crate) type VersionDiffMap<'c> = HashMap<&'c str, (Option<&'c str>, Option<&
 /// A map contains the selected components with their indexes in the full component list.
 ///
 /// Notice that this is an [`IndexMap`], which means the order will be preserved.
-pub(crate) type ComponentChoices<'c> = IndexMap<&'c Component, usize>;
+pub(crate) type ComponentChoices<'c> = IndexMap<usize, &'c Component>;
 
 pub(crate) fn question_str<Q: Display, A: Display>(
     question: Q,
@@ -255,6 +257,10 @@ where
 }
 
 pub(crate) fn confirm<Q: Display>(question: Q, default: bool) -> Result<bool> {
+    if GlobalOpts::get().yes_to_all {
+        return Ok(true);
+    }
+
     let mut stdout = io::stdout();
     writeln!(
         &mut stdout,

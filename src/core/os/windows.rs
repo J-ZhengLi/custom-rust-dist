@@ -3,6 +3,7 @@ use std::env::current_exe;
 use crate::core::directories::RimDir;
 use crate::core::install::{EnvConfig, InstallConfiguration};
 use crate::core::uninstall::{UninstallConfiguration, Uninstallation};
+use crate::core::GlobalOpts;
 use crate::utils;
 use anyhow::Result;
 
@@ -11,14 +12,23 @@ pub(crate) use rustup::*;
 
 impl EnvConfig for InstallConfiguration<'_> {
     fn config_env_vars(&self) -> Result<()> {
-        info!("{}", t!("install_env_config"));
-
         let vars_raw = self.env_vars()?;
-        for (key, val) in vars_raw {
-            set_env_var(key, val.encode_utf16().collect())?;
-        }
 
-        update_env();
+        if GlobalOpts::get().no_modify_env {
+            // Update vars for current process, this is a MUST to ensure this installation
+            // can be done correctly.
+            for (key, val) in vars_raw {
+                std::env::set_var(key, val);
+            }
+        } else {
+            info!("{}", t!("install_env_config"));
+
+            for (key, val) in vars_raw {
+                set_env_var(key, val.encode_utf16().collect())?;
+            }
+
+            update_env();
+        }
 
         self.inc_progress(2.0)
     }
