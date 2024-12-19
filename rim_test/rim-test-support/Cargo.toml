@@ -1,0 +1,9 @@
+[package]
+name = "rim-test-support"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rim-test-macro.workspace = true
+anyhow.workspace = true
+snapbox.workspace = true

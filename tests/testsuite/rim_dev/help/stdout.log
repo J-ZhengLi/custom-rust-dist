@@ -1,0 +1,11 @@
+
+Usage: cargo dev [OPTIONS] [COMMAND]
+
+Options:
+    -h, -help       Print this help message
+
+Commands:
+    dist, d         Generate release binaries
+    run-manager     Run with manager mode
+    vendor          Download packages that are specified in `resource/packages.txt`
+

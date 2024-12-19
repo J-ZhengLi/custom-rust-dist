@@ -1,0 +1,10 @@
+An interactive Rust installation manager
+
+Usage: rim-cli[EXE] [OPTIONS]
+
+Options:
+  -l, --lang <LANG>             Specify another language to display [possible values: cn, en]
+      --prefix <PATH>           Set another path to install Rust
+      --manifest <PATH or URL>  Specify a path or url of manifest file that contains package source and various configurations
+  -h, --help                    Print help
+  -V, --version                 Print version
