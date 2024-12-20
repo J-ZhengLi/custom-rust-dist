@@ -8,6 +8,9 @@ pub(super) enum ComponentCommand {
     /// Install a set of components, check `list component` for available options
     #[command(alias = "add")]
     Install {
+        /// Allow insecure connections when download packages from server.
+        #[arg(short = 'k', long)]
+        insecure: bool,
         /// The list of components to install
         #[arg(value_name = "COMPONENTS")]
         components: Vec<String>,
@@ -24,7 +27,7 @@ pub(super) enum ComponentCommand {
 impl ComponentCommand {
     fn execute(&self) -> Result<()> {
         match self {
-            Self::Install { components } => todo!("install components: {components:?}"),
+            Self::Install { components, .. } => todo!("install components: {components:?}"),
             Self::Uninstall { components } => todo!("uninstall components: {components:?}"),
         }
     }

@@ -5,55 +5,73 @@ use std::path::Path;
 use std::time::Duration;
 
 use anyhow::{anyhow, bail, Context, Result};
+use indicatif::ProgressBar;
+use log::warn;
 use reqwest::blocking::{Client, ClientBuilder};
 use url::Url;
 
 use super::progress_bar::{CliProgress, Style};
+use crate::setter;
 use crate::toolset_manifest::Proxy as CrateProxy;
 
-fn client_builder() -> ClientBuilder {
+fn default_proxy() -> reqwest::Proxy {
+    reqwest::Proxy::custom(|url| env_proxy::for_url(url).to_url())
+        .no_proxy(reqwest::NoProxy::from_env())
+}
+
+fn default_client_builder() -> ClientBuilder {
     let user_agent = format!("{}/{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-    let default_proxy = reqwest::Proxy::custom(|url| env_proxy::for_url(url).to_url())
-        .no_proxy(reqwest::NoProxy::from_env());
     Client::builder()
         .user_agent(user_agent)
         .timeout(Duration::from_secs(30))
         .connection_verbose(false)
-        .proxy(default_proxy)
 }
 
+#[derive(Debug)]
 pub struct DownloadOpt<T: Sized> {
     /// The verbose name of the file to download.
     pub name: String,
-    client: Client,
+    /// Download progress handler, aka a progress bar.
     pub handler: Option<CliProgress<T>>,
+    /// Option to skip SSL certificate verification when downloading.
+    pub insecure: bool,
+    /// Proxy configurations for download.
+    pub proxy: Option<CrateProxy>,
 }
 
-impl<T: Sized> DownloadOpt<T> {
-    pub fn new<S: ToString>(name: S) -> Result<Self> {
-        Ok(Self {
+impl DownloadOpt<ProgressBar> {
+    pub fn new<S: ToString>(name: S) -> Self {
+        Self {
             name: name.to_string(),
-            client: client_builder().build()?,
-            handler: None,
-        })
-    }
-    pub fn proxy(&mut self, proxy: Option<CrateProxy>) -> Result<&mut Self> {
-        // rebuild client with given proxy, otherwise do nothing
-        if let Some(p) = proxy {
-            self.client = client_builder().proxy(p.try_into()?).build()?;
+            handler: Some(CliProgress::new()),
+            insecure: false,
+            proxy: None,
         }
+    }
 
-        Ok(self)
+    setter!(proxy(self, Option<CrateProxy>));
+    setter!(handler(self, Option<CliProgress<ProgressBar>>));
+    setter!(insecure(self, bool));
+
+    /// Build and return a client for download
+    fn client(&self) -> Result<Client> {
+        let proxy = if let Some(p) = &self.proxy {
+            p.try_into()?
+        } else {
+            default_proxy()
+        };
+        let client = default_client_builder()
+            .danger_accept_invalid_certs(self.insecure)
+            .proxy(proxy)
+            .build()?;
+        Ok(client)
     }
-    pub fn handler(&mut self, progress_handler: Option<CliProgress<T>>) -> &mut Self {
-        self.handler = progress_handler;
-        self
-    }
-    /// Retrive text response by sending request to a given url.
+
+    /// Consume self, and retrive text response by sending request to a given url.
     ///
     /// If the `url` is a local file, this will use [`read_to_string`](fs::read_to_string) to
     /// get the text instead.
-    pub fn read(&self, url: &Url) -> Result<String> {
+    pub fn read(self, url: &Url) -> Result<String> {
         if url.scheme() == "file" {
             let file_url = url
                 .to_file_path()
@@ -67,8 +85,12 @@ impl<T: Sized> DownloadOpt<T> {
             });
         }
 
+        if self.insecure {
+            warn!("{}", t!("insecure_download"));
+        }
+
         let resp = self
-            .client
+            .client()?
             .get(url.as_ref())
             .send()
             .with_context(|| format!("failed to receive surver response from '{url}'"))?;
@@ -81,8 +103,9 @@ impl<T: Sized> DownloadOpt<T> {
             );
         }
     }
+    /// Consume self, and download from given `Url` to `Path`.
     // TODO: make local file download fancier
-    pub fn download_file(&self, url: &Url, path: &Path, resume: bool) -> Result<()> {
+    pub fn download_file(self, url: &Url, path: &Path, resume: bool) -> Result<()> {
         if url.scheme() == "file" {
             fs::copy(
                 url.to_file_path()
@@ -92,7 +115,11 @@ impl<T: Sized> DownloadOpt<T> {
             return Ok(());
         }
 
-        let mut resp = self.client.get(url.as_ref()).send().with_context(|| {
+        if self.insecure {
+            warn!("{}", t!("insecure_download"));
+        }
+
+        let mut resp = self.client()?.get(url.as_ref()).send().with_context(|| {
             format!("failed to receive surver response when downloading from '{url}'")
         })?;
         let status = resp.status();
@@ -163,15 +190,12 @@ pub fn download_with_proxy<S: ToString>(
     dest: &Path,
     proxy: Option<&CrateProxy>,
 ) -> Result<()> {
-    DownloadOpt::new(name)?
-        .proxy(proxy.cloned())?
-        .handler(Some(CliProgress::new()))
+    DownloadOpt::new(name)
+        .proxy(proxy.cloned())
         .download_file(url, dest, false)
 }
 
 /// Download a file without resuming, with default proxy settings (from env).
 pub fn download<S: ToString>(name: S, url: &Url, dest: &Path) -> Result<()> {
-    DownloadOpt::new(name)?
-        .handler(Some(CliProgress::new()))
-        .download_file(url, dest, false)
+    DownloadOpt::new(name).download_file(url, dest, false)
 }

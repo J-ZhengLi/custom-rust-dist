@@ -96,6 +96,7 @@
     "no_available_updates": "no available updates",
     "pre_update_note": "updating toolkit version to '%{target_version}' (currently '%{current_version}'), this will replace your current toolkit after installation.",
     "continue": "Continue",
+    "back": "Back",
     "customize": "Customize",
     "pre_update_confirmation": "\nThese components below will be updated, you may choose to install them, or manually select another set by entering '2'\n\n%{list}",
     "downloading_rustup_init": "downloading rustup-init...",
@@ -113,10 +114,15 @@
 
     "ask_manager_option": "Update & Uninstall",
     "ask_update_option": "Choose an update option",
+    "ask_download_option": "Choose a download option",
+    "skip_ssl_check": "skip SSL certificate verification",
     "update_all": "Update all (including toolkit and toolkit manager)",
     "update_self_only": "Update toolkit manager",
     "update_toolkit_only": "Update toolkit",
     "ask_uninstall_option": "Choose an uninstall option",
     "uninstall_all": "Uninstall all (including toolkit and toolkit manager)",
-    "uninstall_toolkit_only": "Uninstall toolkit"
+    "uninstall_toolkit_only": "Uninstall toolkit",
+
+    "insecure_download": "skipping SSL certificate verification (requested by `--insecure` flag)",
+    "insecure_http_override": "using 'http' schema to skip SSL certificate verification (requested by `--insecure` flag)"
 }

@@ -90,6 +90,7 @@
     "no_available_updates": "无可用更新",
     "pre_update_note": "即将升级套件版本至 '%{target_version}' (当前 '%{current_version}')，此举将会覆盖您当前已安装的工具套件。",
     "continue": "继续",
+    "back": "返回",
     "customize": "自定义",
     "pre_update_confirmation": "\n即将更新以下组件, 您可以选择更新它们, 或输入 '2' 来手动选择要更新的组件\n\n%{list}",
     "downloading_rustup_init": "正在下载 rustup-init...",
@@ -107,10 +108,15 @@
 
     "ask_manager_option": "更新和卸载",
     "ask_update_option": "更新选项",
+    "ask_download_option": "选择一个下载选项",
+    "skip_ssl_check": "跳过 SSL 证书验证",
     "update_all": "全部更新 (包括套件及此管理工具)",
     "update_self_only": "更新管理工具",
     "update_toolkit_only": "更新工具套件",
     "ask_uninstall_option": "卸载选项",
     "uninstall_all": "全部卸载 (包括套件及此管理工具)",
-    "uninstall_toolkit_only": "卸载工具套件"
+    "uninstall_toolkit_only": "卸载工具套件",
+
+    "insecure_download": "跳过 SSL 证书验证（根据命令行选项 'insecure' 的要求）",
+    "insecure_http_override": "使用 “http” 跳过 SSL 证书验证（根据命令行选项 'insecure' 的要求）"
 }

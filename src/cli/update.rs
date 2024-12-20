@@ -18,14 +18,15 @@ pub(super) fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
     let ManagerSubcommands::Update {
         toolkit_only,
         manager_only,
+        insecure,
     } = cmd
     else {
         return Ok(false);
     };
 
-    let update_opt = UpdateOpt;
+    let update_opt = UpdateOpt::new().insecure(*insecure);
     if !manager_only {
-        update_opt.update_toolkit(update_toolkit_)?;
+        update_opt.update_toolkit(|path| update_toolkit_(path, *insecure))?;
     }
     if !toolkit_only {
         update_opt.self_update()?;
@@ -34,16 +35,22 @@ pub(super) fn execute(cmd: &ManagerSubcommands) -> Result<bool> {
     Ok(true)
 }
 
-fn update_toolkit_(install_dir: &Path) -> Result<()> {
+fn update_toolkit_(install_dir: &Path, insecure: bool) -> Result<()> {
     let Some(installed) = Toolkit::installed(false)? else {
         info!("{}", t!("no_toolkit_installed"));
         return Ok(());
     };
+    let installed = &*installed.lock().unwrap();
 
     // get possible update
-    let Some(latest_toolkit) = latest_installable_toolkit(false)? else {
+    let Some(latest_toolkit) = latest_installable_toolkit(false, insecure)? else {
         return Ok(());
     };
+    log::debug!(
+        "detected latest toolkit: {}-{}",
+        &latest_toolkit.name,
+        &latest_toolkit.version
+    );
 
     // load the latest manifest
     let manifest_url = latest_toolkit
@@ -56,7 +63,7 @@ fn update_toolkit_(install_dir: &Path) -> Result<()> {
             must contains a valid `manifest_url`"
             )
         })?;
-    let manifest = get_toolset_manifest(Some(&manifest_url))?;
+    let manifest = get_toolset_manifest(Some(&manifest_url), insecure)?;
     let new_components = manifest.current_target_components(false)?;
 
     // notify user that we will install the latest update to replace their current installation
@@ -73,7 +80,7 @@ fn update_toolkit_(install_dir: &Path) -> Result<()> {
     // let user choose if they want to update installed component only, or want to select more components to install
     if let UpdateOption::Yes(components) = updater.get_user_choices()? {
         // install update for selected components
-        let config = InstallConfiguration::init(install_dir, None, &manifest, true)?;
+        let config = InstallConfiguration::new(install_dir, &manifest)?;
         config.update(components.into_values().cloned().collect())
     } else {
         Ok(())

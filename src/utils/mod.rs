@@ -93,8 +93,8 @@ macro_rules! setter {
             $self_arg
         }
     };
-    ($name:ident ($self_arg:ident, $val:ident : $t:ty) { $init_val:expr }) => {
-        pub fn $name(mut $self_arg, $val: $t) -> Self {
+    ($name:ident ($self_arg:ident, $($val:ident : $t:ty),*) { $init_val:expr }) => {
+        pub fn $name(mut $self_arg, $($val: $t),*) -> Self {
             $self_arg.$name = $init_val;
             $self_arg
         }

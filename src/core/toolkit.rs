@@ -1,11 +1,11 @@
-use std::sync::{Mutex, MutexGuard, OnceLock};
+use std::sync::{Mutex, OnceLock};
 
 use crate::core::parser::dist_manifest::DistManifest;
 use crate::core::parser::TomlParser;
 use crate::fingerprint::InstallationRecord;
 use crate::{components, utils};
 use anyhow::Result;
-use log::info;
+use log::{debug, info};
 use semver::Version;
 use serde::Serialize;
 use url::Url;
@@ -44,11 +44,9 @@ impl Toolkit {
     /// The installed kit will be cached to reduce the number of IO operations.
     /// However, if `reload_cache` is `true`, the cache will be ignored, and will be
     /// updated once installed kit is being reloaded.
-    pub fn installed(reload_cache: bool) -> Result<Option<MutexGuard<'static, Self>>> {
+    pub fn installed(reload_cache: bool) -> Result<Option<&'static Mutex<Self>>> {
         if !reload_cache {
-            if let Some(cached) = INSTALLED_KIT.get() {
-                return Ok(Some(cached.lock().unwrap()));
-            }
+            return Ok(INSTALLED_KIT.get());
         }
 
         if !InstallationRecord::exists()? {
@@ -75,11 +73,12 @@ impl Toolkit {
             // If we already have a cache, update the inner value of it.
             let mut guard = existing.lock().unwrap();
             *guard = tk;
-            Ok(Some(guard))
+            drop(guard);
+            Ok(Some(existing))
         } else {
             // If we are creating a fresh cache, just return the inner mutex guard.
             let mutex = INSTALLED_KIT.get_or_init(|| Mutex::new(tk));
-            Ok(Some(mutex.lock().unwrap()))
+            Ok(Some(mutex))
         }
     }
 }
@@ -102,7 +101,7 @@ impl From<DistPackage> for Toolkit {
 /// Note the retrieved list will be reversed so that the newest toolkit will always be on top.
 ///
 /// The collection will always be cached to reduce the number of server requests.
-fn toolkits_from_server() -> Result<&'static [Toolkit]> {
+fn toolkits_from_server(insecure: bool) -> Result<&'static [Toolkit]> {
     if let Some(cached) = ALL_TOOLKITS.get() {
         return Ok(cached);
     }
@@ -117,26 +116,29 @@ fn toolkits_from_server() -> Result<&'static [Toolkit]> {
     info!("{} {dist_m_filename}", t!("fetching"));
     let dist_m_url = Url::parse(&format!("{dist_server}/dist/{dist_m_filename}"))?;
     let dist_m_file = utils::make_temp_file("dist-manifest-", None)?;
-    utils::DownloadOpt::<()>::new("distribution manifest")?.download_file(
-        &dist_m_url,
-        dist_m_file.path(),
-        false,
-    )?;
+    utils::DownloadOpt::new("distribution manifest")
+        .insecure(insecure)
+        .download_file(&dist_m_url, dist_m_file.path(), false)?;
+    debug!("distribution manifest file successfully downloaded!");
 
     // load dist "pacakges" then convert them into `toolkit`s
     let packages = DistManifest::load(dist_m_file.path())?.packages;
     let cached =
         ALL_TOOLKITS.get_or_init(|| packages.into_iter().map(Toolkit::from).rev().collect());
+    debug!(
+        "detected {} available toolkits by accessing server",
+        cached.len()
+    );
     Ok(cached)
 }
 
 /// Return a list of all toolkits that are not currently installed.
-pub fn installable_toolkits(reload_cache: bool) -> Result<Vec<&'static Toolkit>> {
-    let all_toolkits = toolkits_from_server()?;
+pub fn installable_toolkits(reload_cache: bool, insecure: bool) -> Result<Vec<&'static Toolkit>> {
+    let all_toolkits = toolkits_from_server(insecure)?;
     let installable = if let Some(installed) = Toolkit::installed(reload_cache)? {
         all_toolkits
             .iter()
-            .filter(|tk| *tk != &*installed)
+            .filter(|tk| *tk != &*installed.lock().unwrap())
             .collect()
     } else {
         all_toolkits.iter().collect()
@@ -145,11 +147,15 @@ pub fn installable_toolkits(reload_cache: bool) -> Result<Vec<&'static Toolkit>>
 }
 
 /// Return the latest available toolkit if it's not already installed.
-pub fn latest_installable_toolkit(reload_cache: bool) -> Result<Option<&'static Toolkit>> {
+pub fn latest_installable_toolkit(
+    reload_cache: bool,
+    insecure: bool,
+) -> Result<Option<&'static Toolkit>> {
     info!("{}", t!("checking_toolkit_updates"));
 
-    let all_toolkits = toolkits_from_server()?;
+    let all_toolkits = toolkits_from_server(insecure)?;
     if let Some(installed) = Toolkit::installed(reload_cache)? {
+        let installed = &*installed.lock().unwrap();
         let Some(maybe_latest) = all_toolkits
             .iter()
             // make sure they are the same **product**

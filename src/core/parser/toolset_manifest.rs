@@ -257,19 +257,19 @@ pub struct Proxy {
     pub no_proxy: Option<String>,
 }
 
-impl TryFrom<Proxy> for reqwest::Proxy {
+impl TryFrom<&Proxy> for reqwest::Proxy {
     type Error = anyhow::Error;
-    fn try_from(value: Proxy) -> std::result::Result<Self, Self::Error> {
-        let base = match (value.http, value.https) {
+    fn try_from(value: &Proxy) -> std::result::Result<Self, Self::Error> {
+        let base = match (&value.http, &value.https) {
             // When nothing provided, use env proxy if there is.
             (None, None) => reqwest::Proxy::custom(|url| env_proxy::for_url(url).to_url()),
             // When both are provided, use the provided https proxy.
-            (Some(_), Some(https)) => reqwest::Proxy::all(https)?,
-            (Some(http), None) => reqwest::Proxy::http(http)?,
-            (None, Some(https)) => reqwest::Proxy::https(https)?,
+            (Some(_), Some(https)) => reqwest::Proxy::all(https.clone())?,
+            (Some(http), None) => reqwest::Proxy::http(http.clone())?,
+            (None, Some(https)) => reqwest::Proxy::https(https.clone())?,
         };
-        let with_no_proxy = if let Some(no_proxy) = value.no_proxy {
-            base.no_proxy(reqwest::NoProxy::from_string(&no_proxy))
+        let with_no_proxy = if let Some(no_proxy) = &value.no_proxy {
+            base.no_proxy(reqwest::NoProxy::from_string(no_proxy))
         } else {
             // Fallback to using env var
             base.no_proxy(reqwest::NoProxy::from_env())
@@ -511,15 +511,13 @@ fn baked_in_manifest_raw() -> &'static str {
 /// - Download from specific url, which could have file schema.
 /// - Load from `baked_in_manifest_raw`.
 ///
-pub fn get_toolset_manifest(url: Option<&Url>) -> Result<ToolsetManifest> {
+pub fn get_toolset_manifest(url: Option<&Url>, insecure: bool) -> Result<ToolsetManifest> {
     if let Some(url) = url {
         let temp = utils::make_temp_file("toolset-manifest-", None)?;
         // NB: This might fail if the url requires certain proxy setup
-        utils::DownloadOpt::<()>::new("toolset manifest")?.download_file(
-            url,
-            temp.path(),
-            false,
-        )?;
+        utils::DownloadOpt::new("toolset manifest")
+            .insecure(insecure)
+            .download_file(url, temp.path(), false)?;
         ToolsetManifest::load(temp.path())
     } else {
         ToolsetManifest::from_str(baked_in_manifest_raw())

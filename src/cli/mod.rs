@@ -56,6 +56,9 @@ pub struct Installer {
     /// Do NOT use this if you don't know what you're doing.
     #[arg(long)]
     no_modify_env: bool,
+    /// Allow insecure connections when download packages from server.
+    #[arg(short = 'k', long)]
+    insecure: bool,
 
     /// Specify another language to display
     #[arg(short, long, value_name = "LANG", value_parser = Language::possible_values())]
@@ -195,6 +198,9 @@ enum ManagerSubcommands {
     /// Install a specific dist version
     #[command(hide = true)]
     Install {
+        /// Allow insecure connections when download packages from server.
+        #[arg(short = 'k', long)]
+        insecure: bool,
         #[arg(value_name = "VERSION")]
         version: String,
     },
@@ -203,6 +209,9 @@ enum ManagerSubcommands {
     /// By default, this will update both the toolkit and manager, if you just want to update
     /// on of them, pass `--<toolkit|manager>-only` option to it.
     Update {
+        /// Allow insecure connections when download packages from server.
+        #[arg(short = 'k', long)]
+        insecure: bool,
         /// Update toolkit only
         #[arg(long, alias = "toolkit", conflicts_with = "manager_only")]
         toolkit_only: bool,
@@ -270,8 +279,8 @@ impl ManagerSubcommands {
             };
 
             match manager_opt {
-                Self::Update { .. } => {
-                    if !manager_opt.question_update_option_()? {
+                Self::Update { insecure, .. } => {
+                    if !manager_opt.question_update_option_(insecure)? {
                         continue;
                     }
                 }
@@ -291,15 +300,20 @@ impl ManagerSubcommands {
     }
 
     fn question_manager_option_() -> Result<Option<Self>> {
-        let maybe_cmd;
-
         // NOTE: If more option added, make sure to add the corresponding match pattern
         // to `from_interaction` function., otherwise it may cause `unimplemented` error.
-        handle_user_choice!(
+        let maybe_cmd = handle_user_choice!(
             t!("ask_manager_option"), 3,
-            maybe_cmd => {
+            {
                 1 t!("update") => {
-                    Some(Self::Update { toolkit_only: false, manager_only: false })
+                    let insecure = handle_user_choice!(
+                        t!("ask_download_option"), 1,
+                        {
+                            1 t!("default") => { false },
+                            2 t!("skip_ssl_check") => { true }
+                        }
+                    );
+                    Some(Self::Update { insecure, toolkit_only: false, manager_only: false })
                 },
                 2 t!("uninstall") => { Some(Self::Uninstall { keep_self: false }) },
                 3 t!("cancel") => { None }
@@ -311,18 +325,18 @@ impl ManagerSubcommands {
 
     /// Ask user about the update options, return a `bool` indicates whether the
     /// user wishs to continue.
-    fn question_update_option_(&mut self) -> Result<bool> {
-        handle_user_choice!(
+    fn question_update_option_(&mut self, insecure: bool) -> Result<bool> {
+        *self = handle_user_choice!(
             t!("ask_update_option"), 1,
-            *self => {
+            {
                 1 t!("update_all") => {
-                    Self::Update { toolkit_only: false, manager_only: false }
+                    Self::Update { insecure, toolkit_only: false, manager_only: false }
                 },
                 2 t!("update_self_only") => {
-                    Self::Update { toolkit_only: false, manager_only: true }
+                    Self::Update { insecure, toolkit_only: false, manager_only: true }
                 },
                 3 t!("update_toolkit_only") => {
-                    Self::Update { toolkit_only: true, manager_only: false }
+                    Self::Update { insecure, toolkit_only: true, manager_only: false }
                 },
                 4 t!("back") => { return Ok(false) }
             }
@@ -334,9 +348,9 @@ impl ManagerSubcommands {
     /// Ask user about uninstallation options, return a `bool` indicates whether the
     /// user wishs to continue.
     fn question_uninstall_option_(&mut self) -> Result<bool> {
-        handle_user_choice!(
+        *self = handle_user_choice!(
             t!("ask_uninstall_option"), 1,
-            *self => {
+            {
                 1 t!("uninstall_all") => { Self::Uninstall { keep_self: false } },
                 2 t!("uninstall_toolkit_only") => { Self::Uninstall { keep_self: true } },
                 3 t!("back") => { return Ok(false) }

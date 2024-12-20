@@ -34,6 +34,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         rustup_dist_server,
         rustup_update_root,
         manifest: manifest_src,
+        insecure,
         ..
     } = installer;
 
@@ -42,7 +43,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
     }
 
     let manifest_url = manifest_src.as_ref().map(|s| s.to_url()).transpose()?;
-    let mut manifest = get_toolset_manifest(manifest_url.as_ref())?;
+    let mut manifest = get_toolset_manifest(manifest_url.as_ref(), *insecure)?;
     manifest.adjust_paths()?;
 
     let component_list = manifest.current_target_components(true)?;
@@ -59,7 +60,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
         .unwrap_or(DEFAULT_CARGO_REGISTRY);
     let install_dir = user_opt.prefix;
 
-    InstallConfiguration::init(&install_dir, None, &manifest, false)?
+    InstallConfiguration::new(&install_dir, &manifest)?
         .cargo_registry(registry_name, registry_value)
         .rustup_dist_server(
             rustup_dist_server
@@ -71,6 +72,7 @@ pub(super) fn execute_installer(installer: &Installer) -> Result<()> {
                 .clone()
                 .unwrap_or_else(|| default_rustup_update_root().clone()),
         )
+        .insecure(*insecure)
         .install(user_opt.components)?;
 
     let g_opts = GlobalOpts::get();
@@ -256,7 +258,7 @@ fn show_confirmation(install_dir: &str, choices: &ComponentChoices<'_>) -> Resul
 }
 
 pub(super) fn execute_manager(manager: &ManagerSubcommands) -> Result<bool> {
-    let ManagerSubcommands::Install { version } = manager else {
+    let ManagerSubcommands::Install { version, .. } = manager else {
         return Ok(false);
     };
 
