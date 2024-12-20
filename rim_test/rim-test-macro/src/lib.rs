@@ -2,7 +2,6 @@ use proc_macro::*;
 
 #[proc_macro_attribute]
 pub fn rim_test(attr: TokenStream, item: TokenStream) -> TokenStream {
-    
     let mut ignore = false;
 
     for rule in split_attr(attr) {
@@ -28,13 +27,13 @@ pub fn rim_test(attr: TokenStream, item: TokenStream) -> TokenStream {
         }
         ret.extend(Some(TokenTree::from(Group::new(
             Delimiter::Bracket,
-            attr_stream 
+            attr_stream,
         ))));
     };
-    
+
     // 添加`#[test]`
     add_attr(&mut ret, "test", None);
-    
+
     if ignore {
         // 添加 `#[ignore]` reason 暂时不急。
         add_attr(&mut ret, "ignore", None);
@@ -68,27 +67,24 @@ pub fn rim_test(attr: TokenStream, item: TokenStream) -> TokenStream {
 
         init_resource.extend(group.stream());
         ret.extend(Some(TokenTree::from(Group::new(
-            group.delimiter(), 
+            group.delimiter(),
             init_resource,
         ))));
     }
-    
+
     ret
 }
 
 fn split_attr(attr: TokenStream) -> Vec<String> {
     let attrs: Vec<_> = attr.into_iter().collect();
-    attrs.split(|tt| match tt {
-        TokenTree::Punct(p) => p.as_char() == ',',
-        _ => false,
-    })
-    .filter(|tt| !tt.is_empty())
-    .map(|tt| {
-        tt.into_iter()
-            .map(|p| p.to_string())
-            .collect::<String>()
-    })
-    .collect()
+    attrs
+        .split(|tt| match tt {
+            TokenTree::Punct(p) => p.as_char() == ',',
+            _ => false,
+        })
+        .filter(|tt| !tt.is_empty())
+        .map(|tt| tt.iter().map(|p| p.to_string()).collect::<String>())
+        .collect()
 }
 
 fn parse_to_token_stream(code: &str) -> TokenStream {

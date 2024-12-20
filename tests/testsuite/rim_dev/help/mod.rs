@@ -1,5 +1,5 @@
-use rim_test_support::prelude::*;
 use rim_test_support::file;
+use rim_test_support::prelude::*;
 
 #[rim_test]
 fn case() {

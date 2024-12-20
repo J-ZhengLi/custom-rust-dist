@@ -2,15 +2,14 @@ use std::path::{Path, PathBuf};
 
 use rim::utils::{self, Extractable};
 use rim_test_support::paths;
-use rim_test_support::project::ProjectBuilder;
 use rim_test_support::prelude::*;
+use rim_test_support::project::ProjectBuilder;
 
 fn extract_to_temp(filename: &str, skip_prefix: bool) -> (PathBuf, PathBuf) {
     let src_path = paths::assets_home().join(filename);
     let mut extractable = Extractable::load(src_path.as_path()).unwrap();
 
-    let project = ProjectBuilder::from(paths::home())
-        .build();
+    let project = ProjectBuilder::from(paths::home()).build();
 
     if skip_prefix {
         let path = extractable

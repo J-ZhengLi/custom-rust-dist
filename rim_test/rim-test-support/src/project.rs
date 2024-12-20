@@ -1,4 +1,3 @@
-
 use std::path::{Path, PathBuf};
 
 use crate::paths::TestPathExt;
@@ -9,9 +8,7 @@ struct FileBuilder {
 
 impl FileBuilder {
     pub fn new(path: PathBuf) -> FileBuilder {
-        FileBuilder {
-            path
-        }
+        FileBuilder { path }
     }
 
     fn mk(&mut self) {
@@ -29,9 +26,7 @@ pub struct Project {
 
 impl Project {
     pub fn new(root: PathBuf) -> Project {
-        Project {
-            root
-        }
+        Project { root }
     }
 
     pub fn root(&self) -> PathBuf {
@@ -41,7 +36,7 @@ impl Project {
 
 pub struct ProjectBuilder {
     project: Project,
-    files: Vec<FileBuilder>
+    files: Vec<FileBuilder>,
 }
 
 impl ProjectBuilder {
@@ -55,9 +50,8 @@ impl ProjectBuilder {
     }
 
     pub fn file<B: AsRef<Path>>(mut self, path: B) -> Self {
-        self.files.push(FileBuilder::new(
-            self.project.root().join(path.as_ref())
-        ));
+        self.files
+            .push(FileBuilder::new(self.project.root().join(path.as_ref())));
         self
     }
 

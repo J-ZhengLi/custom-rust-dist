@@ -3,8 +3,38 @@ An interactive Rust installation manager
 Usage: rim-cli[EXE] [OPTIONS]
 
 Options:
-  -l, --lang <LANG>             Specify another language to display [possible values: cn, en]
-      --prefix <PATH>           Set another path to install Rust
-      --manifest <PATH or URL>  Specify a path or url of manifest file that contains package source and various configurations
-  -h, --help                    Print help
-  -V, --version                 Print version
+  -v, --verbose
+          Enable verbose output
+
+  -q, --quiet
+          Suppress non-critical messages
+
+  -y, --yes
+          Disable interaction and answer 'yes' to all prompts
+
+      --no-modify-path
+          Don't modify user's `PATH` environment variable.
+          
+          Note that some other variables (such as CARGO_HOME, RUSTUP_DIST_SERVER, etc.) will still be written to ensure the Rust toolchain can be used correctly.
+
+      --no-modify-env
+          Don't make any environment modifications on user's machine, including Windows registry entries and `PATH` variable.
+          
+          Note that the installation might not work as intended if some of the variables are missing (such as CARGO_HOME, RUSTUP_DIST_SERVER, etc.). Do NOT use this if you don't know what you're doing.
+
+  -l, --lang <LANG>
+          Specify another language to display
+          
+          [possible values: cn, en]
+
+      --prefix <PATH>
+          Set another path to install Rust
+
+      --manifest <PATH or URL>
+          Specify a path or url of manifest file that contains package source and various configurations
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
