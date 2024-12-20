@@ -1,0 +1,3 @@
+dist
+dist/2024-09-05
+dist/2024-09-05/cargo-1.81.0-x86_64-pc-windows-gnu.tar.xz@http://static.rust-lang.org/dist/cargo-1.81.0-x86_64-pc-windows-gnu.tar.xz

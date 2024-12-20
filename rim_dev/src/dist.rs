@@ -56,7 +56,10 @@ impl DistWorker<'_> {
     }
     fn dist_common_(&self, target: &str, noweb: bool) -> Result<PathBuf> {
         // Get the dest directory and create one if it does not exist
-        let mut dest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).with_file_name("dist");
+        let mut dest_dir = PathBuf::from(
+            env::var("RIM_WORKSPACE_DIR").unwrap_or(env!("CARGO_MANIFEST_DIR").to_string()),
+        )
+        .with_file_name("dist");
         dest_dir.push(target);
 
         let mut cmd = Command::new("cargo");
