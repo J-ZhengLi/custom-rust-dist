@@ -35,13 +35,12 @@ paths = ['{0}/tools/mingw64']
         )
     }
 
-    fn generate_manager_bin(&mut self, no_gui: bool, args: &[String]) -> Result<()> {
-        let mut cargo_args = if no_gui {
-            ["build", "--"].to_vec()
+    fn generate_manager_bin(&mut self, no_gui: bool) -> Result<()> {
+        let cargo_args = if no_gui {
+            ["build"].to_vec()
         } else {
-            ["tauri", "build", "--debug", "-b", "none", "--"].to_vec()
+            ["tauri", "build", "--debug", "-b", "none"].to_vec()
         };
-        cargo_args.extend(args.iter().map(|s| s.as_str()));
 
         if !no_gui {
             common::install_gui_deps();
@@ -94,7 +93,7 @@ paths = ['{0}/tools/mingw64']
 pub(crate) fn generate_and_run_manager(no_gui: bool, args: &[String]) -> Result<()> {
     let mut fake = FakeInstallation::new();
     fake.generate_meta_files()?;
-    fake.generate_manager_bin(no_gui, args)?;
+    fake.generate_manager_bin(no_gui)?;
 
     // `fake.manager_bin` cannot be none if the previous `generate_manager_bin`
     // succeeded, so it's safe to unwrap
@@ -103,6 +102,7 @@ pub(crate) fn generate_and_run_manager(no_gui: bool, args: &[String]) -> Result<
     let mocked_dist_server = super::server_dir_url();
     // run the manager copy
     let status = Command::new(manager)
+        .args(args)
         .env("RIM_DIST_SERVER", mocked_dist_server.as_str())
         .status()?;
     println!(

@@ -71,7 +71,7 @@ pub(crate) fn install_toolkit_in_new_thread(
 
         // TODO: Use continuous progress
         let config =
-            InstallConfiguration::init(&install_dir, Some(progress), &manifest, is_update)?;
+            InstallConfiguration::new(&install_dir, &manifest)?.progress_indicator(Some(progress));
         if is_update {
             config.update(components_list)?;
         } else {

@@ -53,15 +53,14 @@ use crate::components::Component;
 /// >
 /// ```
 macro_rules! handle_user_choice {
-    ($ques:expr, $default:expr, $assign:expr => { $($idx:literal $choice:expr => $action:block),+ }) => {
-        #[allow(clippy::needless_late_init)]
+    ($ques:expr, $default:expr, { $($idx:literal $choice:expr => $action:block),+ }) => {
         {
             let choices__ = &[ $($choice),* ];
             let choice__ = $crate::cli::common::question_single_choice($ques, choices__, $default)?;
-            $assign = match choice__ {
+            match choice__ {
                 $($idx => $action),*
                 _ => unreachable!("`question_single_choice` ensures choice's range")
-            };
+            }
         }
     };
 }

@@ -77,12 +77,12 @@ fn window_title() -> String {
 
 #[tauri::command]
 fn get_installed_kit(reload: bool) -> Result<Option<Toolkit>> {
-    Ok(Toolkit::installed(reload)?.map(|guard| guard.clone()))
+    Ok(Toolkit::installed(reload)?.map(|mutex| mutex.lock().unwrap().clone()))
 }
 
 #[tauri::command]
 fn get_available_kits(reload: bool) -> Result<Vec<Toolkit>> {
-    Ok(toolkit::installable_toolkits(reload)?
+    Ok(toolkit::installable_toolkits(reload, false)?
         .into_iter()
         .cloned()
         .collect())
@@ -137,7 +137,7 @@ fn install_toolkit(window: tauri::Window, components_list: Vec<Component>) -> Re
 
 #[tauri::command]
 fn maybe_self_update(app: AppHandle) -> Result<()> {
-    let update_kind = update::check_self_update();
+    let update_kind = update::check_self_update(false);
     let Some(new_ver) = update_kind.newer_version() else {
         return Ok(());
     };
@@ -174,7 +174,7 @@ fn handle_toolkit_install_click(url: String) -> Result<Vec<Component>> {
     let url_ = utils::force_parse_url(&url);
 
     // load the manifest for components information
-    let manifest = get_toolset_manifest(Some(&url_))?;
+    let manifest = get_toolset_manifest(Some(&url_), false)?;
     let components = manifest.current_target_components(false)?;
 
     // cache the selected toolset manifest
