@@ -1,0 +1,10 @@
+
+Run with manager mode
+
+Usage: cargo dev run-manager [OPTIONS]
+
+Options:
+        --cli       Run manager mode with commandline interface
+        --gui       Run manager mode with graphical interface (default)
+    -h, -help       Print this help message
+

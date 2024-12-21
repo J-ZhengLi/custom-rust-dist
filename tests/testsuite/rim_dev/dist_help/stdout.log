@@ -1,0 +1,12 @@
+
+Generate release binaries
+
+Usage: cargo dev dist [OPTIONS]
+
+Options:
+        --cli       Generate release binary for CLI mode only
+        --gui       Generate release binary for GUI mode only
+    -b, --binary-only
+                    Build binary only (net-installer), skip offline package generation
+    -h, -help       Print this help message
+
